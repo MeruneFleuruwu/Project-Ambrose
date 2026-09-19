@@ -1,0 +1,24 @@
+{
+  "subject": "Realm selection after login",
+  "area": "protocol",
+  "claim": "The repository does not yet establish which message, ordering, or client surface selects and displays a realm after login; this finding records an evidence gap rather than asserting a client behavior.",
+  "revision": "r806919.Wizard_1_610",
+  "method": "reasoning",
+  "how_to_repeat": [
+    "Use a disposable account and an Ambrose server bound only to loopback.",
+    "Configure two operator-owned realms with distinct names and reachable local endpoints.",
+    "Capture the login-to-character-select exchange privately, then observe which realm list or picker the client displays and whether it selects a default.",
+    "Record only message names, directions, frame ordering, realm counts, display names, endpoint-field presence, and payload lengths; keep captures, addresses, credentials, and client files private.",
+    "Repeat after changing the default realm and after making one realm unavailable, then compare the metadata-only results."
+  ],
+  "evidence": [
+    "The contributor-track lists C-17 as an open request for notes on how the client picks and shows realms after login.",
+    "The roadmap describes a future realm registry and picker but does not provide a verified client capture or observation for the selection exchange.",
+    "No realm-selection finding exists under contrib/findings/protocol in the current repository; the revision is recorded only as the repository's current client baseline, not as an observation made for this finding."
+  ],
+  "disproof": "A private, repeatable observation or capture-derived finding establishes the message, ordering, and client selection/display behavior; that evidence should replace this gap record rather than be added to it.",
+  "confidence": "high",
+  "submitted_by": "Project Ambrose contributor",
+  "submitted_on": "2026-09-19",
+  "status": "claimed"
+}
