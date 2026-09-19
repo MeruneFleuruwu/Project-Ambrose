@@ -31,13 +31,13 @@ If the purpose is only to study framing or a pre-authentication handshake, stop 
 
 ## Start and stop the capture
 
-The client driver starts `tshark` with a filter for the selected TCP port and writes the capture to its run folder. Keep that folder outside the repository:
+The client driver starts `tshark` with a filter for the selected TCP port and writes the capture to a per-run folder below the directory passed with `--runs`. Keep that directory outside the repository:
 
 ```powershell
-python apps\clientdriver\drive.py run --scenario <scenario> --capture-dir C:\Temp\ambrose-capture
+python apps\clientdriver\drive.py run --scenario <scenario> --runs C:\Temp\ambrose-capture
 ```
 
-Use the actual command and scenario supported by the current driver; run `python apps\clientdriver\drive.py --help` when the options differ. Never place the capture under `contrib/`, `src/`, `data/`, or another tracked folder.
+The resulting capture is named `login.pcapng` inside a generated run-id directory, alongside the run report and the `.tshark.txt` diagnostic file. `--runs` is the driver's artifact-root option; there is no `--capture-dir` option. Use the actual command and scenario supported by the current driver; run `python apps\clientdriver\drive.py run --help` when the options differ. Never place the capture under `contrib/`, `src/`, `data/`, or another tracked folder.
 
 Let the scenario finish or stop the driver normally so `tshark` receives its console-control shutdown and finalizes the file. If the process must be killed, treat the capture as possibly truncated and record that limitation. Do not assume that a file is readable merely because it exists.
 
