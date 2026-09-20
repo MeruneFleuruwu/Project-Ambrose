@@ -1,0 +1,25 @@
+{
+  "subject": "Zone objects triggers and doors",
+  "area": "world",
+  "claim": "The repository does not yet establish how the client's zone files lay out objects, trigger events, and door destinations or how those records map to the server's streamed world objects and transfers; the roadmap schema is an implementation target, not a verified client-data mapping.",
+  "revision": "r806919.Wizard_1_610",
+  "method": "reasoning",
+  "how_to_repeat": [
+    "Use a contributor-owned client installation and the project's zone extraction tools to inspect one operator-selected zone at runtime; do not copy client files or extracted text into the repository.",
+    "Record metadata for each object, location, trigger, event, and result: stable identifiers, class names, counts, coordinates, orientation, event membership, and referenced destination identifiers.",
+    "Compare one zone containing an NPC, one prop, and one door with a second zone containing a paired destination, preserving source-file paths and raw records privately.",
+    "For each candidate door, verify the relationship between the trigger event, teleport result, source location, destination zone, and destination location; record unresolved or duplicate pairings without guessing.",
+    "If a private loopback client run is available, observe one walk-in transfer and publish only message names, directions, frame order, identifier names, and payload lengths; retain captures and client data privately."
+  ],
+  "evidence": [
+    "The contributor-track lists F-06 as an open world finding for zone objects, triggers, and doors.",
+    "The phase 4 roadmap names zone_template, zone_location, and zone_object as extraction targets, while the phase 6 roadmap separately names zone_trigger, zone_trigger_result, and zone_teleport relationships.",
+    "The roadmap explicitly says the format is known only in outline and requires human review of proposed teleport pairings before authored rows are committed.",
+    "No zone-layout finding currently exists under contrib/findings/world."
+  ],
+  "disproof": "A repeatable runtime extraction and, where applicable, loopback transfer trace establishes the object, trigger, event, and destination mapping for multiple zones; that evidence should replace this gap record rather than be treated as confirmation of it.",
+  "confidence": "high",
+  "submitted_by": "Project Ambrose contributor",
+  "submitted_on": "2026-09-19",
+  "status": "claimed"
+}
