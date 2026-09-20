@@ -1,0 +1,27 @@
+{
+  "subject": "Client ObjectProperty serialization flags",
+  "area": "objects",
+  "claim": "The type dump records property flag words, but it does not establish for each class whether the client actually serializes a property under the transmit, authority-transmit, public, save, dirty-encode, or related flags in each message context.",
+  "revision": "r806919.Wizard_1_610",
+  "method": "experiment",
+  "how_to_repeat": [
+    "Use an operator-owned client installation, a private loopback Ambrose server, and disposable test data; keep all client files, captures, credentials, and payloads outside the repository.",
+    "Select one reviewed class that the server sends in two contexts, such as a public player object and an authority-only update. Read the class and property flag words from the operator-owned type dump with typeextract, recording only class names, property names, hashes, flag names, and counts.",
+    "Send the same object with one controlled property changed at a time under the candidate public, transmit, and authority-transmit masks. Capture privately and compare only message direction, message name, object class hash, frame length, field offsets, selected-property names, and decode success.",
+    "Repeat with the property marked dirty and clean, if the local test server can control that state, to distinguish DirtyEncode behavior from ordinary selection. Record whether the property is emitted, omitted, rejected, or causes a client-visible error.",
+    "Repeat the same class in every message context under test, because a property selected in one field may be absent or forbidden in another. Treat a class or mask as unverified until both an included and an excluded property case are observed.",
+    "If private evidence is reduced for review, remove all property values, object identifiers, client bytes, addresses, credentials, and screenshots; publish only metadata and the observed selection outcome."
+  ],
+  "evidence": [
+    "The repository's ObjectProperty serializer defines separate transmit, authority-transmit, public, save, and dirty-encode flags and combines masks differently for network and file contexts.",
+    "The serializer reports unselected properties and applies a caller-provided mask, so a type-dump flag word alone does not prove client behavior in a particular message field.",
+    "The phase 3 roadmap records byte-identical round trips for two badge classes and broader codec coverage, but those checks do not establish flag semantics for the next hundred classes.",
+    "The phase 6 roadmap warns that public versus authority property masks for other players' objects are unverified and that a wrong mask can leak private data or crash the viewer.",
+    "No public object finding currently records a class-by-class, message-context serialization experiment for these flags."
+  ],
+  "disproof": "A maintainer-reviewed matrix of classes and message contexts demonstrates that the type-dump flags alone predict every included, omitted, dirty, authority-only, and public serialization outcome; that evidence should replace this gap record with verified class-specific findings.",
+  "confidence": "high",
+  "submitted_by": "Project Ambrose contributor",
+  "submitted_on": "2026-09-19",
+  "status": "claimed"
+}
