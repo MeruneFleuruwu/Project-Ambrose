@@ -1,0 +1,24 @@
+{
+  "subject": "Duel resolution order",
+  "area": "combat",
+  "claim": "The repository does not yet establish the ordering of combat phases, player move submission, server resolution, participant updates, and client-visible effects in a duel; this finding records the evidence gap rather than asserting a combat protocol.",
+  "revision": "r806919.Wizard_1_610",
+  "method": "reasoning",
+  "how_to_repeat": [
+    "Use two disposable accounts and an Ambrose server bound only to loopback, with a deterministic test duel against an authored opponent.",
+    "Capture the private loopback session from duel entry through one completed round, including the planning timer, both move submissions, resolution, health/effect updates, and the next-round boundary.",
+    "Record only message names, service and order identifiers, directions, frame ordering, payload lengths, participant counts, and client-visible state transitions; keep captures, addresses, credentials, and payload bytes private.",
+    "Repeat with one player passing and the other selecting a single-target spell, then with the submission order reversed.",
+    "Compare the metadata-only traces to determine whether the server resolves by team, slot, submission time, or another ordering, and which message marks the round boundary."
+  ],
+  "evidence": [
+    "The contributor-track lists F-01 as an open combat finding for duel resolution order and the messages exchanged at each step.",
+    "The phase 9 roadmap names combat messages such as MSG_COMBATPHASE, MSG_COMBATMOVE, MSG_COMBATACTIONS, MSG_COMBATHEALTH, MSG_COMBATUPFIRST, and MSG_COMBATMOVESELECTION, but does not provide a verified end-to-end trace.",
+    "The phase 11 roadmap requires team and slot-order execution while separately identifying real-client acceptance checks; no repository finding currently proves that ordering."
+  ],
+  "disproof": "A private, repeatable duel trace or simulator-backed finding establishes the complete message ordering and resolution rule; that evidence should replace this gap record rather than be treated as confirmation of it.",
+  "confidence": "high",
+  "submitted_by": "Project Ambrose contributor",
+  "submitted_on": "2026-09-19",
+  "status": "claimed"
+}
