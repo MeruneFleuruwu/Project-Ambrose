@@ -1,0 +1,28 @@
+{
+  "subject": "Chat filters, channels, and menu-chat vocabulary",
+  "area": "protocol",
+  "claim": "The repository identifies typed chat, quick chat, quick-chat text, and core-emote messages, but the r806919 meanings of the chat filter byte, channel or audience fields, menu-chat identifiers, and client/server validation boundaries remain unverified.",
+  "revision": "r806919.Wizard_1_610",
+  "method": "experiment",
+  "how_to_repeat": [
+    "Use two disposable accounts, two operator-owned client installations, and a private loopback Ambrose server with both clients in the same zone; do not use public services or reuse credentials.",
+    "Build a metadata-only inventory of the operator-owned QuickChat.xml entries, recording only entry counts, identifier names or hashes, and duplicate or invalid-id results. Do not copy client text, XML, archives, or extracted rows into the repository.",
+    "Send one ordinary typed line, one quick-chat selection, one quick-chat text entry, and one core emote from client A while client B observes. Record only message names, direction, service/order, frame order, field names, lengths, filter-byte values, source and destination field presence, and the visible result category.",
+    "Repeat each message with A and B in the same zone, different zones, and different visibility or range positions where the local server supports it. Record which audience receives the event and whether the sender is echoed.",
+    "For typed chat, vary exactly one safe input at a time: ordinary text, command-prefix text, an overlong line, and a line containing a locally configured blocked term. Record accept, refusal, command routing, truncation, or broadcast metadata without publishing the text.",
+    "For menu chat, send one valid identifier and one locally generated invalid identifier, then compare the client-visible result and server response. Do not infer the vocabulary or its meaning from a third-party list.",
+    "If private captures or screenshots are reduced for review, remove message text, account names, identifiers that identify a person, credentials, addresses, payload bytes, and client content; publish only metadata and outcomes. Rotate or destroy disposable credentials and delete private artifacts after review."
+  ],
+  "evidence": [
+    "The phase 6.03 roadmap defines separate typed-chat, quick-chat, quick-chat-text, and core-emote messages and requires range filtering, command-prefix routing, ignore-list behavior, and quick-chat ID validation.",
+    "The same roadmap explicitly marks the typed-chat byte encoding, the Filter byte meaning, and the CORE_EMOTE Name=Chat behavior as unverified.",
+    "The contributor track lists F-32 because moderation needs the filter levels, channels, and menu-chat vocabulary before the server can validate them safely.",
+    "The current checkout has no implemented ChatHandler or ChatMgr behavior and no public protocol finding establishing channel or filter semantics.",
+    "No client-derived QuickChat.xml content or private two-client chat capture is available in the repository to establish the vocabulary or audience rules."
+  ],
+  "disproof": "A maintainer-reviewed two-client experiment and metadata-only QuickChat inventory establish the valid menu-chat identifiers, filter and channel meanings, encoding boundaries, audience rules, and rejection behavior; that evidence should replace this gap record with verified per-message findings.",
+  "confidence": "high",
+  "submitted_by": "Project Ambrose contributor",
+  "submitted_on": "2026-09-19",
+  "status": "claimed"
+}
