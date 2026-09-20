@@ -1,0 +1,28 @@
+{
+  "subject": "Zone-change requests, gates, recall, and zone hops",
+  "area": "world",
+  "claim": "The repository describes server-side same-zone and cross-zone transfer results, but does not establish how the r806919 client requests a gate transfer, recall, dorm or zone hop, which fields identify the requested destination, or how the client handles refusal, confirmation, and loading transitions.",
+  "revision": "r806919.Wizard_1_610",
+  "method": "experiment",
+  "how_to_repeat": [
+    "Use an operator-owned client installation, a private loopback Ambrose server, and disposable characters with reviewed authored locations; do not contact public services or commit client-derived zone data.",
+    "Run a baseline login into one zone and record only message names, direction, service/order, frame order, lengths, source and destination field names, transition identifier presence, and loading-screen result. Keep captures, credentials, addresses, and payloads private.",
+    "Walk through one reviewed gate or trigger and record the client-to-server request, the server-to-client transfer sequence, the destination outcome, and whether the request is same-zone or cross-zone. Do not invent or publish destination rows.",
+    "Repeat with a recall action, a dorm or home action if available, and a zone-hop or realm-selection action. Record only the request and response metadata, confirmation or offer categories, refusal reason categories, and whether the client returns to the source zone or remains waiting.",
+    "For each action, test one controlled refusal: unknown destination, unavailable location, missing access requirement, or a server-side timeout. Record whether the client shows a confirmation, offer, error, retry, disconnect, or no visible result.",
+    "Compare same-zone, cross-zone, gate, recall, dorm, and zone-hop traces to determine which fields are client-supplied, which are server-authored, whether a transition id is authoritative, and when the client expects the transfer-complete state.",
+    "If private captures or screenshots are reduced for review, remove destination values, account and character names, credentials, addresses, client content, raw payloads, and extracted zone files. Publish only metadata, counts, hashes, and outcomes, then delete private artifacts and rotate disposable credentials."
+  ],
+  "evidence": [
+    "The contributor track lists F-35 because the request side of zone changes, gates, recall, and zone hops is known only in outline.",
+    "The phase 6 roadmap defines same-zone and cross-zone transfer milestones and identifies MSG_SERVERTRANSFER, but it does not establish the complete client request schemas or refusal and confirmation behavior.",
+    "The roadmap missing-work list names ZONEGATELIST, ZONEHOP, RecallLocationConfirm, and GotoDormConfirm as unassigned messages, alongside related gate and recall systems.",
+    "The F-07 and C-01 work establish that teleporter destinations and authored door mappings remain evidence-gated; this finding does not add or assume any destination rows.",
+    "No public world finding currently records metadata-only request traces for a gate, recall, dorm, zone hop, or controlled refusal."
+  ],
+  "disproof": "A maintainer-reviewed set of loopback traces identifies the request fields, destination authority, confirmation and refusal behavior, and completion sequence for gates, recall, dorm, and zone hops, including same-zone and cross-zone cases; that evidence should replace this gap record with verified zone-change findings.",
+  "confidence": "high",
+  "submitted_by": "Project Ambrose contributor",
+  "submitted_on": "2026-09-19",
+  "status": "claimed"
+}
