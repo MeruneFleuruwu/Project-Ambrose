@@ -1,0 +1,27 @@
+{
+  "subject": "Client behavior when an expected message is absent",
+  "area": "protocol",
+  "claim": "The repository does not yet establish, per client screen, which missing login, character-select, world-entry, zone-transfer, or logout message causes a visible error, retry, timeout, disconnect, or indefinite wait, nor the timeout interval or whether a later message can recover the screen.",
+  "revision": "r806919.Wizard_1_610",
+  "method": "experiment",
+  "how_to_repeat": [
+    "Use a disposable account, an operator-owned client installation, and a private loopback Ambrose server or controlled test proxy; do not contact public services or reuse credentials.",
+    "Run one baseline session through each available screen boundary: SessionOffer/SessionAccept, authentication, character list, character selection, world entry, same-zone transfer, cross-zone transfer, and quit-to-select. Record only screen name, message or opcode name, direction, frame order, length, elapsed time, visible result category, and connection state.",
+    "For each boundary, suppress exactly one server-to-client message after the preceding request has been observed. Keep captures, credentials, session keys, payloads, addresses, logs, and screenshots private.",
+    "Wait for a bounded observation window longer than the configured server timeout and record whether the client shows an error, retries, closes, returns to a prior screen, remains interactive, or stays waiting. Do not infer a timeout from a server-side close without recording the client result.",
+    "Repeat the case with the message delayed rather than dropped, and once with the message delivered after the first visible failure, to distinguish message absence, late delivery, retry, and unrecoverable state.",
+    "If a private capture is reduced for review, remove credentials, identifiers, timestamps that identify a session, addresses, and all payload bytes; publish only metadata and the observed outcome."
+  ],
+  "evidence": [
+    "The contributor track lists F-10 as an open protocol finding for screen-specific behavior when an expected message never arrives.",
+    "The roadmap acceptance checks cover successful login, character selection, world entry, transfers, and logout, but do not provide a client-side timeout matrix for withheld messages.",
+    "doc/CAPTURE.md documents partial handshake observations and explicitly leaves several control-message and timing questions open; it does not establish screen-specific missing-message behavior.",
+    "The current server has configurable accept, keepalive, and protocol handling timeouts, but those server settings do not prove what the retail client displays or how it recovers.",
+    "No public finding currently records a controlled message-drop or delayed-message experiment for the 1.610 client."
+  ],
+  "disproof": "A maintainer-reviewed matrix of controlled drops and delays identifies the expected message, client-visible result, retry or close behavior, and elapsed threshold for each listed screen; that evidence should replace this gap record with verified per-screen findings.",
+  "confidence": "high",
+  "submitted_by": "Project Ambrose contributor",
+  "submitted_on": "2026-09-19",
+  "status": "claimed"
+}
