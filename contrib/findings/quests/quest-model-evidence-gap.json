@@ -1,0 +1,25 @@
+{
+  "subject": "Quest records goals progress and rewards",
+  "area": "quests",
+  "claim": "The repository does not yet establish the complete client-facing shape of a quest record, its goal variants, progress updates, or reward names; the roadmap describes implementation targets but no verified quest exchange or client observation.",
+  "revision": "r806919.Wizard_1_610",
+  "method": "reasoning",
+  "how_to_repeat": [
+    "Use a disposable account and a locally bound Ambrose server with one authored test NPC and one authored quest.",
+    "Capture privately from the NPC service menu through quest offer, acceptance, one goal-progress update, completion, reward delivery, and any chained offer.",
+    "Record only message names, directions, field names, object class names, goal type identifiers, counts, lengths, reward category names, and the ordering of progress and completion updates.",
+    "Repeat with a persona goal and a count-based goal, keeping the client installation, captures, payloads, credentials, and extracted quest text private.",
+    "Compare the metadata-only traces with the server's authored quest schema and record which fields are required, optional, repeated, or absent for each goal type."
+  ],
+  "evidence": [
+    "The contributor-track lists F-04 as an open quest finding covering quest records, goals, progress, and rewards.",
+    "The phase 7 roadmap names candidate goal variants and wire structures, including GoalTemplate, PersonaGoalTemplate, BountyGoalTemplate, ScavengeGoalTemplate, WaypointGoalTemplate, AchieveRankGoalTemplate, GoalCompleteLogic, and reward information, but does not establish their client behavior.",
+    "The roadmap acceptance checks for quest offer, acceptance, persona completion, progress, and rewards remain unverified in the current repository.",
+    "No quest-model finding currently exists under contrib/findings/quests."
+  ],
+  "disproof": "A repeatable private quest trace plus schema comparison establishes the record, goal, progress, and reward mapping across at least two goal types; that evidence should replace this gap record rather than be treated as confirmation of it.",
+  "confidence": "high",
+  "submitted_by": "Project Ambrose contributor",
+  "submitted_on": "2026-09-19",
+  "status": "claimed"
+}
