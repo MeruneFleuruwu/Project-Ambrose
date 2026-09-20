@@ -1,0 +1,28 @@
+{
+  "subject": "Client-written files and cross-session persistence",
+  "area": "client",
+  "claim": "The launcher and driver isolate runs from the install and document a run-folder file set, but the retail client files it creates, modifies, removes, and preserves between sessions on revision r806919 are not independently established beyond those launcher-managed files.",
+  "revision": "r806919.Wizard_1_610",
+  "method": "experiment",
+  "how_to_repeat": [
+    "Make a disposable copy of an operator-owned client installation; do not run the retail launcher or patcher against the pinned development install.",
+    "Create a new empty Ambrose run folder outside the install and record a baseline snapshot of names, sizes, modification times, and file hashes. Keep the install and run folder private.",
+    "Start the client through the Ambrose launcher with patching disabled, loopback login, a disposable account, and a short controlled session. End it normally, then record added, removed, and changed paths in the run folder and the install separately.",
+    "Repeat once after changing only a window setting, once after reaching character select, and once after an interrupted or forcibly ended client process. Record which files survive a normal restart, which values persist, and which files are recreated or discarded.",
+    "Repeat with a fresh run folder and compare results to distinguish client-owned persistence from launcher-seeded templates, launcher logs, copied revision/data files, crash or temporary files, and server-side state.",
+    "Publish only relative path names, file categories, sizes, hashes, timestamps at appropriate resolution, lifecycle action, and persistence outcome. Do not publish file contents, client archives, extracted text, screenshots, credentials, addresses, or personal paths.",
+    "Delete the disposable account and private run artifacts after metadata review; verify that no client file or diagnostic output is staged in Git."
+  ],
+  "evidence": [
+    "doc/config/launcher.md documents that the launcher runs the client from an Ambrose-owned folder, writes config.xml and preferences.xml, copies revision.dat and data.dat when the stamp changes, removes WizardClient.log before each run, and may leave client-created files such as state.dat.",
+    "apps/clientdriver/clientdriver/install.py provides a before-and-after install snapshot that reports added, removed, and changed paths, but it does not establish the retail client's full run-folder persistence behavior.",
+    "doc/PATCHING.md records observed configuration and launcher constraints for r806919 but does not provide a complete file lifecycle matrix across normal, interrupted, and repeated sessions.",
+    "The contributor track lists F-13 as open because Ambrose promises not to write inside the install and needs evidence about what the client writes and retains between sessions.",
+    "No public finding currently records a complete, independently repeated file lifecycle observation for the retail client revision."
+  ],
+  "disproof": "A maintainer-reviewed before-and-after matrix across normal, repeated, setting-change, character-select, and interrupted sessions identifies every relevant client-written path and its persistence rule; that evidence should replace this gap record with verified file-specific findings.",
+  "confidence": "high",
+  "submitted_by": "Project Ambrose contributor",
+  "submitted_on": "2026-09-19",
+  "status": "claimed"
+}
