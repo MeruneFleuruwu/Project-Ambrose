@@ -1,0 +1,28 @@
+{
+  "subject": "First opaque type-dump class selected by hash",
+  "area": "objects",
+  "claim": "The type dump marks classes without reflected properties as opaque, but the repository does not yet establish what any one such class represents on the wire or in the client; its role must be proven one class at a time before the codec treats it as a known value, object, or serialized payload.",
+  "revision": "r806919.Wizard_1_610",
+  "method": "experiment",
+  "how_to_repeat": [
+    "Use an operator-owned client installation and generate a type dump with the repository's typeextract tool. Keep the client, archive, type dump, and extracted data outside the repository and do not publish their contents.",
+    "List classes whose dump kind is opaque and choose one deterministic target, such as the first class in hash order. Record only its name, hash, class kind, default byte/object/depth metadata, source revision, and a hash of the private dump.",
+    "Use bindecode against the operator's own Root.wad to locate private entries that reference the target name or hash. Record only entry names, counts, sizes, and hashes; do not copy archive bytes, extracted tables, or text into the finding.",
+    "Use a private loopback session with a disposable account and a controlled server response that causes the target to be sent or consumed, if the target is reachable through a client-visible message. Capture only metadata such as frame direction, message name, payload length, class hash position, and whether the client accepts, displays, ignores, or rejects the value.",
+    "Compare the target's behavior with the type dump's property-class and value-type rules. Test the smallest valid instance, an empty or default instance where applicable, a length or version boundary, and a malformed or truncated instance. Keep all payloads and client output private.",
+    "Repeat the observation with the target omitted or replaced by the nearest known class only if the private test harness can do so without modifying client files. Record whether the result distinguishes a value type, property object, opaque serialized buffer, identifier, resource handle, or another role.",
+    "Publish a separate finding for each proven class. Include only metadata, field boundaries, counts, hashes, and outcomes; remove private captures, client archives, type-dump text, extracted rows, credentials, paths, and screenshots, then rotate disposable credentials and delete temporary artifacts."
+  ],
+  "evidence": [
+    "The contributor track explicitly asks for opaque type-dump classes to be identified one class at a time because each proven class removes a codec blind spot.",
+    "ClassKind::Opaque is the loader's fallback for classes without reflected properties; that classification alone does not identify the class's wire representation or client role.",
+    "TypeCatalog can expose a class by name or hash and records default size, object, depth, and source metadata, but those fields do not prove how the client uses an opaque class.",
+    "The serializer refuses an unknown class, while an opaque class remains known to the catalog; this distinction still does not prove whether its bytes are a value, nested object, handle, or other client-defined representation.",
+    "No public finding currently assigns a verified semantic identity and wire behavior to an individual opaque class without publishing client-derived data."
+  ],
+  "disproof": "A maintainer-reviewed experiment for one named opaque class identifies its client role and wire boundaries across valid, default, boundary, and malformed cases, and the result is reproduced by a codec test without retaining client-derived bytes.",
+  "confidence": "high",
+  "submitted_by": "Project Ambrose contributor",
+  "submitted_on": "2026-09-19",
+  "status": "claimed"
+}
