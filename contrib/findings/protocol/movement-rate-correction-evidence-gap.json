@@ -1,0 +1,28 @@
+{
+  "subject": "Movement update rate, interpolation, and correction tolerance",
+  "area": "protocol",
+  "claim": "The repository names the client movement messages and proposes speed validation, but does not establish the r806919 normal update cadence, the observer's interpolation window, the position or heading correction tolerance, or the threshold at which a server correction becomes visibly distinguishable from ordinary movement.",
+  "revision": "r806919.Wizard_1_610",
+  "method": "experiment",
+  "how_to_repeat": [
+    "Use two disposable accounts, two operator-owned client installations, and a private loopback Ambrose server with both clients in one zone; do not use public services or commit captures, client files, or payloads.",
+    "Run a baseline walk, idle, turn, jump, and mount session with client A while client B observes. Capture privately and record only message names, direction, service/order, frame sequence, payload length, event timestamps, and visible result categories.",
+    "Estimate the client movement-send cadence from several bounded runs at idle, walking, turning, jumping, and mounting. Report ranges and sample counts rather than a single assumed tick rate.",
+    "Delay or coalesce selected server movement broadcasts in the private harness, then record whether client B interpolates, pauses, snaps, or ignores the update. Vary only the delay or batch size per run.",
+    "Apply controlled position and heading corrections from the private server at increasing bounded deltas, including a normal movement delta and an intentionally excessive delta. Record whether the client visibly snaps, smooths, rejects, or continues from the corrected state.",
+    "Send one locally generated excessive client move in the private test environment with movement validation disabled and enabled. Record only the correction message metadata, resulting position category, connection state, and whether normal movement and mounting trigger a correction.",
+    "If private captures or screenshots are reduced for review, remove coordinates, account names, addresses, credentials, payload bytes, client content, and raw logs; publish only rates, intervals, lengths, deltas expressed as reviewed categories, and outcomes. Delete private artifacts and rotate disposable credentials after review."
+  ],
+  "evidence": [
+    "The contributor track lists F-36 because the server's movement-validation budget depends on the client's update rate, interpolation behavior, and correction tolerance, none of which is measured.",
+    "The phase 6 roadmap defines MSG_CLIENTMOVE, MSG_SERVERMOVE, MSG_MOVESTATE, and related movement broadcasts, but its acceptance checks do not establish normal cadence or interpolation.",
+    "The phase 12 WLD-23 roadmap proposes Movement.ValidateSpeed, Movement.SpeedTolerance, and MSG_MOVECORRECTION, while explicitly warning that mount speed multipliers and false positives remain unverified.",
+    "The roadmap leaves server-side collision and navigation data unscheduled, so a speed-only result cannot be treated as full movement validation.",
+    "No public finding currently records a two-client movement cadence, delayed-broadcast interpolation test, or controlled correction-threshold experiment."
+  ],
+  "disproof": "A maintainer-reviewed two-client matrix establishes normal update cadence, interpolation response to delay and batching, correction thresholds for position and heading, and the accepted or rejected move outcomes for walking, jumping, and mounting; that evidence should replace this gap record with verified movement findings.",
+  "confidence": "high",
+  "submitted_by": "Project Ambrose contributor",
+  "submitted_on": "2026-09-19",
+  "status": "claimed"
+}
