@@ -1,0 +1,28 @@
+{
+  "subject": "Locale file selection and client language behavior",
+  "area": "client",
+  "claim": "The repository documents the launcher locale option and server-side locale stores, but does not establish which r806919 client files and message fields determine the selected language, how locale fallback behaves, or whether changing the launch locale affects all screens and persisted settings.",
+  "revision": "r806919.Wizard_1_610",
+  "method": "experiment",
+  "how_to_repeat": [
+    "Use an operator-owned client installation and a private loopback Ambrose server with a disposable account; never run the retail launcher or patcher against the pinned development install.",
+    "For each locally installed locale, start the Ambrose launcher with patching disabled and one locale value at a time. Keep the run folder outside the install and record only the requested locale, discovered locale directories, file counts, entry counts, duplicate counts, missing-file categories, and client revision.",
+    "Use the same account and a fixed sequence of login, character select, world entry, chat or system notice, quest or object display where available. Record only screen identifier, message or log category, whether text was localized, fallback category, and load or error outcome; do not publish text, screenshots, locale files, or extracted rows.",
+    "Repeat with an unknown locale, a locale whose files are incomplete in the private test copy, and an empty or omitted locale option. Record whether the client rejects startup, falls back, shows mixed-language output, or continues with a default.",
+    "Change only the locale between two runs using the same run-folder template and then relaunch. Record whether the selected locale is read from the command line, configuration, server message, or persisted file, and whether the previous run changes the next one.",
+    "Where server-generated text is involved, compare the requested client locale with the locale field or locale metadata observed in the private session. Do not assume the server locale store or the client locale choice controls the other.",
+    "If private captures, logs, screenshots, or locale data are reduced for review, remove all text values, account names, paths, credentials, addresses, payload bytes, client archives, and extracted files; publish only metadata, counts, hashes, and outcomes. Delete private artifacts and rotate disposable credentials after review."
+  ],
+  "evidence": [
+    "The contributor track lists F-37 because the client ships multiple locales and the project must know which files each locale drives and how the client picks its language.",
+    "doc/config/launcher.md documents `--locale` and the `Locale` setting but does not establish the retail client's fallback, persistence, or per-screen language behavior.",
+    "The repository LocaleStore loads and resolves server-side `.lang` entries from the user's own Root.wad, which does not prove that the client uses the same selection path for its own UI and data.",
+    "The phase roadmap records server-side locale handling and identifies locale-related message metadata as planned, but no public finding establishes the complete client-side selection and fallback rules.",
+    "No public locale finding or client-derived locale catalog is present under contrib/findings/client."
+  ],
+  "disproof": "A maintainer-reviewed matrix across all installed locales, unknown and incomplete locale cases, repeated runs, and representative screens identifies the authoritative selection input, fallback order, persistence behavior, and client/server locale interaction; that evidence should replace this gap record with verified locale findings.",
+  "confidence": "high",
+  "submitted_by": "Project Ambrose contributor",
+  "submitted_on": "2026-09-19",
+  "status": "claimed"
+}
