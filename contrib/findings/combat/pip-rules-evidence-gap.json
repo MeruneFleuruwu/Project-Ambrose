@@ -1,0 +1,25 @@
+{
+  "subject": "Pip power-pip and shadow-pip rules",
+  "area": "combat",
+  "claim": "The repository does not yet establish the complete client-visible rules for gaining, displaying, spending, and valuing ordinary pips, power pips, and shadow pips; the roadmap contains implementation hypotheses but no verified end-to-end client evidence.",
+  "revision": "r806919.Wizard_1_610",
+  "method": "reasoning",
+  "how_to_repeat": [
+    "Use a disposable account and an Ambrose server bound only to loopback, with a deterministic duel whose starting pip values and power-pip chance are controlled by the test setup.",
+    "Capture privately from duel entry through at least three planning and resolution rounds, recording only MSG_COMBATSTATS, MSG_COMBATPIPS, MSG_COMBATMOVE, MSG_COMBATACTIONS, phase messages, directions, frame ordering, pip counts, and payload lengths.",
+    "Repeat with a same-school spell and an off-school spell at the same nominal rank to determine whether a power pip has different payment value by school.",
+    "Repeat with configured power-pip chance at 0% and 100%, and with the live Combat.PowerPipValue setting changed, recording the resulting metadata without committing configuration, captures, or payload bytes.",
+    "For shadow pips, use a private operator-owned setup that reaches the supported shadow-pip threshold, then record when the pip appears, how it is shown, and which combat action consumes it; do not infer shadow behavior from ordinary pip traces."
+  ],
+  "evidence": [
+    "The contributor-track lists F-03 as an open finding for pip, power-pip, and shadow-pip gain, spending, and display rules.",
+    "The roadmap proposes starting-pip and power-pip fields, school-sensitive payment, and a live Combat.PowerPipValue setting, but labels client parity and accepted bounds as unresolved.",
+    "The roadmap places shadow-pip and school-pip behavior in later milestones and provides no verified client trace for their appearance or consumption.",
+    "No pip-rules finding currently exists under contrib/findings/combat."
+  ],
+  "disproof": "A repeatable simulator and client trace establishes the gain, display, payment, and consumption rules for all three pip categories across the listed cases; that evidence should replace this gap record rather than be treated as confirmation of it.",
+  "confidence": "high",
+  "submitted_by": "Project Ambrose contributor",
+  "submitted_on": "2026-09-19",
+  "status": "claimed"
+}
