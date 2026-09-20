@@ -1,0 +1,29 @@
+{
+  "subject": "Retail patcher concurrency, resume, and corrupted-file behavior",
+  "area": "patching",
+  "claim": "The repository does not yet establish how the retail patcher handles concurrent patch requests, an interrupted transfer that must resume, or a local file whose contents or checksum are corrupted; these failure paths remain unverified and must not be inferred from Ambrose's planned patchserver behavior.",
+  "revision": "r806919.Wizard_1_610",
+  "method": "experiment",
+  "how_to_repeat": [
+    "Make a disposable copy of an operator-owned client installation. Never run the retail launcher or patcher against the pinned Ambrose development install, and keep the disposable copy, patch endpoint, logs, and downloaded files outside the repository.",
+    "Record only the private copy's client revision, patch configuration metadata, file manifest names, file sizes, and hashes. Do not publish client archives, executable bytes, patch payloads, extracted text, credentials, or screenshots containing client content.",
+    "Use a patch service controlled by the operator when the client permits a local endpoint; otherwise use only the operator's separately patched disposable copy and record the endpoint and redirect limitations. Keep the network loopback-only whenever the test can be redirected, and do not contact unrelated patch services.",
+    "Start two patch operations against the same disposable copy at the same time. Record whether the second operation waits, is rejected, shares work, overwrites files, or leaves a recoverable lock; record process exit categories, elapsed time, and final manifest hashes only.",
+    "Interrupt a transfer at deterministic points such as after metadata, after a partial file, and immediately before final verification. Restart the patch operation and record whether it resumes from an offset, restarts the file, discards temporary state, or reports an error. Record only byte counts, ranges, status categories, and final hashes.",
+    "Corrupt one disposable-copy file after a successful patch and before the next launch. Repeat patching and record whether the patcher detects the mismatch, repairs it, ignores it, quarantines it, or refuses to continue. Repeat with a truncated file and a stale temporary file if the patcher creates one.",
+    "Repeat each case once with the same manifest and once with a changed manifest so a result is not mistaken for a server-side version change. Preserve private logs only long enough for review, then delete them and rotate any disposable credentials.",
+    "Publish only metadata and outcomes. Do not use a result from a separately patched copy as proof that the pinned r806919 development client or Ambrose patchserver behaves the same way."
+  ],
+  "evidence": [
+    "The contributor track requests F-39 because Phase 16 must survive patcher failure paths involving concurrency, resume, and corrupted files.",
+    "doc/PATCHING.md requires the pinned development install to run with patching disabled and states that a separate copy may no longer match Ambrose's pinned message and type data after retail patching.",
+    "The repository documents an Ambrose patchserver with signed manifests and CRC-32 checks, but those rules do not prove how the retail patcher schedules work, persists partial transfers, or repairs local corruption.",
+    "The launcher and client-driver isolate run folders and avoid writing inside the install, which does not establish the retail patcher's own lock, temporary-file, resume, or recovery semantics.",
+    "No public finding currently records a maintainer-reviewed matrix for these three retail patcher failure classes."
+  ],
+  "disproof": "A maintainer-reviewed experiment on a disposable operator-owned copy records deterministic outcomes for concurrent operations, interrupted transfers, truncated or partial files, and checksum/content corruption, including the exact retry and recovery state without publishing client-derived data.",
+  "confidence": "high",
+  "submitted_by": "Project Ambrose contributor",
+  "submitted_on": "2026-09-19",
+  "status": "claimed"
+}
