@@ -1,0 +1,25 @@
+{
+  "subject": "Quest helper arrow and quest-log grouping",
+  "area": "quests",
+  "claim": "The repository does not yet establish how the client selects an active quest helper arrow or groups goals in the quest log; roadmap fields such as destination zone, location, no-helper, and auto-selection are implementation hypotheses rather than verified client behavior.",
+  "revision": "r806919.Wizard_1_610",
+  "method": "reasoning",
+  "how_to_repeat": [
+    "Use a disposable account and an Ambrose server bound only to loopback with two authored quests: one with a single waypoint goal and one with two active goals pointing to different zones.",
+    "Accept the single-goal quest, then record the private client-visible helper destination, quest-log grouping, map marker presence, and the metadata of the quest messages that supplied them.",
+    "Accept the two-goal quest and vary goal order, goal completion state, NoQuestHelper, and skip-helper-auto-selection settings one case at a time.",
+    "Complete the first goal while the second remains active, then record only the selected helper target, goal ordering, progress counts, destination-zone identifiers, message names, directions, frame ordering, and payload lengths.",
+    "Repeat after relogging and after changing zones to distinguish persisted grouping from transient helper selection; keep captures, client files, credentials, payloads, and display text private."
+  ],
+  "evidence": [
+    "The contributor-track lists F-05 as an open quest finding for helper-arrow selection and quest-log grouping.",
+    "The phase 7 roadmap names GoalLocation, GoalDestinationZone, NoQuestHelper, SkipQuestHelperAutoSelect, and MSG_SENDGOAL fields, but does not prove their client-visible precedence or grouping behavior.",
+    "The phase 10 roadmap separately calls for helper progress, map markers, hidden quests, and next-world behavior, with the real-client checks still unverified.",
+    "No quest-helper or quest-log grouping finding currently exists under contrib/findings/quests."
+  ],
+  "disproof": "A repeatable multi-goal client trace establishes helper precedence, grouping, persistence, and flag behavior across the listed cases; that evidence should replace this gap record rather than be treated as confirmation of it.",
+  "confidence": "high",
+  "submitted_by": "Project Ambrose contributor",
+  "submitted_on": "2026-09-19",
+  "status": "claimed"
+}
