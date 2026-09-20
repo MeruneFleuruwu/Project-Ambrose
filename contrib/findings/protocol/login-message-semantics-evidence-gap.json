@@ -1,0 +1,26 @@
+{
+  "subject": "Unhandled login message semantics",
+  "area": "protocol",
+  "claim": "The current login message table identifies MSG_USER_VALIDATE and the authenticated requests MSG_REQUESTSERVERLIST, MSG_CREATECHARACTER, MSG_DELETECHARACTER, MSG_SELECTCHARACTER, MSG_CHANGECHARACTERNAME, MSG_SAVECHARACTER, MSG_LOGINLOGCHARACTERCREATION, and MSG_FULFILLPROMOCODE as pending, but the request fields, validation rules, and complete client-visible responses for these messages remain unverified.",
+  "revision": "r806919.Wizard_1_610",
+  "method": "reasoning",
+  "how_to_repeat": [
+    "Use disposable accounts, an operator-owned client installation, and a private loopback Ambrose loginserver; never use a production account or a public endpoint.",
+    "Capture a normal password login only to establish the session offer and authenticated state, then capture a quit-to-select reconnect that sends MSG_USER_VALIDATE. Keep the capture, credentials, session keys, machine identifiers, addresses, and payloads private.",
+    "For MSG_USER_VALIDATE, vary exactly one private test input at a time: the current account session, an expired session, a wrong key, a different MachineID, and the previous connection's offer. Record only message names, service/order, direction, frame order, field names, field lengths, error-code names, and whether the connection closes.",
+    "For each authenticated request, use a disposable account and one controlled action at a time: request the server list, create, delete, select, rename, save, log character creation, and fulfill a promotion code. Record the request and every response or disconnect, without recording names, codes, identifiers, or payload contents.",
+    "Compare the metadata-only traces with the login table and the phase 5.06 acceptance checks. A field or response is not considered established unless a valid case and the relevant rejection or failure case are both observed.",
+    "If a private capture is reduced for review, remove credentials, session keys, account and character values, timestamps, addresses, and all payload bytes; publish only metadata and a reproducible description."
+  ],
+  "evidence": [
+    "src/server/apps/loginserver/Server/LoginMessageTable.cpp currently marks MSG_USER_VALIDATE as pending while the authenticated request messages are also pending.",
+    "The phase 5.06 roadmap names MSG_USER_VALIDATE, MSG_USER_VALIDATE_RSP, and MSG_USER_ADMIT_IND and requires success and failure behavior, session lifetime, MachineID, and PassKey3 checks, but its real-client acceptance remains unchecked.",
+    "The same roadmap lists the authenticated request names but does not provide a verified request schema or complete response behavior for each one.",
+    "No public capture, client-derived payload, or verified finding currently establishes all of these message semantics."
+  ],
+  "disproof": "A maintainer-reviewed loopback capture and decoder test covers every listed request, its accepted state, its relevant rejection cases, and the complete response or close behavior; that evidence should replace this gap record with verified per-message findings.",
+  "confidence": "high",
+  "submitted_by": "Project Ambrose contributor",
+  "submitted_on": "2026-09-19",
+  "status": "claimed"
+}
