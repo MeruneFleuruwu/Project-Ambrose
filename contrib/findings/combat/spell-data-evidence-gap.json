@@ -1,0 +1,25 @@
+{
+  "subject": "Spell cost accuracy damage and effects",
+  "area": "combat",
+  "claim": "The repository does not yet establish how a spell's cost, accuracy, damage, and effects are represented together in the client's data or exposed to the server; this finding records the evidence gap rather than asserting field meanings.",
+  "revision": "r806919.Wizard_1_610",
+  "method": "reasoning",
+  "how_to_repeat": [
+    "Use a contributor-owned client installation and the project's type-extraction tool to produce a private type dump for the recorded revision.",
+    "Inspect the operator-owned spell entries and TemplateManifest with bindecode, recording only class names, property names, scalar widths, enum names, template identifiers, and counts.",
+    "Select one simple single-target damage spell and one non-damage spell, then compare their cost, accuracy, target, and effect metadata without copying entry text or binary data into the repository.",
+    "If the same spells are exercised against an Ambrose loopback server, capture the private hand and combat-action exchange and record only message names, directions, field names, offsets, lengths, and observed result categories.",
+    "Repeat with an intentionally forced accuracy failure and a successful cast, keeping the capture, payloads, client files, and credentials private."
+  ],
+  "evidence": [
+    "The contributor-track lists F-02 as an open combat finding about spell cost, accuracy, damage, and effect representation.",
+    "The phase 9 roadmap identifies SpellTemplate fields including m_pipCost, m_accuracy, and effect data, but marks client behavior and exact spell-field requirements as unverified.",
+    "The roadmap names Root.wad Spells data and a generated type dump as local sources, while explicitly prohibiting those client-derived files from the repository.",
+    "No spell-data finding currently exists under contrib/findings/combat."
+  ],
+  "disproof": "A static, capture-backed, or client-experiment finding identifies the complete field mapping and reproduces it for more than one spell; that verified evidence should replace this gap record rather than be treated as confirmation of it.",
+  "confidence": "high",
+  "submitted_by": "Project Ambrose contributor",
+  "submitted_on": "2026-09-19",
+  "status": "claimed"
+}
