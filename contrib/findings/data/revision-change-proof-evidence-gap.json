@@ -1,0 +1,29 @@
+{
+  "subject": "Proof that a client revision changed protocol or type data",
+  "area": "data",
+  "claim": "A difference in client file size or revision label does not by itself prove a meaningful protocol or type-data change; the repository lacks a maintainer-reviewed method that attributes a change between two client revisions to a specific metadata, schema, message, or observed behavior difference.",
+  "revision": "r806919.Wizard_1_610",
+  "method": "experiment",
+  "how_to_repeat": [
+    "Use two operator-owned client installations or disposable copies whose revisions are intentionally different. Never patch the pinned Ambrose development install, never run the retail launcher or patcher against it, and keep both installations and all extracted data outside the repository.",
+    "Record each copy's revision.dat value, executable and relevant archive file names, sizes, modification times, and SHA-256 hashes. Record the tool versions and extraction options. Do not publish client files, archive entries, extracted text, type-dump contents, message XML, or payload bytes.",
+    "Run the repository's typeextract and other approved readers separately for each installation. Reduce the private outputs to counts, class and property hash inventories, message-name and ordinal inventories, schema error counts, source hashes, and the revision associated with each output.",
+    "Compare the reduced inventories by stable identifiers rather than file size: additions, removals, renamed or re-hashed classes and properties, changed flags or types, changed message definitions, and changed defaults. Record enough field names, ids, hashes, and counts to reproduce the comparison without reconstructing client data.",
+    "For every proposed difference, perform a private control check against the same revision twice and against two copies with identical extracted data but different file timestamps or packaging. A result that appears only as a size or timestamp difference is not a revision change.",
+    "Where a structural difference may affect the wire, run the smallest safe loopback client-driver or own-server experiment that exercises the affected message or object. Record only direction, message name, frame or payload length, field boundary metadata, accept/reject outcome, and client revision; keep captures and payloads private.",
+    "Classify each result as packaging-only, extracted-data-only, executable behavior, protocol/schema change, or unverified. Publish a separate finding for a specific proven change and retain this gap until the result is reproduced from both revisions.",
+    "Delete private captures, extracted outputs, temporary installations, and logs after review; rotate disposable credentials and confirm that no client-derived artifact is staged in Git."
+  ],
+  "evidence": [
+    "The contributor track asks F-40 to prove a change between two client revisions instead of inferring it from a size, and places the finding under data.",
+    "Roadmap milestone 3.23 requires extracted data to be kept per revision, rebuilt when the revision or executable changes, and tested from the installed revision rather than from r806919 constants.",
+    "The type extraction and client-data tools expose revision-associated metadata and hashes, but a changed archive size does not identify which schema, message, or executable behavior changed.",
+    "A revision.dat value, file size, timestamp, or archive hash can show that two inputs differ while remaining insufficient to attribute a protocol meaning to the difference.",
+    "No public finding currently records a complete two-revision control matrix that distinguishes packaging changes from a reproduced message, type, or client-behavior change without retaining client-derived data."
+  ],
+  "disproof": "A maintainer-reviewed comparison of two distinct revisions and same-revision controls identifies a specific structural or behavioral change, attributes it to stable metadata or a private experiment, and reproduces the result without relying on file size or publishing client-derived contents.",
+  "confidence": "high",
+  "submitted_by": "Project Ambrose contributor",
+  "submitted_on": "2026-09-19",
+  "status": "claimed"
+}
