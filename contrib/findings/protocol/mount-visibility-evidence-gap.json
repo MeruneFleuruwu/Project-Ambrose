@@ -1,0 +1,28 @@
+{
+  "subject": "Mount application and cross-client visibility",
+  "area": "protocol",
+  "claim": "The repository does not establish which authoritative item, player-object property, equipment message, movement state, or zone broadcast applies a mount, persists it across relog and zone change, and presents the mounted appearance to another client.",
+  "revision": "r806919.Wizard_1_610",
+  "method": "experiment",
+  "how_to_repeat": [
+    "Use two disposable accounts, two operator-owned client installations, and a private loopback Ambrose server with both characters in the same zone; do not contact public services or reuse credentials.",
+    "Use an operator-owned test character with one reviewed mount item and record only metadata about its local template: identifier hash, category, required level, and whether it is equipped. Do not publish client-derived item rows, names, assets, or payloads.",
+    "With client A unmounted, equip the mount through the normal client action and capture privately. Record only request and response message names, direction, service/order, frame order, lengths, changed object or item field names, and visible state categories.",
+    "Observe client B before and after the equip, then repeat while A moves, changes zone, logs out, and logs back in. Record whether B sees a mount object, changed player appearance, movement-state change, despawn, respawn, or no visible change.",
+    "Unequip the mount, relog A, and repeat from a fresh session to distinguish persistent equipment state from a transient client-side toggle. If the local server supports it, test a rejected equip and an invalid or unavailable mount without publishing the item value.",
+    "Compare the metadata-only traces to determine whether mount state is carried by an equipment update, a player object property, a dedicated mount message, or a general object refresh, and whether the server or client owns validation.",
+    "Remove credentials, account and character names, addresses, screenshots with client content, captures, payload bytes, and private logs before recording any result. Rotate or destroy disposable credentials and delete private artifacts after review."
+  ],
+  "evidence": [
+    "The contributor track lists F-33 as an open protocol finding because the project has no milestone establishing how a mount is applied or what another client sees.",
+    "The phase 6 roadmap establishes general player-object, object-spawn, removal, movement, and zone-broadcast messages, but it does not define mount-specific state or visibility.",
+    "The phase 13 roadmap's purchase acceptance mentions a mount appearing in the backpack, but it does not establish equip, persistence, movement, zone-change, relog, or cross-client behavior.",
+    "The current checkout contains no mount-specific finding and no private two-client mount observation.",
+    "No client-derived mount identifiers or payloads are committed, so mount selection and message semantics remain evidence-gated."
+  ],
+  "disproof": "A maintainer-reviewed two-client experiment identifies the authoritative mount state, equip and unequip messages, validation result, persistence across relog and zone change, and the exact cross-client visibility outcome; that evidence should replace this gap record with verified mount findings.",
+  "confidence": "high",
+  "submitted_by": "Project Ambrose contributor",
+  "submitted_on": "2026-09-19",
+  "status": "claimed"
+}
