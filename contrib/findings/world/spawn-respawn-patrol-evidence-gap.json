@@ -1,0 +1,28 @@
+{
+  "subject": "Zone spawn respawn timers and patrol paths",
+  "area": "world",
+  "claim": "The roadmap identifies spawnData.xml fields for spawn groups, respawn rates, chance, start-node types, and path IDs, but the revision r806919 relationship between those fields and live NPC or mob respawn timing, selection, movement, and patrol paths remains unverified.",
+  "revision": "r806919.Wizard_1_610",
+  "method": "experiment",
+  "how_to_repeat": [
+    "Use an operator-owned client installation, a private loopback Ambrose server, and a disposable test account in a zone with an operator-reviewed spawn group; do not use public services or commit client-derived zone files.",
+    "Inspect the operator-owned zone WAD spawnData.xml with project tools and record only zone path, group counts, spawn identifiers or hashes, max-count values, respawn-rate values, chance categories, requirement names, start-node type, path identifier, and decode errors.",
+    "Run one bounded spawn observation with no quest or global requirement changes. Record only object class or template identifiers, spawn and despawn event order, object counts, zone location, movement-state changes, and elapsed intervals.",
+    "Remove or defeat one spawned object in the private test environment, then observe until the group returns or the bounded window expires. Repeat with the same group after changing only its server-side respawn setting to distinguish authored data from live configuration.",
+    "For a group with a path identifier, record sampled position or node metadata at fixed intervals and whether the object follows a loop, chooses a random node, remains stationary, or returns to its spawn point. Do not publish coordinates that reproduce client-derived zone data unless the maintainer has approved them as metadata.",
+    "Repeat with one unmet and one met spawn requirement, if the local harness supports them, and record whether the group is suppressed, delayed, replaced, or unchanged. Do not infer behavior from a missing object without recording the requirement state.",
+    "If private captures, logs, screenshots, or client data are reduced for review, remove payloads, credentials, account names, addresses, raw zone files, extracted text, and client content; publish only metadata, counts, hashes, and observed outcomes. Delete private artifacts and rotate disposable credentials after review."
+  ],
+  "evidence": [
+    "The phase 4 QST-4 roadmap names spawnData.xml sources and the candidate fields maxNumberOfSpawns, respawnRate, percentChance, requirements, start-node type, and pathID.",
+    "The same roadmap requires spawn-group and spawn-item schemas but does not establish how those fields drive live respawn timing, random selection, patrol movement, or requirement transitions.",
+    "The repository missing-work list states that no milestone yet reads collision, navmesh, path data, spawnData.xml, or clientSpawnData.xml for mob wandering, spawn ground snapping, or related server behavior.",
+    "No public world finding currently records a controlled spawn removal, respawn, requirement, or patrol-path experiment.",
+    "No client-derived spawn rows or zone path data are committed, so authored spawn mappings and timing defaults remain evidence-gated."
+  ],
+  "disproof": "A maintainer-reviewed experiment across representative spawn groups establishes the field-to-runtime mapping for counts, chance, requirements, respawn timing, start nodes, and path IDs, including a repeatable patrol or stationary outcome; that evidence should replace this gap record with verified spawn findings.",
+  "confidence": "high",
+  "submitted_by": "Project Ambrose contributor",
+  "submitted_on": "2026-09-19",
+  "status": "claimed"
+}
