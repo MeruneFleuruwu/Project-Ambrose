@@ -1,0 +1,28 @@
+{
+  "subject": "Pet talent pool, manifestation, and persistence",
+  "area": "world",
+  "claim": "The roadmap identifies pet talent pools, level-up rolls, manifestation odds, stored talents, and the pet stats display as separate concerns, but the revision r806919 behavior that selects a talent, decides whether it manifests, stores it, and reports it to the client remains unverified.",
+  "revision": "r806919.Wizard_1_610",
+  "method": "experiment",
+  "how_to_repeat": [
+    "Use a disposable account, an operator-owned client installation, and a private loopback server with a test pet whose allowed talent pool has at least two known metadata-only entries; keep all client files, extracted data, captures, credentials, and payloads private.",
+    "Inspect the operator-owned PetFeedingRewardConfig, TalentData, and pet-template inputs with project tools, recording only template names or hashes, pool membership, level thresholds, and counts. Do not copy client-derived rows or text into the repository.",
+    "Feed one controlled snack at a time while recording only the request and response message names, direction, frame order, lengths, level transition, XP delta category, talent identifier metadata, and whether a talent is shown as manifested.",
+    "Repeat enough fresh disposable pets to observe a level-up with a pool containing multiple candidates, checking whether the selected candidate is in the pool and whether a candidate can repeat on the same pet.",
+    "Change only the server-side manifestation chance setting between bounded runs, then relog and inspect the pet stats page. Record whether the talent is stored, displayed, absent, or changed after relog; do not assert a probability from a small sample.",
+    "If private captures or client observations are reduced for review, remove all values, account or pet identifiers, payload bytes, addresses, screenshots with client content, and extracted client data. Publish only metadata, counts, hashes, and observed outcomes.",
+    "Destroy or rotate the disposable account and delete private captures, logs, screenshots, and run folders after the metadata has been reviewed."
+  ],
+  "evidence": [
+    "The phase 13.02 roadmap names TalentData and pet talent pools as data sources, character_pet and character_pet_talent as storage, and a level-up talent roll as a deliverable.",
+    "The same roadmap requires that talent rolls select only from the pet's pool and never duplicate, but it explicitly marks talent manifestation odds as unverified.",
+    "The roadmap's client acceptance requires the level-up popup to name the new talent and the pet stats page to show it after relog, which does not establish the underlying selection or persistence rules.",
+    "The repository has no public pet-talent finding under contrib/findings/world and no committed client-derived talent rows.",
+    "No private pet feeding or level-up capture is available in the current checkout to establish candidate ordering, duplicate handling, manifestation, or relog persistence."
+  ],
+  "disproof": "A maintainer-reviewed experiment across multiple controlled pools and manifestation settings, with a persistence check after relog, identifies the selection, duplicate, manifestation, storage, and display rules; that evidence should replace this gap record with verified pet-talent findings.",
+  "confidence": "high",
+  "submitted_by": "Project Ambrose contributor",
+  "submitted_on": "2026-09-19",
+  "status": "claimed"
+}
