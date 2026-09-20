@@ -1,0 +1,27 @@
+{
+  "subject": "SessionOffer encryption block",
+  "area": "protocol",
+  "claim": "The 1.610 client accepts Ambrose's known 23-byte SessionOffer form, but the optional or additional encryption block that the client reads is not decoded: its presence, length, field boundaries, algorithm or key material, validation behavior, and effect on subsequent traffic remain unverified.",
+  "revision": "r806919.Wizard_1_610",
+  "method": "reasoning",
+  "how_to_repeat": [
+    "Use a disposable client installation and a private loopback server or transparent proxy that can replay only operator-generated SessionOffer variants; never connect a public endpoint and never reuse credentials.",
+    "Capture the baseline 23-byte SessionOffer and matching SessionAccept metadata, recording only direction, control opcode, total frame length, body length, field boundaries, and whether the client proceeds to MSG_USER_AUTHEN_V3. Keep the capture and all bytes private.",
+    "Construct one server-side test variant at a time by changing only the candidate trailing or encryption-block length or field value. Do not copy bytes from a game client, patch archive, or third-party project.",
+    "For each variant, record whether the client sends SessionAccept, whether its echoed timestamp or session id changes, whether it reaches authentication, the first diagnostic category, and the close or timeout result.",
+    "Repeat accepted variants with a fresh session id and fresh disposable account, then compare the metadata-only results to determine whether the block is optional, authenticated, encrypted, or required before login.",
+    "If private artifacts are reduced for review, remove credentials, session keys, addresses, timestamps that identify a session, and all payload bytes; publish only lengths, names, offsets, hashes, and outcomes."
+  ],
+  "evidence": [
+    "doc/CAPTURE.md records that the 1.610 client accepted a 23-byte SessionOffer body of 14 bytes and that a 28-byte patch-tool offer has five additional bytes whose meaning is open.",
+    "doc/CAPTURE.md states that Ambrose retains trailing offer and accept bytes but does not establish an encryption-block interpretation.",
+    "The contributor track lists F-09 because the client reads an encryption block that Ambrose does not yet send and the block has not been decoded.",
+    "src/server/shared/Network/ControlMessages.h models SessionOffer trailing bytes without assigning them a protocol meaning.",
+    "No public finding currently establishes the block's schema, cryptographic behavior, or client acceptance rules."
+  ],
+  "disproof": "A maintainer-reviewed loopback experiment, backed by a decoder test and metadata-only client outcomes, identifies the block boundaries and demonstrates its required fields and validation behavior; that evidence should replace this gap record with a verified finding.",
+  "confidence": "high",
+  "submitted_by": "Project Ambrose contributor",
+  "submitted_on": "2026-09-19",
+  "status": "claimed"
+}
