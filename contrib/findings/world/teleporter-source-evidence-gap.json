@@ -1,0 +1,25 @@
+{
+  "subject": "ResTeleport destination source",
+  "area": "world",
+  "claim": "The repository establishes that ResTeleport has no properties in the r806919 type dump, but does not establish which trigger, event, server-authored table, or runtime message supplies a teleporter's destination zone and location.",
+  "revision": "r806919.Wizard_1_610",
+  "method": "reasoning",
+  "how_to_repeat": [
+    "Use a contributor-owned client installation and a private loopback Ambrose server with one reviewed walk-in trigger and one destination location.",
+    "Inspect the operator-owned trigger, trigger-result, location, and destination records with project tools, recording only class names, field names, identifiers, event membership, and counts.",
+    "Run the walk-in transfer privately and record the message names, directions, frame ordering, source and destination identifier names, and payload lengths; keep captures, payloads, credentials, addresses, and client files private.",
+    "Change only the server-authored destination row while leaving the trigger and event unchanged, then repeat the transfer after the documented reload or restart boundary.",
+    "Compare the metadata-only traces to determine whether the destination is selected from trigger-result data, a zone_teleport row, an event parameter, or another server-side source."
+  ],
+  "evidence": [
+    "The contributor-track lists F-07 as an open world finding because ResTeleport has no properties in the type data.",
+    "The roadmap records the zero-property ResTeleport observation and separately proposes zone_trigger_result and zone_teleport data for walk-in transfers.",
+    "The roadmap's WLD-15 design states that authored zone_teleport rows may provide destinations, but the real-client transfer and reload checks remain unverified.",
+    "No teleporter-source finding currently exists under contrib/findings/world."
+  ],
+  "disproof": "A repeatable static inspection and loopback transfer experiment identifies the authoritative destination source and its reload/lifetime behavior; that evidence should replace this gap record rather than be treated as confirmation of it.",
+  "confidence": "high",
+  "submitted_by": "Project Ambrose contributor",
+  "submitted_on": "2026-09-19",
+  "status": "claimed"
+}
