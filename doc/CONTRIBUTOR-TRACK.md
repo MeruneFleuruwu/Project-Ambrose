@@ -123,7 +123,6 @@ Each item is worth doing, needs nothing from the phases, and lands inside the tr
 | F-53 | Which classes the type dump marks as having no reflected properties, grouped by base class, with counts | `contrib/findings/objects/` | The static, countable half of F-38 |
 | F-54 | The sizes and counts of every archive in the install: files per archive, compressed and uncompressed totals, as a table | `contrib/findings/data/` | The patch server plans transfers against this |
 | F-55 | What a name table row holds: the fields the extractor reads from each name table, checked against the dump | `contrib/findings/data/` | The world database's name columns are shaped by it |
-| C-68 | A launcher troubleshooting guide: the configuration the client silently ignores, the fullscreen traps, and the page it opens after a refused login | `doc/guides/` | Every one of those was learned the hard way and is written down only in commit messages |
 | C-69 | An audit of every option in every `.conf.dist` against `doc/config/*.md`: documented but absent, present but undocumented, defaults that disagree, with the script that found them | `contrib/tools/` | Configuration drift is invisible until an operator hits it |
 | C-70 | An audit of every log category used in `src/` against the guide's table and the shipped `.conf.dist` loggers, with the script | `contrib/tools/` | A category nothing routes is a message nobody sees |
 | C-71 | A checker for the roadmap files: every dependency names a milestone that exists, ids are unique, sizes match the counting rule, and a ticked box carries evidence | `contrib/tools/` | The maintainer runs one from a scratchpad; the project should own one |
@@ -208,6 +207,7 @@ The first list is mostly taken, and what remains of it waits on servers that do 
 | C-65 | The German and French catalogs for Ambrose's own text, each the same eighty keys as the Spanish one | `contrib/locale/` | MeruneFleuruwu, in #110 and #112 |
 | C-66 | A walked Windows guide from a clean checkout to a built tree, the tests and a local login server | `doc/guides/` | MeruneFleuruwu, in #111 |
 | C-67 | A guide to reading a login capture with the metadata decoder, frame by frame, with the service and order pairs a healthy login produces | `doc/guides/` | MeruneFleuruwu, in #113 |
+| C-68 | The launcher's three misdiagnosed problems: the configuration the client ignores, the fullscreen traps, and the page a refused client opens | `doc/guides/` | MeruneFleuruwu, in #114 |
 
 An item stays listed until its pull request is merged. Ask before starting something not on the list: the answer is usually yes if it lands in the paths above.
 
