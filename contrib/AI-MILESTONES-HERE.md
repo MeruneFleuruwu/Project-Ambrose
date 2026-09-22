@@ -77,9 +77,11 @@ The name of the test that runs it, or the tool run and what it printed, or the s
 9. Write the files, then have me run every check below and fix whatever they print.
 10. Write the pull request description: the milestone id, what was built, how it was verified, which checks are ticked, which are not and why.
 
-## Building and testing it
+## Setting the whole thing up on my machine
 
-There are no prebuilt binaries. This needs CMake 3.25+, vcpkg with `VCPKG_ROOT` set, and Visual Studio 2022+ or GCC 13+.
+Walk me through this once, step by step, waiting for what I actually see at each one. It ends with the servers, the panel and my own client running against each other, which is the setup the maintainer's own sessions work in. **Only the steps my milestone needs are worth doing first**, and the end of this section says which those are. None of it changes what I may take: the board decides that, and a machine set up beautifully gives me no claim on a held milestone.
+
+**1. The toolchain.** CMake 3.25 or newer, vcpkg with `VCPKG_ROOT` set, and Visual Studio 2022+ or GCC 13+. Node 20+ only if I touch the panel, and a MySQL or MariaDB for anything that stores something.
 
 ```
 cmake --preset windows-msvc-x64
@@ -87,9 +89,34 @@ cmake --build --preset windows-debug
 ctest --preset windows-debug
 ```
 
-On Linux the presets are `linux-gcc` and `linux-gcc-debug`, and `doc/guides/linux.md` is a walked guide. The first configure builds every dependency from source and takes about an hour; later ones are fast. A login server also needs a MySQL or MariaDB it can reach, the default being `127.0.0.1;3306;ambrose;ambrose;ambrose_login`, and `dbimport` creates the databases.
+On Linux the presets are `linux-gcc` and `linux-gcc-debug`, and `doc/guides/linux.md` is a guide somebody walked on Ubuntu 24.04. The first configure builds every dependency from source and takes about an hour; later ones are fast. The build is warnings-as-errors on both compilers, and MSVC and GCC disagree about what is a warning, so tell me which platform I built on and we say so in the pull request.
 
-The build is warnings-as-errors on both compilers, and MSVC and GCC disagree about what is a warning. If I can only build on one platform, say so in the pull request. A branch named `milestone/<id>-<short-name>` builds the Linux GCC leg in CI by itself, so an open pull request tells us both whether it compiles there, and the maintainer adds a label for the Windows leg when it is worth one. The first run from a new contributor waits for a maintainer to approve it.
+**2. The databases.** Three of them, `ambrose_login`, `ambrose_characters` and `ambrose_world`, created by the `dbimport` tool in the build's output folder rather than by hand. The default connection string for each is `127.0.0.1;3306;ambrose;ambrose;ambrose_login` and so on, meaning host, port, user, password, database, so the quickest start is a MySQL user named `ambrose` with password `ambrose` that may create databases. Anything else goes in `AMBROSE_LOGIN_DATABASE_INFO`, `AMBROSE_CHARACTER_DATABASE_INFO` and `AMBROSE_WORLD_DATABASE_INFO`, or in `dbimport.conf`. `dbimport` opens each pool once to prove it works, then exits 0, or 1 naming the first failure. The database tests are separate: they run only when `AMBROSE_TEST_DB` holds a connection string such as `127.0.0.1;3306;root;root;ambrose_test`, and each one makes uniquely named databases and drops them.
+
+**3. The configuration files.** Every app needs its own `<app>.conf` next to the executable, copied from the `<app>.conf.dist` the build puts there. Started without one, an app exits naming the full path it wanted and the `.dist` to copy, so the error is the instruction. `doc/config/README.md` has the file format and the layers, and `doc/config/<app>.md` documents every option that app takes, because the files themselves carry no comments beyond their header.
+
+**4. The client data, which sets itself up.** On a first start with `Setup.Mode = auto`, which is the default, a game server finds the newest Wizard101 installation on my machine, builds its type dump by emulating the client's own program, extracts the name tables, and saves the choice to `conf.d/client-data.conf`. `AMBROSE_CLIENT_DIR` names the install explicitly: the folder holding `Bin` and `Data`. The dump lands in the Ambrose data folder, `%LOCALAPPDATA%/ProjectAmbrose` on Windows or `~/.local/share/project-ambrose` otherwise, as `types/<revision>.json`, and is never committed. **Never run KingsIsle's launcher or patcher against that install**: it moves the revision under me and every recorded fact about it.
+
+**5. The servers.** Either start them one at a time, the login server on port 12000 and the game server on 12333, or start `supervisor`, which runs the login, game and patch servers in order, takes back the ones still running if it is restarted, and captures each one's output. `ctest` already proves the apps reach readiness and shut down cleanly against disposable databases, so a failure here is usually configuration rather than code.
+
+**6. The panel.** In `supervisor.conf` set `Panel.Enable = 1`, and **change `Panel.Port`**, because its default is 12000, which is the port the login server takes for game clients on the same machine; 12080 is out of the way. `supervisor --panel-self-signed` writes a certificate that signs itself and prints its fingerprint, which is what a panel on my own machine wants. On its first start with no operator, the panel prints a one-time link, good for thirty minutes and only from the machine it runs on, that makes the owner account with a name and password of my choosing, so no default password ever exists. The panel serves the built page from `Panel.DashboardDir`, which defaults to a `dashboard` folder beside the executable:
+
+```
+npm install
+npm run build --workspace apps/dashboard
+```
+
+Then point `Panel.DashboardDir` at `apps/dashboard/dist`. For work on the panel's own page there is a development server instead, which proxies its API calls to a running panel:
+
+```
+AMBROSE_PANEL_API=https://127.0.0.1:12080 npm run dev --workspace apps/dashboard
+```
+
+**7. My own client.** The `launcher` tool starts my own installation against my own login server, always with patching off, from a folder of its own, and never through KingsIsle's launcher: `launcher --client <the install folder>`. It needs Windows. With a login server running, that is the whole loop: my client reaches the login screen, authenticates against my server, and lands on character select.
+
+**What my milestone actually needs.** Ask me for only these. A milestone whose checks are unit tests needs nothing past step 1. Anything that stores something adds step 2. Anything reading the client's own archives, dumps or zones adds step 4 and my installation. A check marked Real client needs steps 5 and 7 and somebody at the keyboard, and a check marked Dev-gated may need a second machine or hardware I do not have, which stays unticked and is named in the pull request. Panel milestones are held by the maintainer's own sessions, so step 6 is for watching the thing run, not for work I may take.
+
+A branch named `milestone/<id>-<short-name>` builds the Linux GCC leg in CI by itself, so an open pull request tells us both whether it compiles there, and the maintainer adds a label for the Windows leg when it is worth one. The first run from a new contributor waits for a maintainer to approve it.
 
 ## Before the pull request
 
@@ -136,7 +163,7 @@ If I tell you something I only remember or assume, mark it unproven rather than 
 ## Now ask me
 
 1. Which milestone id am I taking, and is it in doc/MILESTONE-TRACK.md's "Open now" table?
-2. What do I have: a client installation, a working build, a MySQL or MariaDB, Windows or Linux, a capture, a type dump?
+2. What do I have already: Windows or Linux, a working build, a MySQL or MariaDB, my own client installation, a type dump? Anything missing that my milestone needs, walk me through the matching step of the setup section before we plan the work, and skip the steps it does not need.
 3. If I am unsure which to take, recommend one that fits what I have, and say which of its acceptance checks I will not be able to run.
 ````
 
