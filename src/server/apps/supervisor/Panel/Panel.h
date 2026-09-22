@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * The panel's own front door in the supervisor: a second listener with its own Panel options, its own token file and its own store, off unless Panel.Enable is set, bound to this machine unless a certificate and key are given or the operator opts into plain HTTP, serving the built dashboard at / and the panel's API under /api/panel/, and reloaded with the rest of the configuration so a bind it would not be allowed to keep is refused while the old one goes on serving.
+ * The panel's own front door in the supervisor: a second listener with its own Panel options, its own token file and its own store, off unless Panel.Enable is set, holding the cost-weighted limit every costly route is held to and the audit tables every change is recorded in, bound to this machine unless a certificate and key are given or the operator opts into plain HTTP, serving the built dashboard at / and the panel's API under /api/panel/, and reloaded with the rest of the configuration so a bind it would not be allowed to keep is refused while the old one goes on serving.
  */
 
 #ifndef AMBROSE_PANEL_H
@@ -8,10 +8,15 @@
 
 #include "AdminServer.h"
 #include "ListenerSettings.h"
+#include "PanelAudit.h"
+#include "PanelRateLimit.h"
 #include "PanelStore.h"
 #include "Types.h"
 
 #include <filesystem>
+#include <functional>
+#include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -42,14 +47,20 @@ public:
     std::string GetToken() const { return _listener.GetToken(); }
     bool IsSecure() const { return _secure; }
     PanelStore& Store() { return _store; }
+    PanelRateLimit& Limit() { return _rateLimit; }
     AdminRouter& Routes() { return _listener.Routes(); }
+
+    bool Record(AuditEvent const& event, std::function<bool(std::string& error)> const& change, std::string& error);
 
 private:
     bool OpenStore(ConfigMgr const& config, std::string& error);
+    std::optional<AdminResponse> Throttle(AdminRequest const& request, uint32 cost);
 
     Log& _log;
     std::filesystem::path _dataFolder;
     PanelStore _store;
+    PanelRateLimit _rateLimit;
+    std::mutex _storeMutex;
     AdminServer _listener;
     bool _secure = false;
 };

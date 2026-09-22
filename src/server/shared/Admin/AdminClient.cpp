@@ -174,6 +174,8 @@ AdminClientResponse AdminClient::Send(AdminClientRequest const& request, std::ch
         wire += fmt::format("X-Request-Id: {}\r\n", request.RequestId);
     if (!request.Body.empty() || request.Method != "GET")
         wire += fmt::format("Content-Type: {}\r\nContent-Length: {}\r\n", request.ContentType, request.Body.size());
+    for (std::pair<std::string, std::string> const& header : request.Headers)
+        wire += fmt::format("{}: {}\r\n", header.first, header.second);
     wire += "\r\n";
     wire += request.Body;
 

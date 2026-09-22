@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Tests the panel's own listener: it serves nothing until Panel.Enable is set, it opens its store with the panel tables before it listens, it answers its own routes on a loopback port with its own token, a bind beyond this machine with no certificate is refused with the Panel option names in the message, the plain-HTTP opt-in lifts that refusal, and a certificate and key are served over TLS with the fingerprint the files hold.
+ * Tests the panel's own listener and what it holds: it serves nothing until Panel.Enable is set, it opens its store with the panel tables before it listens, it answers its own routes on a loopback port with its own token, a bind beyond this machine with no certificate is refused with the Panel option names in the message, the plain-HTTP opt-in lifts that refusal, a certificate and key are served over TLS with the fingerprint the files hold, a route that declares a cost is held back with a retry hint while an uncosted route from the same caller still answers, one audit row records the throttling however many requests are refused in that minute, and a change whose audit row cannot be written is not applied.
  */
 
 #include "AdminClient.h"
@@ -8,6 +8,7 @@
 #include "LogTestDirectory.h"
 #include "LogTestHarness.h"
 #include "Panel.h"
+#include "PanelAudit.h"
 #include "TlsCertificate.h"
 
 #include <fmt/format.h>
@@ -137,4 +138,98 @@ TEST_F(PanelTest, ServesTlsWithTheCertificateItWasGiven)
     EXPECT_EQ(answer.Status, 200) << answer.Body;
     EXPECT_EQ(answer.PeerFingerprint, served.GetInfo().Fingerprint);
     EXPECT_NE(answer.Head.find("Strict-Transport-Security"), std::string::npos) << answer.Head;
+}
+
+TEST_F(PanelTest, HoldsBackACostlyRouteAndRecordsItOnceAMinute)
+{
+    Panel panel = Make();
+    AddPing(panel);
+    panel.Routes().AddCosting("POST", "/api/panel/work", 50, [](AdminRequest const&)
+    {
+        return AdminResponse::Json(200, "{\"done\":true}");
+    });
+
+    std::string error;
+    ASSERT_TRUE(panel.Start(Configured("Panel.Enable = 1\nPanel.Port = 0\nPanel.RateLimitBurst = 120\nPanel.RateLimitPerSecond = 0\n"), error)) << error;
+
+    AdminClient const client("127.0.0.1", panel.GetPort(), panel.GetToken());
+    auto const work = [&] { return client.Send({ "POST", "/api/panel/work", "{}", "application/json", "" }, std::chrono::seconds(10)); };
+    EXPECT_EQ(work().Status, 200);
+    EXPECT_EQ(work().Status, 200);
+
+    AdminClientResponse const held = work();
+    EXPECT_EQ(held.Status, 429) << held.Body;
+    EXPECT_NE(held.Head.find("Retry-After:"), std::string::npos) << held.Head;
+    EXPECT_NE(held.Body.find("too_many_requests"), std::string::npos) << held.Body;
+
+    for (int again = 0; again < 4; ++again)
+        EXPECT_EQ(work().Status, 429);
+
+    AdminClientResponse const uncosted = client.Send({ "GET", "/api/panel/ping", "", "application/json", "" }, std::chrono::seconds(10));
+    EXPECT_EQ(uncosted.Status, 200) << uncosted.Body;
+
+    EXPECT_EQ(PanelAudit::Count(panel.Store(), "panel:request.throttled"), 1);
+}
+
+TEST_F(PanelTest, AChangeWhoseRecordCannotBeWrittenIsNotApplied)
+{
+    Panel panel = Make();
+    std::string error;
+    ASSERT_TRUE(panel.Start(Configured("Panel.Enable = 1\nPanel.Port = 0\n"), error)) << error;
+    ASSERT_TRUE(panel.Store().Execute("CREATE TABLE note (id INTEGER PRIMARY KEY, body TEXT NOT NULL)", error)) << error;
+
+    auto const insert = [&](std::string& failure)
+    {
+        return panel.Store().Execute("INSERT INTO note (body) VALUES ('kept')", failure);
+    };
+
+    AuditEvent named;
+    named.Name = "panel:note.added";
+    named.Actor = AuditActor::Token;
+    named.Address = "127.0.0.1";
+    named.On("note", "1", "kept");
+    ASSERT_TRUE(panel.Record(named, insert, error)) << error;
+    EXPECT_EQ(PanelAudit::Count(panel.Store(), "panel:note.added"), 1);
+
+    AuditEvent nameless;
+    nameless.Actor = AuditActor::Token;
+    EXPECT_FALSE(panel.Record(nameless, insert, error));
+    EXPECT_NE(error.find("no name"), std::string::npos) << error;
+
+    AuditEvent failing;
+    failing.Name = "panel:note.added";
+    EXPECT_FALSE(panel.Record(failing, [](std::string& failure) { failure = "the change refused itself"; return false; }, error));
+    EXPECT_EQ(error, "the change refused itself");
+
+    std::optional<PanelStore::Statement> rows = panel.Store().Prepare("SELECT COUNT(*) FROM note", error);
+    ASSERT_TRUE(rows.has_value()) << error;
+    ASSERT_TRUE(rows->Step(error)) << error;
+    EXPECT_EQ(rows->Int64(0), 1);
+    rows.reset();
+    EXPECT_EQ(PanelAudit::Count(panel.Store(), "panel:note.added"), 1);
+}
+
+TEST_F(PanelTest, AForwardedHeaderChangesNothingWithNoTrustedProxies)
+{
+    Panel panel = Make();
+    panel.Routes().AddCosting("POST", "/api/panel/work", 200, [](AdminRequest const&)
+    {
+        return AdminResponse::Json(200, "{\"done\":true}");
+    });
+
+    std::string error;
+    ASSERT_TRUE(panel.Start(Configured("Panel.Enable = 1\nPanel.Port = 0\nPanel.RateLimitBurst = 100\nPanel.RateLimitPerSecond = 0\nPanel.TrustedProxies =\n"), error)) << error;
+
+    AdminClient const client("127.0.0.1", panel.GetPort(), panel.GetToken());
+    AdminClientRequest request{ "POST", "/api/panel/work", "{}", "application/json", "" };
+    request.Headers.push_back({ "X-Forwarded-For", "203.0.113.9" });
+    AdminClientResponse const held = client.Send(request, std::chrono::seconds(10));
+    EXPECT_EQ(held.Status, 429) << held.Body;
+
+    std::optional<PanelStore::Statement> rows = panel.Store().Prepare("SELECT address FROM audit_event WHERE name = 'panel:request.throttled'", error);
+    ASSERT_TRUE(rows.has_value()) << error;
+    ASSERT_TRUE(rows->Step(error)) << error;
+    EXPECT_EQ(rows->Text(0), "127.0.0.1");
+    EXPECT_FALSE(rows->Step(error));
+    EXPECT_TRUE(error.empty()) << error;
 }

@@ -54,6 +54,7 @@ ListenerSettings ListenerSettings::Load(ConfigMgr const& config, std::string_vie
         report(fmt::format("{} = {} is outside {}-{}; using {}", key("Threads"), threads, MinThreads, MaxThreads, settings.Threads));
 
     settings.DashboardDir = ConfigMgr::PathFromUtf8(Ambrose::Trim(config.GetOption<std::string>(key("DashboardDir"), "", true)));
+    settings.TrustedProxies = std::string(Ambrose::Trim(config.GetOption<std::string>(key("TrustedProxies"), "", true)));
 
     std::string const hostList = config.GetOption<std::string>(key("AllowedHosts"), "", true);
     for (std::string_view rest = hostList; !rest.empty();)
@@ -74,6 +75,16 @@ ListenerSettings ListenerSettings::Load(ConfigMgr const& config, std::string_vie
     settings.SessionLifetimeHours = std::clamp<uint32>(lifetime, MinSessionLifetimeHours, MaxSessionLifetimeHours);
     if (settings.SessionLifetimeHours != lifetime)
         report(fmt::format("{} = {} is outside {}-{}; using {}", key("SessionLifetimeHours"), lifetime, MinSessionLifetimeHours, MaxSessionLifetimeHours, settings.SessionLifetimeHours));
+
+    uint32 const rateBurst = config.GetOption<uint32>(key("RateLimitBurst"), settings.RateLimitBurst, true);
+    settings.RateLimitBurst = std::clamp<uint32>(rateBurst, 1, MaxRateLimitBurst);
+    if (settings.RateLimitBurst != rateBurst)
+        report(fmt::format("{} = {} is outside 1-{}; using {}", key("RateLimitBurst"), rateBurst, MaxRateLimitBurst, settings.RateLimitBurst));
+
+    double const ratePerSecond = config.GetOption<double>(key("RateLimitPerSecond"), settings.RateLimitPerSecond, true);
+    settings.RateLimitPerSecond = std::clamp(ratePerSecond, 0.0, MaxRateLimitPerSecond);
+    if (settings.RateLimitPerSecond != ratePerSecond)
+        report(fmt::format("{} = {} is outside 0-{}; using {}", key("RateLimitPerSecond"), ratePerSecond, MaxRateLimitPerSecond, settings.RateLimitPerSecond));
 
     return settings;
 }

@@ -13,6 +13,8 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 struct AdminClientRequest
 {
@@ -21,6 +23,7 @@ struct AdminClientRequest
     std::string Body;
     std::string ContentType = "application/json";
     std::string RequestId;
+    std::vector<std::pair<std::string, std::string>> Headers;
 };
 
 struct AdminClientResponse

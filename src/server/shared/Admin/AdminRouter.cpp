@@ -6,6 +6,7 @@
 #include "AdminRouter.h"
 #include "AdminSessions.h"
 #include "Base64.h"
+#include "SHA256.h"
 #include "ConstantTime.h"
 #include "CryptoRandom.h"
 #include "IpAddress.h"
@@ -90,7 +91,7 @@ AdminRouter::AdminRouter(AdminAuth& auth) : _auth(auth)
 {
 }
 
-void AdminRouter::Put(std::string method, std::string path, Handler handler, bool isPublic, bool prefix)
+void AdminRouter::Put(std::string method, std::string path, Handler handler, bool isPublic, bool prefix, uint32 cost)
 {
     std::unique_lock const lock(_mutex);
     std::string const upper = Ambrose::ToUpper(method);
@@ -99,14 +100,41 @@ void AdminRouter::Put(std::string method, std::string path, Handler handler, boo
     {
         existing->Run = std::move(handler);
         existing->Public = isPublic;
+        existing->Cost = cost;
         return;
     }
-    _routes.push_back({ upper, std::move(path), std::move(handler), isPublic, prefix });
+    _routes.push_back({ upper, std::move(path), std::move(handler), isPublic, prefix, cost });
 }
 
 void AdminRouter::Add(std::string method, std::string path, Handler handler)
 {
     Put(std::move(method), std::move(path), std::move(handler), false);
+}
+
+void AdminRouter::AddCosting(std::string method, std::string path, uint32 cost, Handler handler)
+{
+    Put(std::move(method), std::move(path), std::move(handler), false, false, cost);
+}
+
+void AdminRouter::SetThrottle(Throttle throttle)
+{
+    std::unique_lock const lock(_mutex);
+    _throttle = std::move(throttle);
+}
+
+uint32 AdminRouter::CostOf(std::string_view method, std::string_view path) const
+{
+    std::shared_lock const lock(_mutex);
+    std::string const upper = Ambrose::ToUpper(method);
+    for (Route const& route : _routes)
+    {
+        if (route.Prefix ? path.starts_with(route.Path) : route.Path == path)
+        {
+            if (route.Method == upper)
+                return route.Cost;
+        }
+    }
+    return 0;
 }
 
 void AdminRouter::AddPrefix(std::string method, std::string prefix, Handler handler)
@@ -157,6 +185,18 @@ void AdminRouter::SetProblemLog(ProblemLog log)
 void AdminRouter::SetSecure(bool secure)
 {
     _secure.store(secure);
+}
+
+void AdminRouter::SetTrustedProxies(TrustedProxies proxies)
+{
+    std::unique_lock lock(_mutex);
+    _trustedProxies = std::move(proxies);
+}
+
+std::string AdminRouter::ResolveAddress(std::string_view peer, std::string_view forwardedFor) const
+{
+    std::shared_lock lock(_mutex);
+    return _trustedProxies.ClientAddress(peer, forwardedFor);
 }
 
 void AdminRouter::SetMaxBodyBytes(std::size_t bytes)
@@ -225,7 +265,12 @@ std::optional<std::string> AdminRouter::SessionSecret(AdminRequest const& reques
 AdminAuthResult AdminRouter::Authenticate(AdminRequest& request) const
 {
     if (!request.Authorization.empty())
-        return _auth.Check(request.RemoteAddress, request.Authorization);
+    {
+        AdminAuthResult const result = _auth.Check(request.RemoteAddress, request.Authorization);
+        if (result == AdminAuthResult::Ok)
+            request.Principal = "token";
+        return result;
+    }
 
     AdminBrowserAccess const browser = GetBrowserAccess();
     if (browser.Sessions)
@@ -241,6 +286,7 @@ AdminAuthResult AdminRouter::Authenticate(AdminRequest& request) const
                 if (changes && !request.Upgrade && !Ambrose::Crypto::ConstantTimeEquals(request.Csrf, *csrf))
                     return AdminAuthResult::Forbidden;
                 request.SessionCsrf = *csrf;
+                request.Principal = "session:" + Base64::Encode(SHA256::GetDigestOf(*secret), Base64::Alphabet::UrlSafe, Base64::Padding::Omitted).substr(0, 16);
                 return AdminAuthResult::Ok;
             }
         }
@@ -339,6 +385,16 @@ AdminResponse AdminRouter::Answer(AdminRequest& request) const
         return Refused(authenticated);
     if (limit != 0 && request.Body.size() > limit)
         return AdminResponse::Problem(413, "payload_too_large", "The admin API takes at most " + std::to_string(limit) + " bytes of request body");
+    Throttle throttle;
+    {
+        std::shared_lock const lock(_mutex);
+        throttle = _throttle;
+    }
+    if (throttle)
+    {
+        if (std::optional<AdminResponse> held = throttle(request, CostOf(request.Method, request.Path)))
+            return std::move(*held);
+    }
     return Serve(request);
 }
 

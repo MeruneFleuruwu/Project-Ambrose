@@ -30,6 +30,8 @@ struct ListenerSettings
     static constexpr uint32 MaxSessionIdleMinutes = 10080;
     static constexpr uint32 MinSessionLifetimeHours = 1;
     static constexpr uint32 MaxSessionLifetimeHours = 720;
+    static constexpr uint32 MaxRateLimitBurst = 1000000;
+    static constexpr double MaxRateLimitPerSecond = 100000.0;
 
     std::string Prefix = "Admin";
     std::string Label = "the admin API";
@@ -49,8 +51,11 @@ struct ListenerSettings
     uint32 Threads = 2;
     std::filesystem::path DashboardDir;
     std::vector<std::string> AllowedHosts;
+    std::string TrustedProxies;
     uint32 SessionIdleMinutes = 720;
     uint32 SessionLifetimeHours = 168;
+    uint32 RateLimitBurst = 120;
+    double RateLimitPerSecond = 2.0;
 
     static ListenerSettings Load(ConfigMgr const& config, std::string_view prefix, uint16 defaultPort, std::vector<std::string>* problems = nullptr);
 

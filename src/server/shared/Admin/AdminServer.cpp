@@ -10,6 +10,7 @@
 #include "Log.h"
 #include "StringUtil.h"
 #include "TlsCertificate.h"
+#include "TrustedProxies.h"
 #include "TlsServerContext.h"
 
 #include <crow.h>
@@ -166,12 +167,12 @@ namespace
         std::vector<std::unique_ptr<SocketBinding>> _bindings;
     };
 
-    AdminRequest ToAdminRequest(crow::request const& request)
+    AdminRequest ToAdminRequest(crow::request const& request, AdminRouter const& router)
     {
         AdminRequest incoming;
         incoming.Method = crow::method_name(request.method);
         incoming.Path = request.url;
-        incoming.RemoteAddress = request.remote_ip_address;
+        incoming.RemoteAddress = router.ResolveAddress(request.remote_ip_address, request.get_header_value("x-forwarded-for"));
         incoming.Authorization = request.get_header_value("Authorization");
         incoming.Body = request.body;
         incoming.Host = request.get_header_value("Host");
@@ -221,7 +222,7 @@ namespace
         {
             if (!_router || BecomesAWebSocket(request))
                 return;
-            Apply(response, _router->Dispatch(ToAdminRequest(request)));
+            Apply(response, _router->Dispatch(ToAdminRequest(request, *_router)));
             response.end();
         }
 
@@ -229,7 +230,7 @@ namespace
         {
             if (!_router || !request.remote_ip_address.empty())
                 return;
-            Apply(response, _router->Dispatch(ToAdminRequest(request)));
+            Apply(response, _router->Dispatch(ToAdminRequest(request, *_router)));
         }
 
     private:
@@ -638,7 +639,7 @@ bool AdminServer::Open(ListenerSettings const& settings, std::string const& toke
     std::optional<uint16> const reserved = ReserveEndpoint(settings.BindIp, settings.Port, error);
     if (!reserved)
     {
-        error = fmt::format("the admin API cannot bind {}:{}: {}", settings.BindIp, settings.Port, error);
+        error = fmt::format("{} cannot bind {}:{}: {}", Capitalised(), settings.BindIp, settings.Port, error);
         return false;
     }
 
@@ -647,10 +648,12 @@ bool AdminServer::Open(ListenerSettings const& settings, std::string const& toke
     _auth.SetToken(_token);
     _auth.SetLimits(settings.AuthFailureBurst, settings.AuthFailuresPerSecond);
     _router.SetMaxBodyBytes(settings.MaxRequestBytes);
-    _router.SetSecure(settings.HasTls());
     ApplyLiveSettings(settings);
     _sessions.CloseAll();
-    _router.SetBrowserAccess({ &_sessions, fmt::format("ambrose_{}_{}", Ambrose::ToLower(settings.Prefix), *reserved), false });
+    bool const secure = settings.HasTls();
+    _router.SetSecure(secure);
+    _router.SetTrustedProxies(TrustedProxies::Parse(settings.TrustedProxies, nullptr, settings.Option("TrustedProxies")));
+    _router.SetBrowserAccess({ &_sessions, fmt::format("{}ambrose_{}_{}", secure ? "__Host-" : "", Ambrose::ToLower(settings.Prefix), *reserved), secure });
 
     LogBridge().Attach(&_log);
     crow::logger::setHandler(&LogBridge());
@@ -664,26 +667,25 @@ bool AdminServer::Open(ListenerSettings const& settings, std::string const& toke
         return false;
     };
 
-    bool const secure = settings.HasTls();
     auto listener = std::make_unique<Listener>();
     listener->BindIp = settings.BindIp;
     if (secure)
     {
         std::string problem;
         if (!listener->Certificate.Load(settings.CertificateFile, settings.PrivateKeyFile, problem))
-            return abandon(fmt::format("the admin API cannot serve TLS: {}", problem));
+            return abandon(fmt::format("{} cannot serve TLS: {}", Capitalised(), problem));
         asio::ssl::context context(asio::ssl::context::tls_server);
         context.set_options(asio::ssl::context::default_workarounds | asio::ssl::context::no_sslv2 | asio::ssl::context::no_sslv3
             | asio::ssl::context::no_tlsv1 | asio::ssl::context::no_tlsv1_1 | asio::ssl::context::single_dh_use);
         context.set_verify_mode(asio::ssl::verify_none);
         if (!listener->Tls.Attach(context.native_handle(), listener->Certificate, problem))
-            return abandon(fmt::format("the admin API cannot serve TLS: {}", problem));
+            return abandon(fmt::format("{} cannot serve TLS: {}", Capitalised(), problem));
         listener->App.ssl(std::move(context));
     }
     listener->App.get_middleware<AdminGate>().Bind(&_router);
     listener->App.catchall_route()([this](crow::request const& request, crow::response& response)
     {
-        Apply(response, _router.Dispatch(ToAdminRequest(request)));
+        Apply(response, _router.Dispatch(ToAdminRequest(request, _router)));
         response.end();
     });
     auto const takeSockets = [this, &listener, &settings](char const* pattern)
@@ -692,7 +694,7 @@ bool AdminServer::Open(ListenerSettings const& settings, std::string const& toke
             .max_payload(settings.MaxRequestBytes)
             .onaccept([this, open = listener->Open](crow::request const& request, std::optional<crow::response>& refusal, void** userdata)
             {
-                AdminRequest incoming = ToAdminRequest(request);
+                AdminRequest incoming = ToAdminRequest(request, _router);
                 incoming.Upgrade = true;
                 incoming.Id = AdminRouter::NewRequestId();
                 auto const refuse = [&](AdminResponse answer)
@@ -761,7 +763,7 @@ bool AdminServer::Open(ListenerSettings const& settings, std::string const& toke
     if (listener->App.wait_for_server_start(std::chrono::milliseconds(10000)) == std::cv_status::timeout)
     {
         listener->App.stop();
-        return abandon(fmt::format("the admin API did not start on {}:{}", settings.BindIp, *reserved));
+        return abandon(fmt::format("{} did not start on {}:{}", Capitalised(), settings.BindIp, *reserved));
     }
 
     uint16 bound = 0;
@@ -776,7 +778,7 @@ bool AdminServer::Open(ListenerSettings const& settings, std::string const& toke
     if (bound == 0)
     {
         listener->App.stop();
-        return abandon(fmt::format("the admin API could not bind {}:{}", settings.BindIp, *reserved));
+        return abandon(fmt::format("{} could not bind {}:{}", Capitalised(), settings.BindIp, *reserved));
     }
 
     listener->Port = bound;

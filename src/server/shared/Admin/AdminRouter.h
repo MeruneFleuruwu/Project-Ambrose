@@ -7,6 +7,7 @@
 #define AMBROSE_ADMINROUTER_H
 
 #include "AdminAuth.h"
+#include "TrustedProxies.h"
 
 #include <atomic>
 #include <cstddef>
@@ -33,6 +34,7 @@ struct AdminRequest
     std::string Csrf;
     bool Upgrade = false;
     std::string Id;
+    std::string Principal;
     std::optional<std::string> SessionCsrf;
 };
 
@@ -70,7 +72,12 @@ public:
     AdminRouter(AdminRouter const&) = delete;
     AdminRouter& operator=(AdminRouter const&) = delete;
 
+    using Throttle = std::function<std::optional<AdminResponse>(AdminRequest const&, uint32 cost)>;
+
     void Add(std::string method, std::string path, Handler handler);
+    void AddCosting(std::string method, std::string path, uint32 cost, Handler handler);
+    void SetThrottle(Throttle throttle);
+    uint32 CostOf(std::string_view method, std::string_view path) const;
     void AddPublic(std::string method, std::string path, Handler handler);
     void AddPrefix(std::string method, std::string prefix, Handler handler);
     void SetFiles(Handler files);
@@ -79,6 +86,8 @@ public:
     void SetProblemLog(ProblemLog log);
     void SetMaxBodyBytes(std::size_t bytes);
     void SetSecure(bool secure);
+    void SetTrustedProxies(TrustedProxies proxies);
+    std::string ResolveAddress(std::string_view peer, std::string_view forwardedFor) const;
     bool Has(std::string const& method, std::string const& path) const;
     std::vector<std::string> Describe() const;
 
@@ -103,15 +112,18 @@ private:
         Handler Run;
         bool Public = false;
         bool Prefix = false;
+        uint32 Cost = 0;
     };
 
     AdminResponse Answer(AdminRequest& request) const;
     AdminResponse Serve(AdminRequest const& request) const;
-    void Put(std::string method, std::string path, Handler handler, bool isPublic, bool prefix = false);
+    void Put(std::string method, std::string path, Handler handler, bool isPublic, bool prefix = false, uint32 cost = 0);
 
     AdminAuth& _auth;
     std::atomic<std::size_t> _maxBodyBytes{ 0 };
     std::atomic<bool> _secure{ false };
+    TrustedProxies _trustedProxies;
+    Throttle _throttle;
     mutable std::shared_mutex _mutex;
     std::vector<Route> _routes;
     Handler _files;
