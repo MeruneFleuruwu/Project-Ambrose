@@ -4,6 +4,8 @@
 
 Work through the phases in order. Each phase ends with something visible in the real client, and each milestone is small enough to implement and verify in one focused stretch. A milestone is done when every acceptance check in its phase file passes.
 
+**Evidence names nothing personal.** Settled on 2026-09-22 at the maintainer's direction. A ticked acceptance check quotes what proved it, and this repository is public, so the quote uses a neutral stand-in wherever a real account, address, token, path or machine name would otherwise appear: `<account>` for a game or panel account, `<address>` for an address that is not loopback, and so on. What matters in the evidence is the behaviour the line shows, never whose account showed it. The same goes for sample data in the panel and for anything pasted into a doc. The forbidden file scan keeps out keys, stores, logs and token files, which is where such things usually leak from; this rule covers the ones a person types by hand.
+
 **Every subsystem ships with its panel surface.** Settled on 2026-09-18 at the maintainer's direction, once the panel foundation is built: a milestone that adds a subsystem also adds what the panel needs to show and drive it, in the same milestone and with its own acceptance check. That means the fields it publishes into the status API, the admin endpoints and events it serves, and its page or section in the dashboard, in the look doc/DESIGN.md sets. Phase 17 then holds only the panel's own machinery, not a queue of pages waiting to be fitted to finished systems. A milestone whose subsystem has nothing to show says so in its deliverables.
 
 ## Where we are

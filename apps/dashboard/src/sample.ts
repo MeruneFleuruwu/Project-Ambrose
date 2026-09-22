@@ -130,7 +130,7 @@ export const realms = [
 ];
 
 export const panelUsers = [
-    { name: "Imjustchico", role: "Owner", twoFactor: "On", lastSignIn: "now" },
+    { name: "operator", role: "Owner", twoFactor: "On", lastSignIn: "now" },
     { name: "helper", role: "Operator", twoFactor: "On", lastSignIn: "2 h ago" },
 ];
 
@@ -141,11 +141,11 @@ export const backups = [
 ];
 
 export const activity = [
-    { when: "09:12", who: "Imjustchico", what: "Restarted gameserver", where: "gameserver" },
+    { when: "09:12", who: "operator", what: "Restarted gameserver", where: "gameserver" },
     { when: "09:05", who: "helper", what: "Kicked Quinn Deathwhisper: stuck in a zone", where: "Players" },
     { when: "08:55", who: "helper", what: "Banned spammer42 for 30 days: spam in chat", where: "Accounts" },
-    { when: "08:40", who: "Imjustchico", what: "Changed Realm.PlayerLimit from 400 to 500", where: "Settings" },
-    { when: "08:31", who: "Imjustchico", what: "Stopped patchserver", where: "patchserver" },
+    { when: "08:40", who: "operator", what: "Changed Realm.PlayerLimit from 400 to 500", where: "Settings" },
+    { when: "08:31", who: "operator", what: "Stopped patchserver", where: "patchserver" },
     { when: "03:00", who: "Scheduler", what: "Took nightly-2026-09-22 and verified it", where: "Backups" },
 ];
 
