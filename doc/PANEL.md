@@ -434,6 +434,14 @@ Power actions (17.27) target one app, one realm (its gameservers), or the whole 
 - On supervisor start, apps still running are re-adopted after checking their process id, process start time and executable path, so a reused process id is never mistaken for an app, and their logs reattach. Apps whose desired state is running and are not running are started.
 - Backoff, windows, timeouts and exit classification are live settings.
 
+### Error reports
+
+Errors are reported from the code that raised them, not matched out of console text (17.106). Every log record carries the repository-relative source file, line and function of the call that wrote it and the message's format template, and the live log stream carries both. Each app groups what it logs at error level and above by category, location and template with a count, first and last time and build revision, and the supervisor keeps those groups in its store across restarts.
+
+- The Error reports page lists the groups by app, category, location and time, and each opens its file and line, template, count, the times and the log lines from before its latest occurrence.
+- Create report writes a versioned file with the product version, commit and branch, the operating system, each app's revision and the chosen groups. Templates hold no player data, so they are always in the file; rendered messages and surrounding log lines join only when the operator ticks them after a preview of exactly what the file will hold.
+- No secret, account verifier, client file or player identity is in a report unless the operator included rendered text after that preview. The page downloads the file and links to the repository's issue form for sending it; nothing is sent from the machine on its own, and every report is audited.
+
 ### Stale state after a crash
 
 A gameserver that dies leaves rows behind that a player feels. 4.07 writes `characters.online`, `account.online`, `realm_online_character` and a realm's `login_key` rows at world entry, and until they are cleared the character stays locked out, which is the crash-safety item doc/ROADMAP.md's review list names. The supervisor is what notices the crash, so it owns the repair (17.61):
