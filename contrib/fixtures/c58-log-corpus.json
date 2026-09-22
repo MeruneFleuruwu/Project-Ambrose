@@ -3,9 +3,9 @@
   "records": [
     {
       "id": "c58-0001",
-      "line": "21:12:00.000 TRACE [server.app        ] Session 1 authenticated as account 1 from 127.0.0.1:12000 in 1 ms",
+      "line": "21:12:00.000 TRACE [accounts          ] Session 1 authenticated as account 1 from 127.0.0.1:12000 in 1 ms",
       "level": "TRACE",
-      "category": "server.app",
+      "category": "accounts",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -21,7 +21,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "accounts          ",
           "start": 20,
           "end": 38
         },
@@ -527,9 +527,9 @@
     },
     {
       "id": "c58-0014",
-      "line": "21:12:13.013 DEBUG [server.app        ] Database pool at 14% after 14 ms",
+      "line": "21:12:13.013 DEBUG [characters        ] Database pool at 14% after 14 ms",
       "level": "DEBUG",
-      "category": "server.app",
+      "category": "characters",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -545,7 +545,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "characters        ",
           "start": 20,
           "end": 38
         },
@@ -1033,9 +1033,9 @@
     },
     {
       "id": "c58-0027",
-      "line": "21:12:26.026 INFO  [server.app        ] Reloaded settings.json in 27 ms",
+      "line": "21:12:26.026 INFO  [commands.console  ] Reloaded settings.json in 27 ms",
       "level": "INFO",
-      "category": "server.app",
+      "category": "commands.console",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -1051,7 +1051,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "commands.console  ",
           "start": 20,
           "end": 38
         },
@@ -1539,9 +1539,9 @@
     },
     {
       "id": "c58-0040",
-      "line": "21:12:39.039 WARN  [server.app        ] Shutdown notice sent to Session 40",
+      "line": "21:12:39.039 WARN  [server.dbimport   ] Shutdown notice sent to Session 40",
       "level": "WARN",
-      "category": "server.app",
+      "category": "server.dbimport",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -1557,7 +1557,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "server.dbimport   ",
           "start": 20,
           "end": 38
         },
@@ -2057,9 +2057,9 @@
     },
     {
       "id": "c58-0053",
-      "line": "21:12:52.052 ERROR [server.app        ] Configuration loaded from gameserver.conf for session 53",
+      "line": "21:12:52.052 ERROR [server.gameserver ] Configuration loaded from gameserver.conf for session 53",
       "level": "ERROR",
-      "category": "server.app",
+      "category": "server.gameserver",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -2075,7 +2075,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "server.gameserver ",
           "start": 20,
           "end": 38
         },
@@ -2563,9 +2563,9 @@
     },
     {
       "id": "c58-0066",
-      "line": "21:13:05.065 FATAL [server.app        ] Worker 66 stopped after 66 ms",
+      "line": "21:13:05.065 FATAL [server.loginserver] Worker 66 stopped after 66 ms",
       "level": "FATAL",
-      "category": "server.app",
+      "category": "server.loginserver",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -2581,7 +2581,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "server.loginserver",
           "start": 20,
           "end": 38
         },
@@ -3069,9 +3069,9 @@
     },
     {
       "id": "c58-0079",
-      "line": "21:13:18.078 TRACE [server.app        ] Failed to open /opt/ambrose/logs/server.log for account 79",
+      "line": "21:13:18.078 TRACE [accounts          ] Failed to open /opt/ambrose/logs/server.log for account 79",
       "level": "TRACE",
-      "category": "server.app",
+      "category": "accounts",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -3087,7 +3087,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "accounts          ",
           "start": 20,
           "end": 38
         },
@@ -3581,9 +3581,9 @@
     },
     {
       "id": "c58-0092",
-      "line": "21:13:31.091 DEBUG [server.app        ] Session 92 sent MSG_LOGIN, payload 92 ms",
+      "line": "21:13:31.091 DEBUG [characters        ] Session 92 sent MSG_LOGIN, payload 92 ms",
       "level": "DEBUG",
-      "category": "server.app",
+      "category": "characters",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -3599,7 +3599,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "characters        ",
           "start": 20,
           "end": 38
         },
@@ -4093,9 +4093,9 @@
     },
     {
       "id": "c58-0105",
-      "line": "21:13:44.104 INFO  [server.app        ] Rejected request from 127.0.0.1:12000 for account 22",
+      "line": "21:13:44.104 INFO  [commands.console  ] Rejected request from 127.0.0.1:12000 for account 22",
       "level": "INFO",
-      "category": "server.app",
+      "category": "commands.console",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -4111,7 +4111,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "commands.console  ",
           "start": 20,
           "end": 38
         },
@@ -4599,9 +4599,9 @@
     },
     {
       "id": "c58-0118",
-      "line": "21:13:57.117 WARN  [server.app        ] MSG_KEEPALIVE answered for Session 21",
+      "line": "21:13:57.117 WARN  [server.dbimport   ] MSG_KEEPALIVE answered for Session 21",
       "level": "WARN",
-      "category": "server.app",
+      "category": "server.dbimport",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -4617,7 +4617,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "server.dbimport   ",
           "start": 20,
           "end": 38
         },
@@ -5099,9 +5099,9 @@
     },
     {
       "id": "c58-0131",
-      "line": "21:14:10.130 ERROR [server.app        ] Session 34 authenticated as account 48 from 127.0.0.1:12000 in 131 ms",
+      "line": "21:14:10.130 ERROR [server.gameserver ] Session 34 authenticated as account 48 from 127.0.0.1:12000 in 131 ms",
       "level": "ERROR",
-      "category": "server.app",
+      "category": "server.gameserver",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -5117,7 +5117,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "server.gameserver ",
           "start": 20,
           "end": 38
         },
@@ -5623,9 +5623,9 @@
     },
     {
       "id": "c58-0144",
-      "line": "21:14:23.143 FATAL [server.app        ] Database pool at 45% after 144 ms",
+      "line": "21:14:23.143 FATAL [server.loginserver] Database pool at 45% after 144 ms",
       "level": "FATAL",
-      "category": "server.app",
+      "category": "server.loginserver",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -5641,7 +5641,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "server.loginserver",
           "start": 20,
           "end": 38
         },
@@ -6129,9 +6129,9 @@
     },
     {
       "id": "c58-0157",
-      "line": "21:14:36.156 TRACE [server.app        ] Reloaded settings.json in 157 ms",
+      "line": "21:14:36.156 TRACE [accounts          ] Reloaded settings.json in 157 ms",
       "level": "TRACE",
-      "category": "server.app",
+      "category": "accounts",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -6147,7 +6147,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "accounts          ",
           "start": 20,
           "end": 38
         },
@@ -6635,9 +6635,9 @@
     },
     {
       "id": "c58-0170",
-      "line": "21:14:49.169 DEBUG [server.app        ] Shutdown notice sent to Session 73",
+      "line": "21:14:49.169 DEBUG [characters        ] Shutdown notice sent to Session 73",
       "level": "DEBUG",
-      "category": "server.app",
+      "category": "characters",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -6653,7 +6653,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "characters        ",
           "start": 20,
           "end": 38
         },
@@ -7153,9 +7153,9 @@
     },
     {
       "id": "c58-0183",
-      "line": "21:15:02.182 INFO  [server.app        ] Configuration loaded from gameserver.conf for session 86",
+      "line": "21:15:02.182 INFO  [commands.console  ] Configuration loaded from gameserver.conf for session 86",
       "level": "INFO",
-      "category": "server.app",
+      "category": "commands.console",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -7171,7 +7171,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "commands.console  ",
           "start": 20,
           "end": 38
         },
@@ -7659,9 +7659,9 @@
     },
     {
       "id": "c58-0196",
-      "line": "21:15:15.195 WARN  [server.app        ] Worker 2 stopped after 196 ms",
+      "line": "21:15:15.195 WARN  [server.dbimport   ] Worker 2 stopped after 196 ms",
       "level": "WARN",
-      "category": "server.app",
+      "category": "server.dbimport",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -7677,7 +7677,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "server.dbimport   ",
           "start": 20,
           "end": 38
         },
@@ -8165,9 +8165,9 @@
     },
     {
       "id": "c58-0209",
-      "line": "21:15:28.208 ERROR [server.app        ] Failed to open /opt/ambrose/logs/server.log for account 43",
+      "line": "21:15:28.208 ERROR [server.gameserver ] Failed to open /opt/ambrose/logs/server.log for account 43",
       "level": "ERROR",
-      "category": "server.app",
+      "category": "server.gameserver",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -8183,7 +8183,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "server.gameserver ",
           "start": 20,
           "end": 38
         },
@@ -8677,9 +8677,9 @@
     },
     {
       "id": "c58-0222",
-      "line": "21:15:41.221 FATAL [server.app        ] Session 28 sent MSG_LOGIN, payload 222 ms",
+      "line": "21:15:41.221 FATAL [server.loginserver] Session 28 sent MSG_LOGIN, payload 222 ms",
       "level": "FATAL",
-      "category": "server.app",
+      "category": "server.loginserver",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -8695,7 +8695,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "server.loginserver",
           "start": 20,
           "end": 38
         },
@@ -9189,9 +9189,9 @@
     },
     {
       "id": "c58-0235",
-      "line": "21:15:54.234 TRACE [server.app        ] Rejected request from 127.0.0.1:12000 for account 69",
+      "line": "21:15:54.234 TRACE [accounts          ] Rejected request from 127.0.0.1:12000 for account 69",
       "level": "TRACE",
-      "category": "server.app",
+      "category": "accounts",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -9207,7 +9207,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "accounts          ",
           "start": 20,
           "end": 38
         },
@@ -9695,9 +9695,9 @@
     },
     {
       "id": "c58-0248",
-      "line": "21:16:07.247 DEBUG [server.app        ] MSG_KEEPALIVE answered for Session 54",
+      "line": "21:16:07.247 DEBUG [characters        ] MSG_KEEPALIVE answered for Session 54",
       "level": "DEBUG",
-      "category": "server.app",
+      "category": "characters",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -9713,7 +9713,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "characters        ",
           "start": 20,
           "end": 38
         },
@@ -10195,9 +10195,9 @@
     },
     {
       "id": "c58-0261",
-      "line": "21:16:20.260 INFO  [server.app        ] Session 67 authenticated as account 12 from 127.0.0.1:12000 in 261 ms",
+      "line": "21:16:20.260 INFO  [commands.console  ] Session 67 authenticated as account 12 from 127.0.0.1:12000 in 261 ms",
       "level": "INFO",
-      "category": "server.app",
+      "category": "commands.console",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -10213,7 +10213,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "commands.console  ",
           "start": 20,
           "end": 38
         },
@@ -10719,9 +10719,9 @@
     },
     {
       "id": "c58-0274",
-      "line": "21:16:33.273 WARN  [server.app        ] Database pool at 76% after 274 ms",
+      "line": "21:16:33.273 WARN  [server.dbimport   ] Database pool at 76% after 274 ms",
       "level": "WARN",
-      "category": "server.app",
+      "category": "server.dbimport",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -10737,7 +10737,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "server.dbimport   ",
           "start": 20,
           "end": 38
         },
@@ -11225,9 +11225,9 @@
     },
     {
       "id": "c58-0287",
-      "line": "21:16:46.286 ERROR [server.app        ] Reloaded settings.json in 287 ms",
+      "line": "21:16:46.286 ERROR [server.gameserver ] Reloaded settings.json in 287 ms",
       "level": "ERROR",
-      "category": "server.app",
+      "category": "server.gameserver",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -11243,7 +11243,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "server.gameserver ",
           "start": 20,
           "end": 38
         },
@@ -11731,9 +11731,9 @@
     },
     {
       "id": "c58-0300",
-      "line": "21:16:59.299 FATAL [server.app        ] Shutdown notice sent to Session 9",
+      "line": "21:16:59.299 FATAL [server.loginserver] Shutdown notice sent to Session 9",
       "level": "FATAL",
-      "category": "server.app",
+      "category": "server.loginserver",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -11749,7 +11749,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "server.loginserver",
           "start": 20,
           "end": 38
         },
@@ -12249,9 +12249,9 @@
     },
     {
       "id": "c58-0313",
-      "line": "21:17:12.312 TRACE [server.app        ] Configuration loaded from gameserver.conf for session 22",
+      "line": "21:17:12.312 TRACE [accounts          ] Configuration loaded from gameserver.conf for session 22",
       "level": "TRACE",
-      "category": "server.app",
+      "category": "accounts",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -12267,7 +12267,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "accounts          ",
           "start": 20,
           "end": 38
         },
@@ -12755,9 +12755,9 @@
     },
     {
       "id": "c58-0326",
-      "line": "21:17:25.325 DEBUG [server.app        ] Worker 35 stopped after 326 ms",
+      "line": "21:17:25.325 DEBUG [characters        ] Worker 35 stopped after 326 ms",
       "level": "DEBUG",
-      "category": "server.app",
+      "category": "characters",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -12773,7 +12773,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "characters        ",
           "start": 20,
           "end": 38
         },
@@ -13261,9 +13261,9 @@
     },
     {
       "id": "c58-0339",
-      "line": "21:17:38.338 INFO  [server.app        ] Failed to open /opt/ambrose/logs/server.log for account 7",
+      "line": "21:17:38.338 INFO  [commands.console  ] Failed to open /opt/ambrose/logs/server.log for account 7",
       "level": "INFO",
-      "category": "server.app",
+      "category": "commands.console",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -13279,7 +13279,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "commands.console  ",
           "start": 20,
           "end": 38
         },
@@ -13773,9 +13773,9 @@
     },
     {
       "id": "c58-0352",
-      "line": "21:17:51.351 WARN  [server.app        ] Session 61 sent MSG_LOGIN, payload 352 ms",
+      "line": "21:17:51.351 WARN  [server.dbimport   ] Session 61 sent MSG_LOGIN, payload 352 ms",
       "level": "WARN",
-      "category": "server.app",
+      "category": "server.dbimport",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -13791,7 +13791,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "server.dbimport   ",
           "start": 20,
           "end": 38
         },
@@ -14285,9 +14285,9 @@
     },
     {
       "id": "c58-0365",
-      "line": "21:18:04.364 ERROR [server.app        ] Rejected request from 127.0.0.1:12000 for account 33",
+      "line": "21:18:04.364 ERROR [server.gameserver ] Rejected request from 127.0.0.1:12000 for account 33",
       "level": "ERROR",
-      "category": "server.app",
+      "category": "server.gameserver",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -14303,7 +14303,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "server.gameserver ",
           "start": 20,
           "end": 38
         },
@@ -14791,9 +14791,9 @@
     },
     {
       "id": "c58-0378",
-      "line": "21:18:17.377 FATAL [server.app        ] MSG_KEEPALIVE answered for Session 87",
+      "line": "21:18:17.377 FATAL [server.loginserver] MSG_KEEPALIVE answered for Session 87",
       "level": "FATAL",
-      "category": "server.app",
+      "category": "server.loginserver",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -14809,7 +14809,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "server.loginserver",
           "start": 20,
           "end": 38
         },
@@ -15291,9 +15291,9 @@
     },
     {
       "id": "c58-0391",
-      "line": "21:18:30.390 TRACE [server.app        ] Session 3 authenticated as account 59 from 127.0.0.1:12000 in 391 ms",
+      "line": "21:18:30.390 TRACE [accounts          ] Session 3 authenticated as account 59 from 127.0.0.1:12000 in 391 ms",
       "level": "TRACE",
-      "category": "server.app",
+      "category": "accounts",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -15309,7 +15309,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "accounts          ",
           "start": 20,
           "end": 38
         },
@@ -15815,9 +15815,9 @@
     },
     {
       "id": "c58-0404",
-      "line": "21:18:43.403 DEBUG [server.app        ] Database pool at 8% after 404 ms",
+      "line": "21:18:43.403 DEBUG [characters        ] Database pool at 8% after 404 ms",
       "level": "DEBUG",
-      "category": "server.app",
+      "category": "characters",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -15833,7 +15833,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "characters        ",
           "start": 20,
           "end": 38
         },
@@ -16321,9 +16321,9 @@
     },
     {
       "id": "c58-0417",
-      "line": "21:18:56.416 INFO  [server.app        ] Reloaded settings.json in 417 ms",
+      "line": "21:18:56.416 INFO  [commands.console  ] Reloaded settings.json in 417 ms",
       "level": "INFO",
-      "category": "server.app",
+      "category": "commands.console",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -16339,7 +16339,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "commands.console  ",
           "start": 20,
           "end": 38
         },
@@ -16827,9 +16827,9 @@
     },
     {
       "id": "c58-0430",
-      "line": "21:19:09.429 WARN  [server.app        ] Shutdown notice sent to Session 42",
+      "line": "21:19:09.429 WARN  [server.dbimport   ] Shutdown notice sent to Session 42",
       "level": "WARN",
-      "category": "server.app",
+      "category": "server.dbimport",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -16845,7 +16845,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "server.dbimport   ",
           "start": 20,
           "end": 38
         },
@@ -17345,9 +17345,9 @@
     },
     {
       "id": "c58-0443",
-      "line": "21:19:22.442 ERROR [server.app        ] Configuration loaded from gameserver.conf for session 55",
+      "line": "21:19:22.442 ERROR [server.gameserver ] Configuration loaded from gameserver.conf for session 55",
       "level": "ERROR",
-      "category": "server.app",
+      "category": "server.gameserver",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -17363,7 +17363,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "server.gameserver ",
           "start": 20,
           "end": 38
         },
@@ -17851,9 +17851,9 @@
     },
     {
       "id": "c58-0456",
-      "line": "21:19:35.455 FATAL [server.app        ] Worker 68 stopped after 456 ms",
+      "line": "21:19:35.455 FATAL [server.loginserver] Worker 68 stopped after 456 ms",
       "level": "FATAL",
-      "category": "server.app",
+      "category": "server.loginserver",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -17869,7 +17869,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "server.loginserver",
           "start": 20,
           "end": 38
         },
@@ -18357,9 +18357,9 @@
     },
     {
       "id": "c58-0469",
-      "line": "21:19:48.468 TRACE [server.app        ] Failed to open /opt/ambrose/logs/server.log for account 54",
+      "line": "21:19:48.468 TRACE [accounts          ] Failed to open /opt/ambrose/logs/server.log for account 54",
       "level": "TRACE",
-      "category": "server.app",
+      "category": "accounts",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -18375,7 +18375,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "accounts          ",
           "start": 20,
           "end": 38
         },
@@ -18869,9 +18869,9 @@
     },
     {
       "id": "c58-0482",
-      "line": "21:20:01.481 DEBUG [server.app        ] Session 94 sent MSG_LOGIN, payload 482 ms",
+      "line": "21:20:01.481 DEBUG [characters        ] Session 94 sent MSG_LOGIN, payload 482 ms",
       "level": "DEBUG",
-      "category": "server.app",
+      "category": "characters",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -18887,7 +18887,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "characters        ",
           "start": 20,
           "end": 38
         },
@@ -19381,9 +19381,9 @@
     },
     {
       "id": "c58-0495",
-      "line": "21:20:14.494 INFO  [server.app        ] Rejected request from 127.0.0.1:12000 for account 80",
+      "line": "21:20:14.494 INFO  [commands.console  ] Rejected request from 127.0.0.1:12000 for account 80",
       "level": "INFO",
-      "category": "server.app",
+      "category": "commands.console",
       "value_spans": [
         {
           "value_class": "timestamp",
@@ -19399,7 +19399,7 @@
         },
         {
           "value_class": "category",
-          "text": "server.app        ",
+          "text": "commands.console  ",
           "start": 20,
           "end": 38
         },
