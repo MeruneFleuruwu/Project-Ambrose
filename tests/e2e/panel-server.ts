@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Starts a real Ambrose app whose admin API serves the built panel, for the end-to-end and screenshot runs: the patchserver the C++ build made, or the one AMBROSE_PANEL_APP names, on a port the caller picks with a known token and its logs in a folder of its own, waits until it answers, and stops it again; or the supervisor from the same build, given a folder of its own holding its config and one patchserver to run, so the panel it serves carries another app's state and power buttons that reach it; or the supervisor with its own panel listener on, watching no app, so the built page can be loaded from the door it will really be opened through.
+ * Starts a real Ambrose app whose admin API serves the built panel, for the end-to-end and screenshot runs: the patchserver the C++ build made, or the one AMBROSE_PANEL_APP names, on a port the caller picks with a known token and its logs in a folder of its own, waits until it answers, and stops it again; or the supervisor from the same build, given a folder of its own holding its config and one patchserver to run, so the panel it serves carries another app's state and power buttons that reach it; or the supervisor with its own panel listener on, running one patchserver, so the built page can be loaded from the door it will really be opened through and carry an app's state through it.
  */
 
 import { spawn, type ChildProcess } from "node:child_process";
@@ -150,15 +150,22 @@ export async function startSupervisor(port: number, appPort: number): Promise<Pa
     };
 }
 
-export async function startPanelListener(adminPort: number, panelPort: number): Promise<Panel> {
-    if (!supervisor) throw new Error("no built supervisor; build the C++ tree");
+export async function startPanelListener(adminPort: number, panelPort: number, appPort: number): Promise<Panel> {
+    if (!supervisor || !app) throw new Error("no built supervisor and patchserver; build the C++ tree");
     const folder = mkdtempSync(path.join(tmpdir(), "ambrose-panel-listener-"));
     const forward = (file: string) => path.resolve(file).split("\\").join("/");
     copyFileSync(path.resolve("src/server/apps/supervisor/supervisor.conf.dist"), path.join(folder, "supervisor.conf.dist"));
+    copyFileSync(path.resolve("src/server/apps/patchserver/patchserver.conf.dist"), path.join(folder, "patchserver.conf.dist"));
+    writeFileSync(
+        path.join(folder, "patchserver.conf"),
+        ["BindIP = 127.0.0.1", `PatchServerPort = ${appPort}`, "Admin.Enable = 0", "Console.Colors = 0", `LogsDir = "${forward(path.join(folder, "logs"))}"`, ""].join("\n"),
+    );
     writeFileSync(
         path.join(folder, "supervisor.conf"),
         [
-            "Supervisor.Apps =",
+            "Supervisor.Apps = patchserver",
+            `App.patchserver.Program = "${forward(app)}"`,
+            `App.patchserver.Config = "${forward(path.join(folder, "patchserver.conf"))}"`,
             "Supervisor.StateFile = state.json",
             "Supervisor.OutputDir = output",
             "Console.Enable = 0",
@@ -189,6 +196,11 @@ export async function startPanelListener(adminPort: number, panelPort: number): 
     return {
         url,
         stop: async () => {
+            await fetch(`${url}/api/apps/patchserver/power`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "kill" }),
+            }).catch(() => undefined);
             child.kill();
             await exited(child);
             rmSync(folder, { recursive: true, force: true });

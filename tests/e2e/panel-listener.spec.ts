@@ -1,18 +1,18 @@
 /*
  * Project Ambrose by Imjustchico
- * The built panel loaded from the panel's own listener rather than an app's admin API: it signs in and reaches the overview with nothing written to the browser console, every request it makes goes back to the listener it came from, and every response carries the policy, frame denial, nosniff and referrer headers.
+ * The built panel loaded from the panel's own listener rather than an app's admin API: it signs in and reaches the overview with nothing written to the browser console, every request it makes goes back to the listener it came from, every response carries the policy, frame denial, nosniff and referrer headers, and the servers page reaches the app the supervisor runs through that listener rather than the app list of the supervisor alone.
  */
 
 import { expect, test } from "@playwright/test";
-import { built, startPanelListener, supervisor, token, type Panel } from "./panel-server";
+import { app, built, startPanelListener, supervisor, token, type Panel } from "./panel-server";
 
-test.skip(!supervisor || !built, "needs the built panel and supervisor");
+test.skip(!supervisor || !app || !built, "needs the built panel, patchserver and supervisor");
 test.describe.configure({ mode: "serial" });
 
 let panel: Panel;
 
 test.beforeAll(async () => {
-    panel = await startPanelListener(12630, 12631);
+    panel = await startPanelListener(12630, 12631, 12632);
 });
 
 test.afterAll(async () => {
@@ -55,4 +55,14 @@ test("every response from the panel listener carries its security headers", asyn
     expect(refused.status).toBe(401);
     expect(refused.headers.get("content-security-policy")).toContain("frame-ancestors 'none'");
     expect(refused.headers.get("x-content-type-options")).toBe("nosniff");
+});
+
+test("the servers page reaches the app the supervisor runs through the panel listener", async ({ page }) => {
+    await page.goto(`${panel.url}/#servers`);
+    await page.getByLabel("Admin token").fill(token);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page.getByRole("heading", { name: "Servers", level: 1 })).toBeVisible();
+
+    const row = page.getByRole("row").filter({ hasText: "patchserver" });
+    await expect(row.getByText("Running")).toBeVisible({ timeout: 20000 });
 });
