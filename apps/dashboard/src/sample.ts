@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Made-up figures the pages show until 17.06 reads them from the admin API: three apps, a realm, players, accounts, log lines and panel users, shaped like the answers the real routes give.
+ * Made-up figures the pages show until 17.06 reads them from the admin API: three apps, a realm, players and their count over the last hour, day and week, accounts, activity, log lines and panel users, shaped like the answers the real routes give.
  */
 
 export type AppState = "healthy" | "waiting" | "wrong" | "unknown";
@@ -83,9 +83,24 @@ export const backups = [
 
 export const activity = [
     { when: "09:12", who: "Imjustchico", what: "Restarted gameserver", where: "gameserver" },
+    { when: "09:05", who: "helper", what: "Kicked Quinn Deathwhisper: stuck in a zone", where: "Players" },
     { when: "08:55", who: "helper", what: "Banned spammer42 for 30 days: spam in chat", where: "Accounts" },
     { when: "08:40", who: "Imjustchico", what: "Changed Realm.PlayerLimit from 400 to 500", where: "Settings" },
+    { when: "08:31", who: "Imjustchico", what: "Stopped patchserver", where: "patchserver" },
+    { when: "03:00", who: "Scheduler", what: "Took nightly-2026-09-22 and verified it", where: "Backups" },
 ];
+
+const lastHour = [7, 7, 8, 7, 8, 8, 9, 10, 9, 9, 8, 9, 9];
+const lastDay = [6, 8, 11, 12, 14, 17, 20, 23, 26, 29, 31, 28, 22, 15, 10, 6, 4, 3, 2, 2, 3, 5, 7, 9];
+const lastWeek = [14, 27, 9, 3, 13, 25, 8, 3, 15, 29, 10, 4, 16, 33, 12, 5, 19, 38, 15, 6, 18, 36, 13, 4, 14, 31, 10, 7];
+const weekDays = ["Tue 15", "Wed 16", "Thu 17", "Fri 18", "Sat 19", "Sun 20", "Mon 21", "Tue 22"];
+const clock = (minutes: number) => `${String(Math.floor(minutes / 60) % 24).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+
+export const playerHistory = {
+    hour: lastHour.map((value, index) => ({ label: clock(8 * 60 + 12 + index * 5), value })),
+    day: lastDay.map((value, index) => ({ label: clock((10 + index) * 60), value })),
+    week: lastWeek.map((value, index) => ({ label: `${weekDays[Math.floor((index * 6 + 12) / 24)]} ${clock(((index * 6 + 12) % 24) * 60)}`, value })),
+};
 
 const levels = ["info", "info", "info", "debug", "warn", "info", "error", "info"] as const;
 const lines = [

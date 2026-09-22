@@ -170,7 +170,7 @@
                 Sample data
             </Badge>
         </header>
-        <main class="flex flex-1 flex-col gap-6 p-4 md:p-6">
+        <main class="@container/main flex flex-1 flex-col gap-6 p-4 md:p-6">
             {#if !route}
                 <Denied title="No such page" detail={`Nothing in the panel lives at #${path}.`} />
             {:else if !allowed}
