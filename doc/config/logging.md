@@ -119,6 +119,7 @@ A message goes to the logger with the longest matching name at a dot boundary. `
 | `network.session` | Session offers, accepts and kicks at Info; sessions closed for too many strikes, a full inbound queue, a failed handler, a protocol error, a missing SessionAccept or silence after a keepalive at Warn; strikes, keepalives in both directions and each closed session at Debug; and messages that could not be sent at Error |
 | `sql.sql`, `sql.updates`, `sql.driver` | Database queries, updates and connections |
 | `accounts` | Accounts created, passwords, security levels, locks and bans, and verifiers that do not open |
+| `characters` | Characters created, deleted and restored at Info, and a commit that reported a failure while the character was stored at Warn |
 | `commands.console` | Console lines accepted, refused during shutdown, dropped when the queue is full, and the input closing. Arguments of commands marked sensitive, such as `account create`, are never written |
 
 ## Async mode
