@@ -1,0 +1,14 @@
+{
+  "reload_targets": [
+    { "id": "settings", "name": "settings" }
+  ],
+  "schedule_actions": [],
+  "announcement_channels": [],
+  "problem_codes": [
+    {
+      "code": "install_missing",
+      "message": "client installation is not configured",
+      "subject": "client-data"
+    }
+  ]
+}

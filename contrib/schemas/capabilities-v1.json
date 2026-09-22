@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ambrose.invalid/schema/capabilities-v1.json",
+  "title": "Project Ambrose capabilities response v1",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "reload_targets",
+    "schedule_actions",
+    "announcement_channels",
+    "problem_codes"
+  ],
+  "properties": {
+    "reload_targets": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/capability" }
+    },
+    "schedule_actions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/capability" }
+    },
+    "announcement_channels": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/capability" }
+    },
+    "problem_codes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/problem_code" }
+    }
+  },
+  "$defs": {
+    "capability": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 }
+      }
+    },
+    "problem_code": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["code", "message", "subject"],
+      "properties": {
+        "code": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "minLength": 1 },
+        "subject": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

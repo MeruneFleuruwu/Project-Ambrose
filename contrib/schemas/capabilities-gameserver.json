@@ -1,0 +1,15 @@
+{
+  "reload_targets": [
+    { "id": "settings", "name": "settings" },
+    { "id": "zone_teleport", "name": "zone teleport" }
+  ],
+  "schedule_actions": [],
+  "announcement_channels": [],
+  "problem_codes": [
+    {
+      "code": "type_dump_missing",
+      "message": "type dump is not loaded",
+      "subject": "client-data"
+    }
+  ]
+}

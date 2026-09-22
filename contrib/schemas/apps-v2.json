@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ambrose.invalid/schema/apps-v2.json",
+  "title": "Project Ambrose apps response v2",
+  "type": "array",
+  "items": {
+    "$ref": "#/$defs/app"
+  },
+  "$defs": {
+    "app": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "app",
+        "role",
+        "realm",
+        "address",
+        "port"
+      ],
+      "properties": {
+        "app": { "type": "string", "minLength": 1 },
+        "role": { "type": "string", "minLength": 1 },
+        "realm": { "type": "string" },
+        "address": { "type": "string", "minLength": 1 },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "health": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
