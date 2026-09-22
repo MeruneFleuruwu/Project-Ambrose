@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Tests prefix layout, multi-line splitting, escaping and UTF-8 repair.
+ * Tests prefix layout, the short console timestamp, multi-line splitting, escaping and UTF-8 repair.
  */
 
 #include "LogMessage.h"
@@ -41,6 +41,21 @@ TEST(LogMessageTest, PrefixSegmentsFollowFlagsInFixedOrder)
     EXPECT_EQ(Render(message, 0x07), "2023-11-14_22:13:20.123 INFO  [server.test] hello\n");
     EXPECT_EQ(Render(message, 0x27), "2023-11-14_22:13:20.123 INFO  T42 [server.test] hello\n");
     EXPECT_EQ(Render(message, 0x18), "hello\n");
+}
+
+TEST(LogMessageTest, TheShortTimestampKeepsTheTimeAndDropsTheDate)
+{
+    LogMessage const message = MakeMessage("hello");
+    LogLayout layout;
+    layout.Timestamp = LogTimestampStyle::Short;
+    std::string out;
+    message.AppendLines(out, AppenderFlags::PrefixTimestamp, true, nullptr, layout);
+    EXPECT_EQ(out, "22:13:20.123 hello\n");
+
+    layout.Timestamp = LogTimestampStyle::Off;
+    out.clear();
+    message.AppendLines(out, AppenderFlags::PrefixTimestamp, true, nullptr, layout);
+    EXPECT_EQ(out, "hello\n");
 }
 
 TEST(LogMessageTest, EachLineOfMultiLineMessageGetsPrefix)

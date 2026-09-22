@@ -58,3 +58,16 @@ python contrib\fixtures\validate_c62.py
 
 The validator applies the same layer order as `ConfigMgr` and compares each
 case with its expected effective values.
+
+The C-63 corpus contains deterministic terminal lines for the console layout:
+middle-truncated categories, repeated prefixes on multi-line messages, a value
+at the end of a line, an empty category, and an empty physical line.
+
+Run its validator from the repository root:
+
+```powershell
+python contrib\fixtures\validate_c63.py
+```
+
+The validator renders each case using the documented short timestamp and
+18-character category column, then compares every expected line byte-for-byte.

@@ -122,8 +122,8 @@ void LogMessage::AppendPrefix(std::string& out, AppenderFlags flags, bool utc, s
         std::string_view const full = LogTimestamp::FormatPrefix(Time, utc);
         if (layout.Timestamp == LogTimestampStyle::Short)
         {
-            std::size_t const space = full.find(' ');
-            out.append(space == std::string_view::npos ? full : full.substr(space + 1));
+            std::size_t const split = full.find_first_of("_ ");
+            out.append(split == std::string_view::npos ? full : full.substr(split + 1));
         }
         else
         {
