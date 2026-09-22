@@ -43,6 +43,15 @@ def moved(now, before):
     return lines
 
 
+def stamp():
+    try:
+        out = subprocess.run(["git", "log", "-1", "--format=%cs %h"], capture_output=True, text=True, check=True)
+        date, commit = out.stdout.strip().split()
+        return f"{date} · {commit}"
+    except (OSError, subprocess.CalledProcessError, ValueError):
+        return "counted from the roadmap itself"
+
+
 def embed(now, before):
     milestones = now["milestones"]
     checks = now["checks"]
@@ -68,7 +77,7 @@ def embed(now, before):
             "color": GOLD,
             "fields": fields,
             "image": {"url": "attachment://progress.png"},
-            "footer": {"text": f'{now["updated"]["date"]} · {now["updated"]["commit"]}'},
+            "footer": {"text": stamp()},
         }],
     }
 
