@@ -103,6 +103,13 @@ class CommitTrailerTests(unittest.TestCase):
     def test_trailer_without_email_is_rejected(self):
         self.assertFalse(ci_commit_trailer.has_trailer("Add thing\n\nCo-Authored-By: Claude\n"))
 
+    def test_a_bot_authored_commit_needs_no_trailer(self):
+        self.assertTrue(ci_commit_trailer.written_by_a_bot("dependabot[bot]"))
+        self.assertTrue(ci_commit_trailer.written_by_a_bot("github-actions[bot] "))
+        self.assertFalse(ci_commit_trailer.written_by_a_bot("Justchicoo"))
+        self.assertFalse(ci_commit_trailer.written_by_a_bot("A Person [bot] who is not"))
+        self.assertFalse(ci_commit_trailer.has_trailer("Front end: Bump the front-end group with 5 updates"))
+
     def test_range_for_pull_request(self):
         environment = {"EVENT_NAME": "pull_request", "PR_BASE": "aaa", "PR_HEAD": "bbb"}
         self.assertEqual(ci_commit_trailer.range_from_github_environment(environment), ["aaa..bbb"])

@@ -13,5 +13,5 @@ An experimental Wizard101 server written from scratch in C++ by AI agents under 
 - Every file starts with the Project Ambrose branding header and a one-line brief of what the file holds and does, in the format doc/ARCHITECTURE.md gives for its file type. Write no other comments anywhere.
 - Clean-room implementation. AzerothCore and other emulators may be studied for structure and patterns, and other Wizard101 server projects for protocol and game behavior. Never copy, translate, or port their code, and never commit their data files.
 - Never commit files extracted from the game client. Tools that read a user's own installation at runtime are fine.
-- Every commit carries an AI attribution trailer naming the model that wrote it.
+- Every commit carries an AI attribution trailer naming the model that wrote it. A commit authored by a bot account, such as Dependabot's, names its tool in the author field instead and needs no trailer.
 - Verify before claiming. State how a change was built and tested, and say plainly when something could not be verified.

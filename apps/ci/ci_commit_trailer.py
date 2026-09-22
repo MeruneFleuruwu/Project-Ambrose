@@ -1,5 +1,5 @@
 # Project Ambrose by Imjustchico
-# Fails when any non-merge commit in a range, or committed in the last eight days on a scheduled run, lacks the Co-Authored-By trailer naming the AI that wrote it.
+# Fails when any non-merge commit in a range, or committed in the last eight days on a scheduled run, lacks the Co-Authored-By trailer naming the AI that wrote it, except one authored by a bot account, whose author name already names the tool the trailer would.
 import argparse
 import datetime
 import os
@@ -14,6 +14,10 @@ SCHEDULE_WINDOW_DAYS = 8
 
 def has_trailer(message):
     return bool(TRAILER.search(message))
+
+
+def written_by_a_bot(author):
+    return author.strip().lower().endswith("[bot]")
 
 
 def git(root, *args):
@@ -58,6 +62,8 @@ def main(argv=None):
     missing = 0
     for sha in checked:
         message = git(root, "log", "-1", "--format=%B", sha)
+        if written_by_a_bot(git(root, "log", "-1", "--format=%an", sha)):
+            continue
         if not has_trailer(message):
             subject = message.strip().splitlines()[0] if message.strip() else "(empty message)"
             print(f"{sha[:10]} {subject}: missing a Co-Authored-By trailer naming the AI model or tool")
