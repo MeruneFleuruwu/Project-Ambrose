@@ -46,6 +46,7 @@ find_package(nlohmann_json CONFIG REQUIRED)
 find_package(unofficial-libmariadb CONFIG REQUIRED)
 find_package(unofficial-sqlite3 CONFIG REQUIRED)
 find_package(OpenSSL REQUIRED)
+find_package(unofficial-sodium CONFIG REQUIRED)
 find_package(Threads REQUIRED)
 
 if(BUILD_TESTING)
