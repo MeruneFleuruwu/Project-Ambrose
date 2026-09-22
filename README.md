@@ -12,6 +12,7 @@
 [![Build](https://github.com/Justchicoo/Project-Ambrose/actions/workflows/core-build.yml/badge.svg)](https://github.com/Justchicoo/Project-Ambrose/actions/workflows/core-build.yml)
 [![Front end](https://github.com/Justchicoo/Project-Ambrose/actions/workflows/front-end.yml/badge.svg)](https://github.com/Justchicoo/Project-Ambrose/actions/workflows/front-end.yml)
 [![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20Linux-8798BC?labelColor=131B31)](#building)
+[![Progress](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FJustchicoo%2FProject-Ambrose%2Fmain%2Fdoc%2Fprogress%2Fbadge.json)](doc/progress/)
 [![Contributor track](https://img.shields.io/badge/open%20items-59-5FD3C4?labelColor=131B31)](doc/CONTRIBUTOR-TRACK.md)
 
 **[Roadmap](doc/ROADMAP.md)** &nbsp;·&nbsp; **[Architecture](doc/ARCHITECTURE.md)** &nbsp;·&nbsp; **[Panel](doc/PANEL.md)** &nbsp;·&nbsp; **[Contribute](doc/CONTRIBUTOR-TRACK.md)** &nbsp;·&nbsp; **[Start with your AI](contrib/AI-START-HERE.md)** &nbsp;·&nbsp; **[Discord](https://discord.gg/Dx6ACDUj6N)**
@@ -24,6 +25,16 @@ The experiment is simple: see how far AI-driven development can take a complete 
 
 > [!NOTE]
 > **Pre-alpha.** A real Wizard101 client, started by Ambrose's own launcher, talks to the servers as far as character select, and each server shows itself live in its own web panel. It stops there.
+
+## Where the project is
+
+<div align="center">
+
+<img src="doc/progress/progress.svg" alt="Project Ambrose progress: milestones finished, acceptance checks passed and the progress of each phase" width="100%">
+
+</div>
+
+The card is generated from the roadmap itself by `apps/progress/progress.py`, so it cannot drift from what is built: a milestone counts when every one of its acceptance checks is ticked. [doc/progress/progress.json](doc/progress/progress.json) holds the same numbers for anything that wants to read them, and the panel and the Discord announcement both use it.
 
 ## What runs today
 

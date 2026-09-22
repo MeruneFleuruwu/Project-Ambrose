@@ -1,0 +1,53 @@
+# Project Ambrose by Imjustchico
+# Keeps one Discord message showing the project's progress: when a push to main changes the generated numbers it renders the card, edits that message in place rather than posting another, and remembers its id on the progress-state branch, skipping quietly when the repository has no webhook secret.
+name: progress
+
+on:
+  push:
+    branches: [main]
+    paths: ["doc/progress/progress.json"]
+  workflow_dispatch:
+
+concurrency:
+  group: progress
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  announce:
+    name: announce
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+      - name: Render the card
+        run: |
+          npm install --no-save --no-audit --no-fund playwright@1.63.0
+          npx playwright install --with-deps chromium
+          node apps/progress/render.mjs doc/progress/progress.svg progress.png
+      - name: Read the remembered message
+        run: |
+          git fetch origin progress-state:progress-state 2>/dev/null || echo "no state branch yet"
+          git show progress-state:discord-message.json > discord-message.json 2>/dev/null || echo "no remembered message yet"
+      - name: Update the Discord message
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_PROGRESS_WEBHOOK }}
+        run: python apps/progress/announce.py --webhook-env WEBHOOK --attach progress.png --state discord-message.json
+      - name: Remember the message
+        if: ${{ hashFiles('discord-message.json') != '' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -rf state && mkdir state && cp discord-message.json state/
+          cd state
+          git init -q -b progress-state
+          git add discord-message.json
+          git commit -q -m "Progress: the Discord message this repository keeps updating"
+          git push -q --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" progress-state

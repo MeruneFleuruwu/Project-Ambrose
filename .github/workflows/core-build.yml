@@ -5,7 +5,7 @@ name: core-build
 on:
   push:
     branches: [main]
-    paths: [".github/**", "apps/ci/**", "apps/designtokens/**", "design/**", "vcpkg.json"]
+    paths: [".github/**", "apps/ci/**", "apps/designtokens/**", "apps/progress/**", "design/**", "vcpkg.json"]
   pull_request:
     types: [opened, synchronize, reopened, labeled]
   schedule:
@@ -70,6 +70,9 @@ jobs:
       - name: Vendored icons
         if: ${{ !cancelled() }}
         run: python apps/designtokens/icons.py --check
+      - name: Progress card
+        if: ${{ !cancelled() }}
+        run: python apps/progress/progress.py --check
       - name: Front-end check self-tests
         if: ${{ !cancelled() }}
         run: python apps/ci/tests/test_ci_frontend.py
