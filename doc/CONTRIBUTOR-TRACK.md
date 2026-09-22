@@ -123,7 +123,6 @@ Each item is worth doing, needs nothing from the phases, and lands inside the tr
 | F-53 | Which classes the type dump marks as having no reflected properties, grouped by base class, with counts | `contrib/findings/objects/` | The static, countable half of F-38 |
 | F-54 | The sizes and counts of every archive in the install: files per archive, compressed and uncompressed totals, as a table | `contrib/findings/data/` | The patch server plans transfers against this |
 | F-55 | What a name table row holds: the fields the extractor reads from each name table, checked against the dump | `contrib/findings/data/` | The world database's name columns are shaped by it |
-| C-60 | The problem code catalog: every structured problem 17.03 lists, with code, message, subject, severity and what an operator does about it | `contrib/schemas/` | The panel, the docs and the status response all read one list |
 | C-61 | A corpus of duration strings for the project's own parser, `1d12h`, `30m`, `perm` and the malformed ones, with the seconds each must yield or the refusal | `contrib/fixtures/` | The console's ban command reads them; a corpus keeps two parsers agreeing |
 | C-62 | A corpus of configuration layering cases: `.conf.dist`, `conf.d`, `.conf`, environment and command line, each with the effective value expected | `contrib/fixtures/` | The layering order is documented; a corpus makes it tested |
 | C-63 | A corpus of console lines that stress the column layout: a category wider than the column, a multi-line message, a value at the very end, a line with no category | `contrib/fixtures/` | 17.74's layout is held by a few tests; a corpus holds it by many |
@@ -208,6 +207,7 @@ The first list is mostly taken, and what remains of it waits on servers that do 
 | C-58 | A corpus of five hundred console log records across every level and all eighteen categories the servers log under, with C-29's value spans as expected answers | `contrib/fixtures/` | MeruneFleuruwu, in #101 |
 | C-57 | JSON Schemas for the apps and capabilities routes, with live gameserver answers as fixtures and a checker that refuses a later version dropping or renaming a field | `contrib/schemas/` | MeruneFleuruwu, in #103 |
 | C-59 | Sixty seconds of tick, session and memory series in the shape the panel's charts take, with a plain gap and a marked restart | `contrib/fixtures/` | MeruneFleuruwu, in #104 |
+| C-60 | The problem code catalog, with severity, operator action and the fixing page for each code the admin API registers, checked against the server's own list | `contrib/schemas/` | MeruneFleuruwu, in #105 |
 
 An item stays listed until its pull request is merged. Ask before starting something not on the list: the answer is usually yes if it lands in the paths above.
 
