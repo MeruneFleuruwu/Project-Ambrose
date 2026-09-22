@@ -9,6 +9,8 @@
 #include "IpAddress.h"
 #include "Log.h"
 #include "StringUtil.h"
+#include "TlsCertificate.h"
+#include "TlsServerContext.h"
 
 #include <crow.h>
 
@@ -299,6 +301,8 @@ struct AdminServer::Listener
     AdminApp App;
     std::future<void> Worker;
     std::shared_ptr<OpenSockets> Open = std::make_shared<OpenSockets>();
+    TlsCertificate Certificate;
+    TlsServerContext Tls;
     std::string BindIp;
     uint16 Port = 0;
 };
@@ -497,6 +501,28 @@ bool AdminServer::Start(AdminSettings const& settings, std::string& error)
     return Open(settings, token.Token, error);
 }
 
+bool AdminServer::SwapCertificate()
+{
+    if (!_listener || !_listener->Tls.IsAttached())
+        return true;
+    TlsCertificate fresh;
+    std::string problem;
+    if (!fresh.Load(_listener->Certificate.GetCertificateFile(), _listener->Certificate.GetKeyFile(), problem)
+        || !_listener->Tls.Swap(fresh, problem))
+    {
+        AMBROSE_LOG(_log, LogLevel::Error, "server.admin", "The admin API keeps serving its old certificate: {}", problem);
+        return false;
+    }
+    if (fresh.GetInfo().Fingerprint != _listener->Certificate.GetInfo().Fingerprint)
+    {
+        _listener->Certificate = std::move(fresh);
+        AMBROSE_LOG(_log, LogLevel::Info, "server.admin", "The admin API now serves {}", _listener->Certificate.Describe());
+        for (std::string const& warning : _listener->Certificate.Warnings(static_cast<int64>(std::time(nullptr))))
+            AMBROSE_LOG(_log, LogLevel::Warn, "server.admin", "{}", warning);
+    }
+    return true;
+}
+
 bool AdminServer::Reload(AdminSettings const& settings)
 {
     if (!settings.Enable)
@@ -532,6 +558,8 @@ bool AdminServer::Reload(AdminSettings const& settings)
     bool const rebinds = !IsRunning() || !_active.ListenerEquals(effective);
     if (!rebinds)
     {
+        if (!SwapCertificate())
+            return false;
         _auth.SetLimits(settings.AuthFailureBurst, settings.AuthFailuresPerSecond);
         _router.SetMaxBodyBytes(settings.MaxRequestBytes);
         ApplyLiveSettings(settings);
@@ -600,6 +628,7 @@ bool AdminServer::Open(AdminSettings const& settings, std::string const& token, 
     _auth.SetToken(_token);
     _auth.SetLimits(settings.AuthFailureBurst, settings.AuthFailuresPerSecond);
     _router.SetMaxBodyBytes(settings.MaxRequestBytes);
+    _router.SetSecure(settings.HasTls());
     ApplyLiveSettings(settings);
     _sessions.CloseAll();
     _router.SetBrowserAccess({ &_sessions, fmt::format("ambrose_admin_{}", *reserved), false });
@@ -616,8 +645,22 @@ bool AdminServer::Open(AdminSettings const& settings, std::string const& token, 
         return false;
     };
 
+    bool const secure = settings.HasTls();
     auto listener = std::make_unique<Listener>();
     listener->BindIp = settings.BindIp;
+    if (secure)
+    {
+        std::string problem;
+        if (!listener->Certificate.Load(settings.CertificateFile, settings.PrivateKeyFile, problem))
+            return abandon(fmt::format("the admin API cannot serve TLS: {}", problem));
+        asio::ssl::context context(asio::ssl::context::tls_server);
+        context.set_options(asio::ssl::context::default_workarounds | asio::ssl::context::no_sslv2 | asio::ssl::context::no_sslv3
+            | asio::ssl::context::no_tlsv1 | asio::ssl::context::no_tlsv1_1 | asio::ssl::context::single_dh_use);
+        context.set_verify_mode(asio::ssl::verify_none);
+        if (!listener->Tls.Attach(context.native_handle(), listener->Certificate, problem))
+            return abandon(fmt::format("the admin API cannot serve TLS: {}", problem));
+        listener->App.ssl(std::move(context));
+    }
     listener->App.get_middleware<AdminGate>().Bind(&_router);
     listener->App.catchall_route()([this](crow::request const& request, crow::response& response)
     {
@@ -721,9 +764,16 @@ bool AdminServer::Open(AdminSettings const& settings, std::string const& token, 
     _listener = std::move(listener);
     _active = settings;
     _active.Port = bound;
-    AMBROSE_LOG(_log, LogLevel::Info, "server.admin", "The admin API is listening on http://{}:{}", _listener->BindIp, _listener->Port);
+    AMBROSE_LOG(_log, LogLevel::Info, "server.admin", "The admin API is listening on {}://{}:{}", secure ? "https" : "http", _listener->BindIp, _listener->Port);
+    if (secure)
+        AMBROSE_LOG(_log, LogLevel::Info, "server.admin", "It serves {}", _listener->Certificate.Describe());
     for (std::string const& warning : settings.Warnings())
         AMBROSE_LOG(_log, LogLevel::Warn, "server.admin", "{}", warning);
+    if (secure)
+    {
+        for (std::string const& warning : _listener->Certificate.Warnings(static_cast<int64>(std::time(nullptr))))
+            AMBROSE_LOG(_log, LogLevel::Warn, "server.admin", "{}", warning);
+    }
     return true;
 }
 

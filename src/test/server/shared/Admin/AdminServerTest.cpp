@@ -1,8 +1,9 @@
 /*
  * Project Ambrose by Imjustchico
- * Tests the admin API listener on a loopback port the operating system picks: health needs the token, wrong tokens are rate limited while the right one still answers, every /api path answers the same way without one whatever method it carries, whatever upgrade it claims and wherever it falls on a kept-alive connection, TLS files that name a certificate nothing serves yet are warned about, a reload rotates the token without a restart and keeps the old listener when the new port is taken, an unsafe remote bind is refused, WebSocket routes registered before or after the listener opens take the same token and carry frames both ways, a machine with no data folder keeps its generated token beside the config file, an app reloads the listener from its own config, an app whose admin binding is unsafe exits with a failure, the built panel is served without a token and with the security headers, a browser signs in only from its own origin by trading the token for a cookie named after the port, with each wrong field named beside the request id, the cookie's unsafe requests and socket upgrades need its own origin and CSRF token, signing out and rotating the token end the session, and a host the listener does not answer for is refused.
+ * Tests the admin API listener on a loopback port the operating system picks: health needs the token, wrong tokens are rate limited while the right one still answers, every /api path answers the same way without one whatever method it carries, whatever upgrade it claims and wherever it falls on a kept-alive connection, a certificate and key are served over TLS with HSTS and reported to the log, a reload swaps the certificate live and keeps the old one when the new pair does not match, a certificate that will not load stops the listener opening, a reload rotates the token without a restart and keeps the old listener when the new port is taken, an unsafe remote bind is refused, WebSocket routes registered before or after the listener opens take the same token and carry frames both ways, a machine with no data folder keeps its generated token beside the config file, an app reloads the listener from its own config, an app whose admin binding is unsafe exits with a failure, the built panel is served without a token and with the security headers, a browser signs in only from its own origin by trading the token for a cookie named after the port, with each wrong field named beside the request id, the cookie's unsafe requests and socket upgrades need its own origin and CSRF token, signing out and rotating the token end the session, and a host the listener does not answer for is refused.
  */
 
+#include "AdminClient.h"
 #include "AdminServer.h"
 #include "AdminSettings.h"
 #include "ConfigMgr.h"
@@ -11,6 +12,7 @@
 #include "LogTestDirectory.h"
 #include "LogTestHarness.h"
 #include "ServerApp.h"
+#include "TlsCertificate.h"
 
 #include <asio/connect.hpp>
 #include <asio/io_context.hpp>
@@ -22,6 +24,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cctype>
@@ -915,32 +918,112 @@ TEST_F(AdminServerTest, KeepsNoSharedFailureBudgetForRequestsCrowAnswersItself)
     EXPECT_EQ(Get(port, "/api/health", Token).Status, 200);
 }
 
-TEST_F(AdminServerTest, WarnsThatTlsFilesAreNotServedYetOnALoopbackBind)
+TEST_F(AdminServerTest, ServesOverTlsWithHstsAndTheCertificateItWasGiven)
 {
     _harness.ApplyOrFail("Appender.Capture = 200,1,0\nLogger.root = 1,Capture\n");
     AdminServer server = Make();
     server.SetHealthSource([] { return AdminHealth{ "testserver", "", "rev", 0, "running" }; });
-    AdminSettings settings = Loopback();
-    settings.CertificateFile = "admin.crt";
-    settings.PrivateKeyFile = "admin.key";
 
+    AdminSettings settings = Loopback();
+    settings.CertificateFile = _directory.Path() / "admin.crt";
+    settings.PrivateKeyFile = _directory.Path() / "admin.key";
     std::string error;
+    ASSERT_TRUE(TlsCertificate::CreateSelfSigned(settings.CertificateFile, settings.PrivateKeyFile, "Ambrose test", { "localhost", "127.0.0.1" }, 60, error)) << error;
+    TlsCertificate served;
+    ASSERT_TRUE(served.Load(settings.CertificateFile, settings.PrivateKeyFile, error)) << error;
+
     ASSERT_TRUE(server.Start(settings, error)) << error;
-    EXPECT_EQ(Get(server.GetPort(), "/api/health", Token).Status, 200);
+    AdminClient const client("127.0.0.1", server.GetPort(), Token, true);
+    AdminClientResponse const health = client.Send({ "GET", "/api/health", "", "application/json", "" }, std::chrono::seconds(10));
+    ASSERT_TRUE(health.Answered) << health.Error;
+    EXPECT_EQ(health.Status, 200) << health.Body;
+    EXPECT_EQ(health.PeerFingerprint, served.GetInfo().Fingerprint);
+    EXPECT_NE(health.Head.find("Strict-Transport-Security: max-age=31536000"), std::string::npos) << health.Head;
+    EXPECT_NE(health.Head.find("Content-Security-Policy"), std::string::npos) << health.Head;
+    EXPECT_NE(health.Head.find("X-Content-Type-Options: nosniff"), std::string::npos) << health.Head;
+    EXPECT_NE(health.Head.find("frame-ancestors 'none'"), std::string::npos) << health.Head;
 
     std::vector<std::string> const lines = _harness.Store().Texts("Capture");
-    std::size_t listening = lines.size();
-    std::size_t warned = lines.size();
-    for (std::size_t index = 0; index < lines.size(); ++index)
+    EXPECT_TRUE(std::any_of(lines.begin(), lines.end(), [&](std::string const& line)
     {
-        if (lines[index].find("is listening on") != std::string::npos)
-            listening = index;
-        if (lines[index].find("Admin.CertificateFile") != std::string::npos)
-            warned = index;
-    }
-    ASSERT_LT(listening, lines.size());
-    ASSERT_LT(warned, lines.size());
-    EXPECT_LT(listening, warned);
+        return line.find("is listening on https://") != std::string::npos;
+    })) << lines.size() << " lines captured";
+    EXPECT_TRUE(std::any_of(lines.begin(), lines.end(), [&](std::string const& line)
+    {
+        return line.find(served.GetInfo().Fingerprint) != std::string::npos;
+    })) << lines.size() << " lines captured";
+}
+
+TEST_F(AdminServerTest, ServesPlainHttpWithoutHsts)
+{
+    AdminServer server = Make();
+    server.SetHealthSource([] { return AdminHealth{ "testserver", "", "rev", 0, "running" }; });
+    std::string error;
+    ASSERT_TRUE(server.Start(Loopback(), error)) << error;
+
+    HttpReply const health = Get(server.GetPort(), "/api/health", Token);
+    ASSERT_EQ(health.Status, 200) << health.Head;
+    EXPECT_EQ(health.Head.find("Strict-Transport-Security"), std::string::npos) << health.Head;
+    EXPECT_NE(health.Head.find("Content-Security-Policy"), std::string::npos) << health.Head;
+}
+
+TEST_F(AdminServerTest, AReloadSwapsTheCertificateAndKeepsTheOldOneWhenTheNewPairIsWrong)
+{
+    AdminServer server = Make();
+    server.SetHealthSource([] { return AdminHealth{ "testserver", "", "rev", 0, "running" }; });
+
+    AdminSettings settings = Loopback();
+    settings.CertificateFile = _directory.Path() / "admin.crt";
+    settings.PrivateKeyFile = _directory.Path() / "admin.key";
+    std::string error;
+    ASSERT_TRUE(TlsCertificate::CreateSelfSigned(settings.CertificateFile, settings.PrivateKeyFile, "Ambrose first", { "127.0.0.1" }, 60, error)) << error;
+    ASSERT_TRUE(server.Start(settings, error)) << error;
+    settings.Port = server.GetPort();
+
+    auto const fingerprintNow = [&]
+    {
+        AdminClient const client("127.0.0.1", server.GetPort(), Token, true);
+        AdminClientResponse const answer = client.Send({ "GET", "/api/health", "", "application/json", "" }, std::chrono::seconds(10));
+        EXPECT_TRUE(answer.Answered) << answer.Error;
+        EXPECT_EQ(answer.Status, 200) << answer.Body;
+        return answer.PeerFingerprint;
+    };
+
+    std::filesystem::path const second = _directory.Path() / "second.crt";
+    std::filesystem::path const secondKey = _directory.Path() / "second.key";
+    ASSERT_TRUE(TlsCertificate::CreateSelfSigned(second, secondKey, "Ambrose second", { "127.0.0.1" }, 60, error)) << error;
+    TlsCertificate replacement;
+    ASSERT_TRUE(replacement.Load(second, secondKey, error)) << error;
+    std::filesystem::copy_file(second, settings.CertificateFile, std::filesystem::copy_options::overwrite_existing);
+    std::filesystem::copy_file(secondKey, settings.PrivateKeyFile, std::filesystem::copy_options::overwrite_existing);
+
+    ASSERT_TRUE(server.Reload(settings));
+    EXPECT_EQ(fingerprintNow(), replacement.GetInfo().Fingerprint);
+
+    std::filesystem::path const third = _directory.Path() / "third.crt";
+    std::filesystem::path const thirdKey = _directory.Path() / "third.key";
+    ASSERT_TRUE(TlsCertificate::CreateSelfSigned(third, thirdKey, "Ambrose third", { "127.0.0.1" }, 60, error)) << error;
+    std::filesystem::copy_file(thirdKey, settings.PrivateKeyFile, std::filesystem::copy_options::overwrite_existing);
+
+    EXPECT_FALSE(server.Reload(settings));
+    EXPECT_TRUE(server.IsRunning());
+    EXPECT_EQ(fingerprintNow(), replacement.GetInfo().Fingerprint);
+}
+
+TEST_F(AdminServerTest, RefusesToOpenWithACertificateItCannotServe)
+{
+    AdminServer server = Make();
+    server.SetHealthSource([] { return AdminHealth{ "testserver", "", "rev", 0, "running" }; });
+
+    AdminSettings settings = Loopback();
+    settings.CertificateFile = _directory.Write("broken.crt", "not a certificate\n");
+    settings.PrivateKeyFile = _directory.Write("broken.key", "not a key\n");
+
+    std::string error;
+    EXPECT_FALSE(server.Start(settings, error));
+    EXPECT_FALSE(server.IsRunning());
+    EXPECT_NE(error.find("broken.crt"), std::string::npos) << error;
+    EXPECT_NE(error.find("cannot serve TLS"), std::string::npos) << error;
 }
 
 TEST_F(AdminServerTest, KeepsAGeneratedTokenBesideTheConfigWithNoDataFolder)

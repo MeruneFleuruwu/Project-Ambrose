@@ -76,6 +76,7 @@ private:
     struct Listener;
 
     bool Open(AdminSettings const& settings, std::string const& token, std::string& error);
+    bool SwapCertificate();
     void Close();
     AdminSocketRoute const* FindSocket(std::string const& path) const;
     void ApplyLiveSettings(AdminSettings const& settings);

@@ -1,15 +1,17 @@
 /*
  * Project Ambrose by Imjustchico
- * Sends one request over standalone Asio with Connection: close and waits for the listener to close, all inside one deadline that closes the socket when it passes; a listener bound to every address is reached on loopback, an IPv6 host is bracketed, an answer larger than MaxResponseBytes is refused, and the body is read by its Content-Length or its chunks.
+ * Sends one request over standalone Asio, through TLS when the listener serves it, with Connection: close and waits for the listener to close, all inside one deadline that closes the socket when it passes; a listener bound to every address is reached on loopback, an IPv6 host is bracketed, an answer larger than MaxResponseBytes is refused, and the body is read by its Content-Length or its chunks.
  */
 
 #include "AdminClient.h"
 #include "StringUtil.h"
+#include "TlsCertificate.h"
 
 #include <asio/connect.hpp>
 #include <asio/io_context.hpp>
 #include <asio/ip/tcp.hpp>
 #include <asio/read.hpp>
+#include <asio/ssl.hpp>
 #include <asio/write.hpp>
 
 #include <fmt/format.h>
@@ -79,7 +81,7 @@ namespace
     }
 }
 
-AdminClient::AdminClient(std::string host, uint16 port, std::string token) : _host(std::move(host)), _port(port), _token(std::move(token))
+AdminClient::AdminClient(std::string host, uint16 port, std::string token, bool tls) : _host(std::move(host)), _port(port), _token(std::move(token)), _tls(tls)
 {
 }
 
@@ -122,6 +124,7 @@ std::optional<AdminClientResponse> AdminClient::Parse(std::string_view raw, std:
     AdminClientResponse response;
     response.Answered = true;
     response.Status = status;
+    response.Head = std::string(head);
     response.ContentType = HeaderValue(head, "Content-Type").value_or(std::string());
     response.RequestId = HeaderValue(head, "X-Request-Id").value_or(std::string());
     std::string_view const body = raw.substr(headEnd + 4);
@@ -176,30 +179,47 @@ AdminClientResponse AdminClient::Send(AdminClientRequest const& request, std::ch
 
     asio::io_context context;
     asio::ip::tcp::socket socket(context);
+    asio::ssl::context secure(asio::ssl::context::tls_client);
+    secure.set_verify_mode(asio::ssl::verify_none);
+    asio::ssl::stream<asio::ip::tcp::socket&> encrypted(socket, secure);
     std::string raw;
     std::array<char, 16384> buffer{};
     std::string failure;
+    std::string fingerprint;
     bool finished = false;
     std::function<void()> readMore;
-    readMore = [&]
+    auto const exchange = [&](auto& stream)
     {
-        socket.async_read_some(asio::buffer(buffer), [&](std::error_code const& error, std::size_t bytes)
+        readMore = [&]
         {
-            raw.append(buffer.data(), bytes);
-            if (raw.size() > MaxResponseBytes + 65536)
+            stream.async_read_some(asio::buffer(buffer), [&](std::error_code const& error, std::size_t bytes)
             {
-                failure = "the answer is larger than the client takes";
+                raw.append(buffer.data(), bytes);
+                if (raw.size() > MaxResponseBytes + 65536)
+                {
+                    failure = "the answer is larger than the client takes";
+                    finished = true;
+                    return;
+                }
+                if (!error)
+                {
+                    readMore();
+                    return;
+                }
+                if (error != asio::error::eof && error != asio::error::connection_reset && error != asio::ssl::error::stream_truncated)
+                    failure = fmt::format("the answer could not be read: {}", error.message());
+                finished = true;
+            });
+        };
+        asio::async_write(stream, asio::buffer(wire), [&](std::error_code const& written, std::size_t)
+        {
+            if (written)
+            {
+                failure = fmt::format("the request could not be sent: {}", written.message());
                 finished = true;
                 return;
             }
-            if (!error)
-            {
-                readMore();
-                return;
-            }
-            if (error != asio::error::eof && error != asio::error::connection_reset)
-                failure = fmt::format("the answer could not be read: {}", error.message());
-            finished = true;
+            readMore();
         });
     };
     socket.async_connect(asio::ip::tcp::endpoint(address, _port), [&](std::error_code const& error)
@@ -210,15 +230,36 @@ AdminClientResponse AdminClient::Send(AdminClientRequest const& request, std::ch
             finished = true;
             return;
         }
-        asio::async_write(socket, asio::buffer(wire), [&](std::error_code const& written, std::size_t)
+        if (!_tls)
         {
-            if (written)
+            exchange(socket);
+            return;
+        }
+        SSL_set_tlsext_host_name(encrypted.native_handle(), _host.c_str());
+        encrypted.async_handshake(asio::ssl::stream_base::client, [&](std::error_code const& shook)
+        {
+            if (shook)
             {
-                failure = fmt::format("the request could not be sent: {}", written.message());
+                failure = fmt::format("the TLS handshake with {} failed: {}", host, shook.message());
                 finished = true;
                 return;
             }
-            readMore();
+            if (X509* const peer = SSL_get1_peer_certificate(encrypted.native_handle()))
+            {
+                if (BIO* const bio = BIO_new(BIO_s_mem()))
+                {
+                    if (PEM_write_bio_X509(bio, peer) == 1)
+                    {
+                        char* text = nullptr;
+                        long const length = BIO_get_mem_data(bio, &text);
+                        if (length > 0)
+                            fingerprint = TlsCertificate::Fingerprint(std::string_view(text, static_cast<std::size_t>(length)));
+                    }
+                    BIO_free(bio);
+                }
+                X509_free(peer);
+            }
+            exchange(encrypted);
         });
     });
     context.run_for(timeout);
@@ -243,5 +284,6 @@ AdminClientResponse AdminClient::Send(AdminClientRequest const& request, std::ch
         response.Error = fmt::format("the admin API on {} gave an answer that could not be read: {}", host, parseError);
         return response;
     }
+    parsed->PeerFingerprint = std::move(fingerprint);
     return std::move(*parsed);
 }

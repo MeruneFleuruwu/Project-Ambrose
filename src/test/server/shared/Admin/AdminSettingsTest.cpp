@@ -142,9 +142,8 @@ TEST(AdminSettingsTest, TlsFilesMustComeInPairsAndAreNotServedYet)
     EXPECT_FALSE(settings.RemoteAccessError().has_value());
 
     settings.BindIp = "0.0.0.0";
-    refused = settings.RemoteAccessError();
-    ASSERT_TRUE(refused.has_value());
-    EXPECT_NE(refused->find("does not serve yet"), std::string::npos);
+    EXPECT_FALSE(settings.RemoteAccessError().has_value());
+    EXPECT_TRUE(settings.Warnings().empty());
 }
 
 TEST(AdminSettingsTest, AnAddressThatIsNotAnIpIsRefused)
@@ -284,18 +283,18 @@ namespace
 #endif
 }
 
-TEST(AdminSettingsTest, NamesTheTlsFilesWhenThePlainHttpOptInCannotLiftTheRefusal)
+TEST(AdminSettingsTest, TlsCarriesARemoteBindWithoutThePlainHttpOptIn)
 {
     AdminSettings settings = Loopback();
     settings.BindIp = "0.0.0.0";
     settings.CertificateFile = "admin.crt";
     settings.PrivateKeyFile = "admin.key";
-    settings.AllowPlainHttpRemote = true;
 
-    std::optional<std::string> const refused = settings.RemoteAccessError();
-    ASSERT_TRUE(refused.has_value());
-    EXPECT_NE(refused->find("clear both files"), std::string::npos) << *refused;
-    EXPECT_NE(refused->find("already allows"), std::string::npos) << *refused;
+    EXPECT_FALSE(settings.RemoteAccessError().has_value());
+    EXPECT_FALSE(settings.PlainHttpRemoteWarning().has_value());
+
+    settings.AllowPlainHttpRemote = true;
+    EXPECT_FALSE(settings.RemoteAccessError().has_value());
     EXPECT_FALSE(settings.PlainHttpRemoteWarning().has_value());
 
     settings.CertificateFile.clear();
@@ -354,21 +353,20 @@ TEST(AdminTokenTest, WritesAGeneratedTokenOnlyIntoAFileItCreates)
     EXPECT_FALSE(error.empty());
 }
 
-TEST(AdminSettingsTest, TlsFilesOnALoopbackBindWarnThatNothingServesThemYet)
+TEST(AdminSettingsTest, TlsFilesLetABindReachBeyondThisMachineWithNothingToSayOutLoud)
 {
     AdminSettings settings = Loopback();
-    EXPECT_FALSE(settings.TlsNotServedWarning().has_value());
     EXPECT_TRUE(settings.Warnings().empty());
 
     settings.CertificateFile = "admin.crt";
     settings.PrivateKeyFile = "admin.key";
-    ASSERT_FALSE(settings.RemoteAccessError().has_value());
-    std::optional<std::string> const warning = settings.TlsNotServedWarning();
-    ASSERT_TRUE(warning.has_value());
-    EXPECT_NE(warning->find("Admin.CertificateFile"), std::string::npos) << *warning;
-    EXPECT_NE(warning->find("Admin.PrivateKeyFile"), std::string::npos) << *warning;
-    EXPECT_NE(warning->find("17.14"), std::string::npos) << *warning;
-    EXPECT_EQ(settings.Warnings(), (std::vector<std::string>{ *warning }));
+    EXPECT_TRUE(settings.HasTls());
+    EXPECT_FALSE(settings.RemoteAccessError().has_value());
+    EXPECT_TRUE(settings.Warnings().empty());
+
+    settings.BindIp = "10.0.0.5";
+    EXPECT_FALSE(settings.RemoteAccessError().has_value());
+    EXPECT_TRUE(settings.Warnings().empty());
 }
 
 TEST(AdminSettingsTest, WarningsNameThePlainHttpOptInOnARemoteBind)

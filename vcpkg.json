@@ -9,6 +9,7 @@
     "fmt",
     "libmariadb",
     "nlohmann-json",
+    "openssl",
     "pugixml",
     "sqlite3",
     "unicorn",

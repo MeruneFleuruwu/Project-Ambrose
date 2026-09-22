@@ -78,6 +78,7 @@ public:
     void SetBrowserAccess(AdminBrowserAccess access);
     void SetProblemLog(ProblemLog log);
     void SetMaxBodyBytes(std::size_t bytes);
+    void SetSecure(bool secure);
     bool Has(std::string const& method, std::string const& path) const;
     std::vector<std::string> Describe() const;
 
@@ -110,6 +111,7 @@ private:
 
     AdminAuth& _auth;
     std::atomic<std::size_t> _maxBodyBytes{ 0 };
+    std::atomic<bool> _secure{ false };
     mutable std::shared_mutex _mutex;
     std::vector<Route> _routes;
     Handler _files;

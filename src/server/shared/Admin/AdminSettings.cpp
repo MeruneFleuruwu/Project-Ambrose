@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Reads the Admin options from config, clamping out-of-range values and reporting each problem, judges a bind address against the remote-access rule, where anything but loopback needs TLS, which this build does not serve yet, or the plain-HTTP opt-in with no TLS files set, collects the warnings a binding the rule allows still carries: plain HTTP off this machine, and TLS files that name a certificate nothing serves yet, and finds the built panel beside the executable when no folder is set.
+ * Reads the Admin options from config, clamping out-of-range values and reporting each problem, judges a bind address against the remote-access rule, where anything but loopback needs a certificate and key or the plain-HTTP opt-in, collects the warning a binding the rule allows still carries, that plain HTTP off this machine crosses the network unencrypted, and finds the built panel beside the executable when no folder is set.
  */
 
 #include "AdminSettings.h"
@@ -102,11 +102,8 @@ std::optional<std::string> AdminSettings::RemoteAccessError() const
         return std::string(CertificateFile.empty()
             ? "Admin.PrivateKeyFile is set without Admin.CertificateFile, so the admin API has no certificate to serve TLS with"
             : "Admin.CertificateFile is set without Admin.PrivateKeyFile, so the admin API has no key to serve TLS with");
-    if (!BindsBeyondThisMachine())
+    if (!BindsBeyondThisMachine() || HasTls())
         return std::nullopt;
-    if (HasTls())
-        return fmt::format("Admin.BindIP = {} reaches beyond this machine and Admin.CertificateFile with Admin.PrivateKeyFile asks for TLS, which this build does not serve yet; bind 127.0.0.1, or clear both files {}", BindIp,
-            AllowPlainHttpRemote ? "to serve plain HTTP off this machine, which Admin.AllowPlainHttpRemote = 1 already allows" : "and set Admin.AllowPlainHttpRemote = 1 to serve plain HTTP off this machine");
     if (!AllowPlainHttpRemote)
         return fmt::format("Admin.BindIP = {} reaches beyond this machine with no TLS; set Admin.CertificateFile and Admin.PrivateKeyFile, bind 127.0.0.1, or set Admin.AllowPlainHttpRemote = 1 to send the token, commands and logs unencrypted", BindIp);
     return std::nullopt;
@@ -119,20 +116,11 @@ std::optional<std::string> AdminSettings::PlainHttpRemoteWarning() const
     return fmt::format("Admin.AllowPlainHttpRemote = 1 serves the admin API as plain HTTP on {}: the token is still required, but it, every command and every log line cross the network unencrypted, so anyone on the path can read them and reuse the token", BindIp);
 }
 
-std::optional<std::string> AdminSettings::TlsNotServedWarning() const
-{
-    if (!HasTls())
-        return std::nullopt;
-    return fmt::format("Admin.CertificateFile and Admin.PrivateKeyFile ask for TLS, which this build does not serve yet, so the admin API on {} answers plain HTTP until milestone 17.14 settles certificate handling", BindIp);
-}
-
 std::vector<std::string> AdminSettings::Warnings() const
 {
     std::vector<std::string> warnings;
     if (std::optional<std::string> const remote = PlainHttpRemoteWarning())
         warnings.push_back(*remote);
-    if (std::optional<std::string> const tls = TlsNotServedWarning())
-        warnings.push_back(*tls);
     return warnings;
 }
 

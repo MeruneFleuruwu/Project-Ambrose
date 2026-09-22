@@ -154,6 +154,11 @@ void AdminRouter::SetProblemLog(ProblemLog log)
     _problemLog = std::move(log);
 }
 
+void AdminRouter::SetSecure(bool secure)
+{
+    _secure.store(secure);
+}
+
 void AdminRouter::SetMaxBodyBytes(std::size_t bytes)
 {
     _maxBodyBytes.store(bytes);
@@ -346,6 +351,8 @@ void AdminRouter::Finish(AdminRequest const& request, AdminResponse& response) c
     response.Headers.emplace_back("Referrer-Policy", "same-origin");
     response.Headers.emplace_back("Cross-Origin-Opener-Policy", "same-origin");
     response.Headers.emplace_back("Cross-Origin-Resource-Policy", "same-origin");
+    if (_secure.load())
+        response.Headers.emplace_back("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
     if (!HasHeader(response, "Cache-Control"))
         response.Headers.emplace_back("Cache-Control", "no-store");
 

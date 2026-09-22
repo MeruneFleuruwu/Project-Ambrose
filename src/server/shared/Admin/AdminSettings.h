@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Admin API listener settings loaded from config: whether it runs, where it binds, its token and token file, the plain-HTTP opt-in, the TLS files, the failed-authentication limit, the largest request it takes, the remote-access rule that judges a bind address, and the warnings a binding the rule allows still has to say out loud.
+ * Admin API listener settings loaded from config: whether it runs, where it binds, its token and token file, the plain-HTTP opt-in, the certificate and key it serves TLS with, the failed-authentication limit, the largest request it takes, the remote-access rule that judges a bind address, and the warnings a binding the rule allows still has to say out loud.
  */
 
 #ifndef AMBROSE_ADMINSETTINGS_H
@@ -53,7 +53,6 @@ struct AdminSettings
     bool HasTls() const;
     std::optional<std::string> RemoteAccessError() const;
     std::optional<std::string> PlainHttpRemoteWarning() const;
-    std::optional<std::string> TlsNotServedWarning() const;
     std::vector<std::string> Warnings() const;
     bool ListenerEquals(AdminSettings const& other) const;
     std::filesystem::path DashboardFolder() const;
