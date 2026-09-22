@@ -217,4 +217,4 @@ Notes, proposals and guides are read by the agents building the milestones they 
 
 ### Started, still open
 
-These carry a first delivery and stay listed above because the item is not what landed: C-01 has its `zone_teleport` table (#55) and no rows; C-11 has its seed folder's README (#56) and no seeds; F-12 has a finding that Ambrose's launcher applies its options and leaves the install untouched (#53), not yet what each of the client's own options does.
+These carry a first delivery and stay listed above because the item is not what landed: C-01 has its `zone_teleport` table (#55) and no rows; C-11 has its seed folder's README (#56) and no seeds; F-12 has a finding that Ambrose's launcher applies its options and leaves the install untouched (#53), not yet what each of the client's own options does; C-74 has three replay manifests whose frames the reassembler reads (#120), with every message body empty, so its login and wrong-password exchanges are byte for byte the same and nothing replayed tells a success from a refusal.
