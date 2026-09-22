@@ -102,20 +102,30 @@ export const playerHistory = {
     week: lastWeek.map((value, index) => ({ label: `${weekDays[Math.floor((index * 6 + 12) / 24)]} ${clock(((index * 6 + 12) % 24) * 60)}`, value })),
 };
 
-const levels = ["info", "info", "info", "debug", "warn", "info", "error", "info"] as const;
 const lines = [
-    ["server", "gameserver started in 1.8 s"],
-    ["network", "Accepted 127.0.0.1:53122"],
-    ["login", "Account ember signed in"],
-    ["zone", "Loaded WizardCity/WC_Ravenwood with 38 objects"],
-    ["database", "Pending SQL update 2026_09_21_00_world.sql"],
-    ["commands.console", "Console: account set password (arguments hidden)"],
-    ["client", "The type dump was built from r801440, the install is r806919"],
-    ["login", "Account talon signed in"],
+    ["info", "server", "gameserver started in 1.8 s"],
+    ["info", "network", "Accepted 127.0.0.1:53122"],
+    ["info", "login", "Account ember signed in"],
+    ["debug", "zone", "Loaded WizardCity/WC_Ravenwood with 38 objects"],
+    ["warn", "database", "Pending SQL update 2026_09_21_00_world.sql"],
+    ["info", "commands.console", "Console: account set password (arguments hidden)"],
+    ["trace", "network", "Sent MSG_KEEPALIVE to 127.0.0.1:53122"],
+    ["info", "login", "Account talon signed in"],
+    ["debug", "zone", "Ember Stormweaver entered WC_Ravenwood"],
+    ["warn", "client", "The type dump was built from r801440, the install is r806919"],
+] as const;
+const burst = [
+    ["error", "database", "Lost the connection to the character database, retrying in 2 s"],
+    ["warn", "database", "A character query took 1840 ms"],
+    ["warn", "network", "127.0.0.1:53188 timed out after 30 s"],
 ] as const;
 
-export const logRecords = Array.from({ length: 40 }, (_, index) => {
-    const line = lines[index % lines.length];
-    const seconds = String(index % 60).padStart(2, "0");
-    return { sequence: 1000 + index, time: `2026-09-22 09:12:${seconds}`, level: levels[index % levels.length], category: line[0], message: line[1] };
-});
+export type LogRecord = { sequence: number; seconds: number; time: string; level: string; category: string; message: string };
+
+export function logRecord(index: number): LogRecord {
+    const [level, category, message] = index >= 150 && index < 168 ? burst[index % burst.length] : lines[index % lines.length];
+    const seconds = 9 * 3600 + index * 3;
+    return { sequence: 1000 + index, seconds, time: `2026-09-22 ${clock(Math.floor(seconds / 60))}:${String(seconds % 60).padStart(2, "0")}`, level, category, message };
+}
+
+export const logRecords = Array.from({ length: 240 }, (_, index) => logRecord(index));
