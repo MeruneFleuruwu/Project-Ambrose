@@ -1,21 +1,20 @@
-<!-- Project Ambrose by Imjustchico: Project overview, status, ground rules, and disclaimer. -->
+<!-- Project Ambrose by Imjustchico: Project overview, status, building, contributing, community, ground rules, licence and disclaimer. -->
 <div align="center">
 
-# Project Ambrose
-
-**A Wizard101 server written from scratch in C++20, built by AI agents under human direction.**
+<img src=".github/banner.svg" alt="Project Ambrose: a Wizard101 server written from scratch in C++20, built by AI agents under human direction" width="100%">
 
 [![License](https://img.shields.io/badge/license-MIT-E4B457?style=for-the-badge&labelColor=0B1020)](LICENSE)
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-5FD3C4?style=for-the-badge&logo=cplusplus&logoColor=white&labelColor=0B1020)](doc/ARCHITECTURE.md)
+[![Svelte](https://img.shields.io/badge/panel-Svelte%205-E2725B?style=for-the-badge&logo=svelte&logoColor=white&labelColor=0B1020)](doc/UI-STACK.md)
 [![Discord](https://img.shields.io/badge/Discord-join%20us-C77DFF?style=for-the-badge&logo=discord&logoColor=white&labelColor=0B1020)](https://discord.gg/Dx6ACDUj6N)
 [![Reddit](https://img.shields.io/badge/Reddit-r%2FProjectAmbrose-FF4500?style=for-the-badge&logo=reddit&logoColor=white&labelColor=0B1020)](https://www.reddit.com/r/ProjectAmbrose/)
-[![Milestones](https://img.shields.io/badge/roadmap-386%20milestones-E2725B?style=for-the-badge&labelColor=0B1020)](doc/ROADMAP.md)
 
 [![Build](https://github.com/Justchicoo/Project-Ambrose/actions/workflows/core-build.yml/badge.svg)](https://github.com/Justchicoo/Project-Ambrose/actions/workflows/core-build.yml)
+[![Front end](https://github.com/Justchicoo/Project-Ambrose/actions/workflows/front-end.yml/badge.svg)](https://github.com/Justchicoo/Project-Ambrose/actions/workflows/front-end.yml)
 [![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20Linux-8798BC?labelColor=131B31)](#building)
-[![Contributor track](https://img.shields.io/badge/open%20items-74-5FD3C4?labelColor=131B31)](doc/CONTRIBUTOR-TRACK.md)
+[![Contributor track](https://img.shields.io/badge/open%20items-73-5FD3C4?labelColor=131B31)](doc/CONTRIBUTOR-TRACK.md)
 
-[Roadmap](doc/ROADMAP.md) &nbsp;.&nbsp; [Architecture](doc/ARCHITECTURE.md) &nbsp;.&nbsp; [Contribute](doc/CONTRIBUTOR-TRACK.md) &nbsp;.&nbsp; [Start with your AI](contrib/AI-START-HERE.md) &nbsp;.&nbsp; [Discord](https://discord.gg/Dx6ACDUj6N) &nbsp;.&nbsp; [Reddit](https://www.reddit.com/r/ProjectAmbrose/)
+**[Roadmap](doc/ROADMAP.md)** &nbsp;·&nbsp; **[Architecture](doc/ARCHITECTURE.md)** &nbsp;·&nbsp; **[Panel](doc/PANEL.md)** &nbsp;·&nbsp; **[Contribute](doc/CONTRIBUTOR-TRACK.md)** &nbsp;·&nbsp; **[Start with your AI](contrib/AI-START-HERE.md)** &nbsp;·&nbsp; **[Discord](https://discord.gg/Dx6ACDUj6N)**
 
 </div>
 
@@ -24,7 +23,7 @@
 The experiment is simple: see how far AI-driven development can take a complete game server. Humans set direction and review; AI agents write the code. Nothing here is copied from another emulator, and nothing extracted from the game client is ever committed.
 
 > [!NOTE]
-> **Pre-alpha.** A real Wizard101 client, started by Ambrose's own launcher, talks to the servers as far as character select. It stops there.
+> **Pre-alpha.** A real Wizard101 client, started by Ambrose's own launcher, talks to the servers as far as character select, and each server shows itself live in its own web panel. It stops there.
 
 ## What runs today
 
@@ -33,10 +32,12 @@ The experiment is simple: see how far AI-driven development can take a complete 
 | Session handshake against a retail client | World, zones and movement |
 | Signing in, a wrong password, and a retry | Quests, combat, pets, housing |
 | The character list, and the shutdown notice | Character creation end to end |
-| Ambrose's own launcher starting the client | The operations panel |
+| Ambrose's own launcher starting the client | Panel accounts, roles and the pages after the overview |
 | Type extraction from your own installation | Patch serving |
+| The admin API: health, status, and a live log stream with secrets hidden | |
+| The panel's overview, served by each server and signed in once | |
 
-[doc/ROADMAP.md](doc/ROADMAP.md)'s **Where we are** says exactly which milestones are done. The full plan is **17 phases and 387 milestones**, each ending in something visible in the real client.
+[doc/ROADMAP.md](doc/ROADMAP.md)'s **Where we are** says exactly which milestones are done. The plan runs in **17 phases**, each milestone ending in something visible in the real client or the panel.
 
 ## Building
 
@@ -84,17 +85,26 @@ Hosted CI builds the Windows leg on Sundays and Wednesdays, the sanitizer legs o
 
 ## Contributing
 
-The phases are built in order by the maintainer's own agents, so nobody else works from them. Everything from outside lands on a **separate track** that cannot collide with a milestone in flight.
+The phases are built in order by the maintainer's own agents, so nobody else works from them. Everything from outside lands on a **separate track** that cannot collide with a milestone in flight, and every pull request is verified by running it, not by reading it.
 
 | | |
 |---|---|
-| **74 open items** | [doc/CONTRIBUTOR-TRACK.md](doc/CONTRIBUTOR-TRACK.md) - F-01 to F-55 for proven findings, C-01 to C-75 for tools, data, schemas, fixtures, guides and proposals |
+| **73 open items** | [doc/CONTRIBUTOR-TRACK.md](doc/CONTRIBUTOR-TRACK.md) - findings about the game, and tools, schemas, fixtures, guides and proposals, each with what it needs and how it is proven |
 | **Start in one paste** | [contrib/AI-START-HERE.md](contrib/AI-START-HERE.md) - a prompt for any AI assistant, with everything it needs to work here without guessing |
 | **The shape of a finding** | [contrib/findings/README.md](contrib/findings/README.md) - one claim about how the game behaves, written so it can be proven or refuted |
 | **House rules** | [CONTRIBUTING.md](CONTRIBUTING.md) - AI-written changes are expected, not merely allowed |
-| **Ask anything** | [Discord](https://discord.gg/Dx6ACDUj6N) for questions as they come up, [r/ProjectAmbrose](https://www.reddit.com/r/ProjectAmbrose/) for longer threads and announcements |
 
 The most valuable thing anyone can add is a **proven finding**: Ambrose is built only on data it has re-derived itself, and every finding is verified or refuted before a milestone is built on it. A finding that turns out false is still worth sending, because it stops the next person chasing it.
+
+## Community
+
+| | |
+|---|---|
+| **Discord** | [discord.gg/Dx6ACDUj6N](https://discord.gg/Dx6ACDUj6N) - questions as they come up, and every merge as it lands |
+| **Reddit** | [r/ProjectAmbrose](https://www.reddit.com/r/ProjectAmbrose/) - longer threads and announcements |
+| **Bugs and ideas** | [Issues](https://github.com/Justchicoo/Project-Ambrose/issues/new/choose) - a form for each |
+| **Security** | [SECURITY.md](SECURITY.md) - report privately, never in a public issue |
+| **Conduct** | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) - one standard in the repository, on Discord and on Reddit |
 
 ## Ground rules
 
@@ -106,7 +116,7 @@ The most valuable thing anyone can add is a **proven finding**: Ambrose is built
 
 ## Licence
 
-MIT ([LICENSE](LICENSE)). [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) lists every library and what each licence asks.
+MIT ([LICENSE](LICENSE)). The licence covers the code and documents in this repository. It does not cover Wizard101 or any KingsIsle Entertainment property: no game file, asset or text is included here, and every tool reads a user's own installation at run time. [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) lists the libraries this software uses and what each one requires, including the two that ask for more than attribution.
 
 ---
 

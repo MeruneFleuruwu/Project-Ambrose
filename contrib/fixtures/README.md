@@ -29,3 +29,32 @@ python contrib\fixtures\validate_c59.py
 The validator checks the ring contract: exactly sixty seconds, a pair of
 `times` and `values` arrays for each metric, the null gap and restart, and the
 expected session, tick and resident-memory ranges.
+
+The C-61 corpus is a deterministic list of duration strings for the server's ban
+parser and the helper in `src/common/Utilities/Duration.cpp`. It covers plain
+seconds, compound units, permanent bans, and malformed inputs the parser must
+reject.
+seconds, compound units, permanent bans, and the malformed inputs the parser
+must reject.
+
+Run its validator from the repository root:
+
+```powershell
+python contrib\fixtures\validate_c61.py
+```
+
+The validator checks each accepted string's exact second count and confirms that
+all malformed values are refused instead of being treated as valid.
+
+The C-62 corpus contains synthetic configuration cases covering the shipped
+`.conf.dist`, sorted `conf.d` defaults and config files, the required local
+`.conf`, environment variables, and command-line overrides.
+
+Run its validator from the repository root:
+
+```powershell
+python contrib\fixtures\validate_c62.py
+```
+
+The validator applies the same layer order as `ConfigMgr` and compares each
+case with its expected effective values.
