@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "name": "login-success",
+  "source": "Ambrose-authored message-definition fixture; no client capture",
+  "sequence": [
+    {
+      "name": "auth-request",
+      "direction": "client-to-server",
+      "message": "MSG_USER_AUTHEN_V3",
+      "service": 7,
+      "order": 27,
+      "fields": {
+        "fixture": "empty-body-shape"
+      }
+    },
+    {
+      "name": "auth-response",
+      "direction": "server-to-client",
+      "message": "MSG_USER_AUTHEN_RSP",
+      "service": 7,
+      "order": 14,
+      "fields": {
+        "Error": 0
+      }
+    },
+    {
+      "name": "admit-indication",
+      "direction": "server-to-client",
+      "message": "MSG_USER_ADMIT_IND",
+      "service": 7,
+      "order": 20,
+      "fields": {
+        "Status": 1
+      }
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "auth-response",
+      "request_hex": "0df0090000000000071b040000",
+      "expected_response_hex": "0df0090000000000070e040000",
+      "response_bytes": 13
+    }
+  ]
+}
