@@ -28,7 +28,8 @@ Run from the repository root:
 python contrib\schemas\check_status_schema.py
 ```
 
-The fixtures are shape-faithful synthetic responses derived from the encoder
-and review data. A live server response could not be saved because this
-workspace has no configured vcpkg toolchain or built server; the checker does
-not claim that these fixtures are live captures.
+`status-gameserver.json` is a live answer: the maintainer started a gameserver
+with `Admin.Enable = 1` and no client install, and saved what `GET /api/status`
+returned, which is why it carries the `install_missing` problem and a null
+`sessions`. `status-loginserver.json` is still a shape-faithful synthetic
+response derived from the encoder.
