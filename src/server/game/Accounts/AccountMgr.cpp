@@ -4,6 +4,7 @@
  */
 
 #include "AccountMgr.h"
+#include "AccountText.h"
 #include "ClientKey.h"
 #include "DatabaseEnv.h"
 #include "Log.h"
@@ -14,30 +15,6 @@
 namespace
 {
     using LoginStatement = std::unique_ptr<PreparedStatement<LoginDatabaseConnection>>;
-
-    bool IsUsernameCharacter(char c) noexcept
-    {
-        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.';
-    }
-
-    bool IsStorableText(std::string_view text) noexcept
-    {
-        if (!Utf::IsValidUtf8(text))
-            return false;
-        for (char const c : text)
-            if (static_cast<uint8>(c) < 0x20 || c == 0x7F)
-                return false;
-        return true;
-    }
-
-    std::size_t CountCodepoints(std::string_view text) noexcept
-    {
-        std::size_t count = 0;
-        for (char const c : text)
-            if ((static_cast<uint8>(c) & 0xC0) != 0x80)
-                ++count;
-        return count;
-    }
 
     AccountInfo ReadAccount(PreparedResultSet const& row)
     {
@@ -65,7 +42,7 @@ bool AccountMgr::IsLookupName(std::string_view username) noexcept
     if (username.empty() || username.size() > AccountSettings::MaxUsernameLength)
         return false;
     for (char const c : username)
-        if (!IsUsernameCharacter(c))
+        if (!Ambrose::AccountText::IsUsernameCharacter(c))
             return false;
     return true;
 }
@@ -118,27 +95,25 @@ std::shared_ptr<AccountSettings const> AccountMgr::GetSettings() const
 
 AccountOpResult AccountMgr::ValidateUsername(std::string_view username) const
 {
-    if (username.size() > AccountSettings::MaxUsernameLength)
-        return AccountOpResult::NameTooLong;
-    for (char const c : username)
-        if (!IsUsernameCharacter(c))
-            return AccountOpResult::NameInvalid;
-    if (username.size() < GetSettings()->UsernameMinLength)
-        return AccountOpResult::NameTooShort;
+    switch (Ambrose::AccountText::CheckUsername(username, GetSettings()->UsernameMinLength))
+    {
+        case Ambrose::AccountText::TextProblem::TooLong: return AccountOpResult::NameTooLong;
+        case Ambrose::AccountText::TextProblem::Invalid: return AccountOpResult::NameInvalid;
+        case Ambrose::AccountText::TextProblem::TooShort: return AccountOpResult::NameTooShort;
+        case Ambrose::AccountText::TextProblem::Ok: break;
+    }
     return AccountOpResult::Ok;
 }
 
 AccountOpResult AccountMgr::ValidatePassword(std::string_view password) const
 {
-    if (password.size() > AccountSettings::MaxPasswordLength)
-        return AccountOpResult::PassTooLong;
-    if (!Utf::IsValidUtf8(password))
-        return AccountOpResult::PassInvalid;
-    for (char const c : password)
-        if (static_cast<uint8>(c) < 0x20 || c == 0x7F)
-            return AccountOpResult::PassInvalid;
-    if (CountCodepoints(password) < GetSettings()->PasswordMinLength)
-        return AccountOpResult::PassTooShort;
+    switch (Ambrose::AccountText::CheckPassword(password, GetSettings()->PasswordMinLength))
+    {
+        case Ambrose::AccountText::TextProblem::TooLong: return AccountOpResult::PassTooLong;
+        case Ambrose::AccountText::TextProblem::Invalid: return AccountOpResult::PassInvalid;
+        case Ambrose::AccountText::TextProblem::TooShort: return AccountOpResult::PassTooShort;
+        case Ambrose::AccountText::TextProblem::Ok: break;
+    }
     return AccountOpResult::Ok;
 }
 
@@ -150,7 +125,7 @@ AccountOpResult AccountMgr::CreateAccount(std::string_view username, std::string
         return result;
     if (email.size() > AccountSettings::MaxEmailLength)
         return AccountOpResult::EmailTooLong;
-    if (!IsStorableText(email))
+    if (!Ambrose::AccountText::IsStorable(email))
         return AccountOpResult::EmailInvalid;
 
     AccountLookup const existing = GetAccountByName(username);
@@ -255,7 +230,7 @@ AccountOpResult AccountMgr::Ban(uint64 accountId, std::chrono::seconds duration,
         return AccountOpResult::BadDuration;
     if (bannedBy.size() > MaxBannedByLength || reason.size() > MaxReasonLength)
         return AccountOpResult::ReasonTooLong;
-    if (!IsStorableText(bannedBy) || !IsStorableText(reason))
+    if (!Ambrose::AccountText::IsStorable(bannedBy) || !Ambrose::AccountText::IsStorable(reason))
         return AccountOpResult::ReasonInvalid;
     AccountLookup const lookup = GetAccountById(accountId);
     if (lookup.Result != AccountOpResult::Ok)

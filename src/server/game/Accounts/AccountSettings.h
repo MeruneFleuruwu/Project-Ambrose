@@ -6,6 +6,7 @@
 #ifndef AMBROSE_ACCOUNTSETTINGS_H
 #define AMBROSE_ACCOUNTSETTINGS_H
 
+#include "AccountText.h"
 #include "VerifierKeyRing.h"
 
 #include <optional>
@@ -16,11 +17,11 @@ class ConfigMgr;
 
 struct AccountSettings
 {
-    static constexpr uint32 MaxUsernameLength = 32;
-    static constexpr uint32 MaxPasswordLength = 128;
-    static constexpr uint32 MaxEmailLength = 255;
-    static constexpr uint32 DefaultUsernameMinLength = 3;
-    static constexpr uint32 DefaultPasswordMinLength = 4;
+    static constexpr uint32 MaxUsernameLength = Ambrose::AccountText::MaxUsernameLength;
+    static constexpr uint32 MaxPasswordLength = Ambrose::AccountText::MaxPasswordLength;
+    static constexpr uint32 MaxEmailLength = Ambrose::AccountText::MaxEmailLength;
+    static constexpr uint32 DefaultUsernameMinLength = Ambrose::AccountText::DefaultUsernameMinLength;
+    static constexpr uint32 DefaultPasswordMinLength = Ambrose::AccountText::DefaultPasswordMinLength;
 
     uint32 UsernameMinLength = DefaultUsernameMinLength;
     uint32 PasswordMinLength = DefaultPasswordMinLength;
