@@ -1021,7 +1021,13 @@ TEST_F(AdminServerTest, SignsABrowserInAndServesItByCookie)
     ASSERT_FALSE(csrf.empty());
 
     EXPECT_EQ(Call(port, "GET", "/api/health", { cookie }).Status, 200);
+    HttpReply const nobody = Call(port, "GET", "/api/session", {});
+    EXPECT_EQ(nobody.Status, 200);
+    EXPECT_EQ(nlohmann::json::parse(nobody.Body)["signed_in"], false);
+    EXPECT_TRUE(nlohmann::json::parse(nobody.Body)["csrf"].is_null());
+    EXPECT_EQ(Get(port, "/api/session", OtherToken).Status, 401);
     HttpReply const session = Call(port, "GET", "/api/session", { cookie });
+    EXPECT_EQ(nlohmann::json::parse(session.Body)["signed_in"], true);
     EXPECT_EQ(nlohmann::json::parse(session.Body)["csrf"], csrf);
     EXPECT_EQ(nlohmann::json::parse(session.Body)["signed_in_with"], "session");
     EXPECT_EQ(nlohmann::json::parse(Get(port, "/api/session", Token).Body)["signed_in_with"], "token");

@@ -21,6 +21,27 @@ This directory contains the version-one JSON contract for `GET /api/apps` and
 
 Both v2 files are additive compatibility examples. A checker refuses a v2 file
 that drops or renames a v1 property.
+# C-56: Status API schema
+
+This directory contains the version-one `GET /api/status` contract from
+milestone 17.03, copied from `src/server/shared/Admin/AdminStatus.cpp` and the
+status API review in `doc/PANEL.md`.
+
+The status response has these top-level fields:
+
+- `schema`, `app`, `role`, `realm`, `revision`, `state`: strings except for
+  the integer `schema`;
+- `uptime`: integer seconds;
+- `memory`: an object containing integer `resident_bytes`, or `null`;
+- `threads` and `sessions`: integers or `null`;
+- `tick`: an object containing `average_ms`, `max_ms`, `samples` and
+  `window_seconds`, or `null`;
+- `stats`: an object whose values are published by running subsystems; and
+- `problems`: an array of `{code, message, subject}` objects.
+
+`address` and `port` are not status fields; they belong to `GET /api/apps`.
+The v2 schema is an additive compatibility example and the checker refuses
+removed or renamed v1 properties.
 
 Run from the repository root:
 
@@ -30,3 +51,11 @@ python contrib\schemas\check_c57_schemas.py
 
 The fixtures are synthetic values built from the encoder contract. No live
 capture or client-derived data is claimed here.
+python contrib\schemas\check_status_schema.py
+```
+
+`status-gameserver.json` is a live answer: the maintainer started a gameserver
+with `Admin.Enable = 1` and no client install, and saved what `GET /api/status`
+returned, which is why it carries the `install_missing` problem and a null
+`sessions`. `status-loginserver.json` is still a shape-faithful synthetic
+response derived from the encoder.

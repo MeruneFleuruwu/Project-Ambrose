@@ -123,9 +123,7 @@ Each item is worth doing, needs nothing from the phases, and lands inside the tr
 | F-53 | Which classes the type dump marks as having no reflected properties, grouped by base class, with counts | `contrib/findings/objects/` | The static, countable half of F-38 |
 | F-54 | The sizes and counts of every archive in the install: files per archive, compressed and uncompressed totals, as a table | `contrib/findings/data/` | The patch server plans transfers against this |
 | F-55 | What a name table row holds: the fields the extractor reads from each name table, checked against the dump | `contrib/findings/data/` | The world database's name columns are shaped by it |
-| C-56 | A JSON Schema for `GET /api/status` as milestone 17.03 specifies it, with one fixture per app, and a checker that fails when a field is renamed or removed between two versions of the schema | `contrib/schemas/` | 17.03's own acceptance asks for exactly that test; a contributor can write it before the endpoint exists |
 | C-57 | JSON Schemas and fixtures for `GET /api/apps` and `GET /api/capabilities` | `contrib/schemas/` | The dashboard reads both on every page; fixtures let it be built before the servers answer |
-| C-58 | A corpus of five hundred log records in the console's own shape across every category and level, each with the value spans C-29's classifier should find, as expected answers | `contrib/fixtures/` | 17.04 streams these and 17.76 colours them; a corpus tests both |
 | C-59 | Metric series fixtures: tick times, sessions and memory over sixty seconds, in the shape 17.11 will emit, including a gap and a restart | `contrib/fixtures/` | The panel's charts need real-looking series before real ones exist |
 | C-60 | The problem code catalog: every structured problem 17.03 lists, with code, message, subject, severity and what an operator does about it | `contrib/schemas/` | The panel, the docs and the status response all read one list |
 | C-61 | A corpus of duration strings for the project's own parser, `1d12h`, `30m`, `perm` and the malformed ones, with the seconds each must yield or the refusal | `contrib/fixtures/` | The console's ban command reads them; a corpus keeps two parsers agreeing |
@@ -208,6 +206,8 @@ The first list is mostly taken, and what remains of it waits on servers that do 
 | C-43 | What a reproducible load report has to record | `contrib/notes/load-report-c43.md` | MeruneFleuruwu, in #58 |
 | C-50 | Spanish for the dashboard pages | `contrib/locale/es.md` | MeruneFleuruwu, in #46 |
 | C-51 | A dry validator for the machine-checkable finding block | `contrib/tools/ambrose-finding-check/` | MeruneFleuruwu, in #47 |
+| C-56 | A JSON Schema for the status route with a fixture per app, checked against a live gameserver answer, and a checker that refuses a later version dropping or renaming a field | `contrib/schemas/` | MeruneFleuruwu, in #102 |
+| C-58 | A corpus of five hundred console log records across every level and all eighteen categories the servers log under, with C-29's value spans as expected answers | `contrib/fixtures/` | MeruneFleuruwu, in #101 |
 
 An item stays listed until its pull request is merged. Ask before starting something not on the list: the answer is usually yes if it lands in the paths above.
 
