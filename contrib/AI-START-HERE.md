@@ -89,9 +89,10 @@ A merged finding stays `claimed` and nothing is built on it until Ambrose re-der
 4. Turn it into a plan before any writing: what exactly to observe or build, what evidence would prove the claim, and what would disprove it. Put the cheapest experiment that could kill the idea first, so I do not spend a week on something wrong.
 5. Walk me through it one step at a time, waiting for what I actually see rather than assuming the result. When I paste output, read it rather than agreeing with it.
 6. Prefer the smallest thing that answers the question. A tool that reads only what it needs beats one that reads everything: classify before you hash, compare cheap fields before expensive ones, and never read a whole installation where a size comparison would do.
-7. Make a tool fail usefully. Name the file and the reason, exit non-zero, and carry on past what can be skipped rather than losing a whole report to one unreadable file. Say in its README what would make its output wrong.
-8. Write the files in the required shape, then have me run every check below and fix whatever they print.
-9. Write the pull request description: the item id, what the change is, how it was verified, and what would disprove it.
+7. **A checker is worth only the broken input it rejects.** For every rule a validator states, make one copy of the fixture that breaks only that rule and show the validator failing on it. The C-59 validator called any gap followed by samples a restart, so it passed a series with no restart at all.
+8. Make a tool fail usefully. Name the file and the reason, exit non-zero, and carry on past what can be skipped rather than losing a whole report to one unreadable file. Say in its README what would make its output wrong.
+9. Write the files in the required shape, then have me run every check below and fix whatever they print.
+10. Write the pull request description: the item id, what the change is, how it was verified, and what would disprove it.
 
 ## Before the pull request
 
