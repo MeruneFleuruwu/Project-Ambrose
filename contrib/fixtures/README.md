@@ -15,3 +15,17 @@ python contrib\fixtures\validate_c58.py
 The validator checks record identity, fixed-column level and category fields,
 all six severity levels, the documented logging categories, every expected
 C-29 value-class span, UTF-8 byte offsets, and the required C-58 count.
+
+The C-59 fixture is a deterministic sixty-second metric ring for the dashboard's
+live status view. It contains a null gap and a restart so the chart can show a
+process stop and a clean relaunch without inventing a bogus zero-value sample.
+
+Run its validator from the repository root:
+
+```powershell
+python contrib\fixtures\validate_c59.py
+```
+
+The validator checks the ring contract: exactly sixty seconds, a pair of
+`times` and `values` arrays for each metric, the null gap and restart, and the
+expected session, tick and resident-memory ranges.
