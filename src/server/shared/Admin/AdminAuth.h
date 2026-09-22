@@ -22,7 +22,8 @@ enum class AdminAuthResult
 {
     Ok,
     Unauthorized,
-    RateLimited
+    RateLimited,
+    Forbidden
 };
 
 class AdminAuth

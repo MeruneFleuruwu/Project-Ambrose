@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Runs the admin API on Crow: it resolves the token, tells every route whose socket is still open when the listener stops and detaches the handle first so nothing reaches a connection Crow has let go, refuses a bind the remote-access rule forbids, says out loud what a bind it allows still costs, proves no other socket holds the address before Crow takes it, answers every request from the shared table in a middleware that runs before Crow's own routing, answers from the same table again after it the requests Crow replies to before a connection has an address of its own, such as OPTIONS, hands only a real WebSocket upgrade to the route registered for it under the same authentication, gives each open socket a handle a route may keep and write to from any thread until the socket closes, queues a close behind the frames sent before it, and on a reload rotates the token live, rebinds a changed address, or brings the old listener back when the new one cannot bind.
+ * Runs the admin API on Crow: it resolves the token, tells every route whose socket is still open when the listener stops and detaches the handle first so nothing reaches a connection Crow has let go, refuses a bind the remote-access rule forbids, says out loud what a bind it allows still costs, proves no other socket holds the address before Crow takes it, answers every request from the shared table in a middleware that runs before Crow's own routing, with the host, origin, cookie and CSRF headers a browser session is checked by, answers from the same table again after it the requests Crow replies to before a connection has an address of its own, such as OPTIONS, hands only a real WebSocket upgrade to the route registered for it under the same host check and authentication, serves the built panel and its sign-in, which trades the token once for a session cookie named after the port because cookies ignore ports, logs every error with its request id, gives each open socket a handle a route may keep and write to from any thread until the socket closes, queues a close behind the frames sent before it, and on a reload rotates the token live and ends every session with the old one, applies the panel folder, allowed hosts and session lifetimes without rebinding, rebinds a changed address, or brings the old listener back when the new one cannot bind.
  */
 
 #include "AdminServer.h"
@@ -8,6 +8,7 @@
 #include "ConfigMgr.h"
 #include "IpAddress.h"
 #include "Log.h"
+#include "StringUtil.h"
 
 #include <crow.h>
 
@@ -154,6 +155,10 @@ namespace
         incoming.RemoteAddress = request.remote_ip_address;
         incoming.Authorization = request.get_header_value("Authorization");
         incoming.Body = request.body;
+        incoming.Host = request.get_header_value("Host");
+        incoming.Origin = request.get_header_value("Origin");
+        incoming.Cookie = request.get_header_value("Cookie");
+        incoming.Csrf = request.get_header_value("X-CSRF-Token");
         return incoming;
     }
 
@@ -297,6 +302,89 @@ AdminServer::AdminServer(Log& log, std::string appName, std::filesystem::path da
         body["state"] = health.State;
         return AdminResponse::Json(200, body.dump());
     });
+
+    _router.SetFiles([this](AdminRequest const& request) { return _files.Serve(request); });
+    _router.SetProblemLog([this](AdminRequest const& request, AdminResponse const& response)
+    {
+        LogLevel const level = response.Status >= 500 ? LogLevel::Error : (response.Status == 429 ? LogLevel::Debug : LogLevel::Info);
+        nlohmann::json const body = nlohmann::json::parse(response.Body, nullptr, false);
+        std::string const code = body.is_object() && body.contains("error") && body["error"].is_string() ? body["error"].get<std::string>() : std::string();
+        AMBROSE_LOG(_log, level, "server.admin", "{} {} from {} answered {} {} (request {})", request.Method, request.Path, request.RemoteAddress, response.Status, code, request.Id);
+    });
+    _router.AddPublic("POST", "/api/session", [this](AdminRequest const& request) { return SignIn(request); });
+    _router.Add("GET", "/api/session", [this](AdminRequest const& request)
+    {
+        nlohmann::json body;
+        body["app"] = _appName;
+        body["signed_in_with"] = request.SessionCsrf ? "session" : "token";
+        body["csrf"] = request.SessionCsrf ? nlohmann::json(*request.SessionCsrf) : nlohmann::json(nullptr);
+        body["idle_seconds"] = _sessions.GetIdleLifetime().count();
+        body["lifetime_seconds"] = _sessions.GetAbsoluteLifetime().count();
+        return AdminResponse::Json(200, body.dump());
+    });
+    _router.Add("DELETE", "/api/session", [this](AdminRequest const& request)
+    {
+        if (!request.SessionCsrf)
+            return AdminResponse::Problem(400, "no_session", "Only a browser session signs out; a bearer token has no session to end");
+        if (std::optional<std::string> const secret = _router.SessionSecret(request))
+            _sessions.Close(*secret);
+        AdminResponse response;
+        response.Status = 204;
+        response.ContentType.clear();
+        response.Headers.emplace_back("Set-Cookie", SessionCookie(std::string(), true));
+        return response;
+    });
+}
+
+AdminResponse AdminServer::SignIn(AdminRequest const& request)
+{
+    if (!Ambrose::EqualsIgnoreCase(request.Origin, _router.ExpectedOrigin(request)))
+        return AdminRouter::Refused(AdminAuthResult::Forbidden);
+
+    nlohmann::json const body = nlohmann::json::parse(request.Body, nullptr, false);
+    if (!body.is_object())
+        return AdminResponse::Invalid("Signing in takes a JSON object holding this app's admin token", { { "token", "Enter this app's admin token" } });
+    std::vector<std::pair<std::string, std::string>> fields;
+    for (auto const& [key, value] : body.items())
+        if (key != "token")
+            fields.emplace_back(key, "Signing in takes only the token");
+    auto const token = body.find("token");
+    bool const hasToken = token != body.end() && token->is_string() && !Ambrose::Trim(token->get_ref<std::string const&>()).empty();
+    if (!hasToken)
+        fields.emplace_back("token", "Enter this app's admin token");
+    if (!fields.empty())
+        return AdminResponse::Invalid("Signing in takes this app's admin token and nothing else", std::move(fields));
+
+    AdminAuthResult const result = _auth.Check(request.RemoteAddress, "Bearer " + std::string(Ambrose::Trim(token->get_ref<std::string const&>())));
+    if (result == AdminAuthResult::RateLimited)
+        return AdminRouter::Refused(result);
+    if (result != AdminAuthResult::Ok)
+        return AdminResponse::Problem(401, "wrong_token", "That is not this app's admin token");
+
+    AdminSession const opened = _sessions.Open();
+    AMBROSE_LOG(_log, LogLevel::Info, "server.admin", "A browser signed in to the admin API from {} (request {})", request.RemoteAddress, request.Id);
+    nlohmann::json answer;
+    answer["app"] = _appName;
+    answer["signed_in_with"] = "session";
+    answer["csrf"] = opened.Csrf;
+    answer["idle_seconds"] = _sessions.GetIdleLifetime().count();
+    answer["lifetime_seconds"] = _sessions.GetAbsoluteLifetime().count();
+    AdminResponse response = AdminResponse::Json(201, answer.dump());
+    response.Headers.emplace_back("Set-Cookie", SessionCookie(opened.Secret, false));
+    return response;
+}
+
+std::string AdminServer::SessionCookie(std::string const& value, bool clear) const
+{
+    AdminBrowserAccess const browser = _router.GetBrowserAccess();
+    return fmt::format("{}={}; Path=/; HttpOnly; SameSite=Strict{}{}", browser.CookieName, value, browser.Secure ? "; Secure" : "", clear ? "; Max-Age=0" : "");
+}
+
+void AdminServer::ApplyLiveSettings(AdminSettings const& settings)
+{
+    _files.SetRoot(settings.DashboardFolder());
+    _router.SetAllowedHosts(settings.AllowedHosts);
+    _sessions.SetLifetimes(std::chrono::minutes(settings.SessionIdleMinutes), std::chrono::hours(settings.SessionLifetimeHours));
 }
 
 AdminServer::~AdminServer()
@@ -407,11 +495,13 @@ bool AdminServer::Reload(AdminSettings const& settings)
     {
         _auth.SetLimits(settings.AuthFailureBurst, settings.AuthFailuresPerSecond);
         _router.SetMaxBodyBytes(settings.MaxRequestBytes);
+        ApplyLiveSettings(settings);
         if (token.Token != _token)
         {
             _token = token.Token;
             _auth.SetToken(_token);
-            AMBROSE_LOG(_log, LogLevel::Info, "server.admin", "The admin API token changed; the old one no longer answers");
+            _sessions.CloseAll();
+            AMBROSE_LOG(_log, LogLevel::Info, "server.admin", "The admin API token changed; the old one no longer answers and every browser session it opened has ended");
         }
         _active = effective;
         return true;
@@ -471,6 +561,9 @@ bool AdminServer::Open(AdminSettings const& settings, std::string const& token, 
     _auth.SetToken(_token);
     _auth.SetLimits(settings.AuthFailureBurst, settings.AuthFailuresPerSecond);
     _router.SetMaxBodyBytes(settings.MaxRequestBytes);
+    ApplyLiveSettings(settings);
+    _sessions.CloseAll();
+    _router.SetBrowserAccess({ &_sessions, fmt::format("ambrose_admin_{}", *reserved), false });
 
     LogBridge().Attach(&_log);
     crow::logger::setHandler(&LogBridge());
@@ -498,17 +591,29 @@ bool AdminServer::Open(AdminSettings const& settings, std::string const& token, 
             .max_payload(settings.MaxRequestBytes)
             .onaccept([this](crow::request const& request, std::optional<crow::response>& refusal, void** userdata)
             {
-                AdminRequest const incoming = ToAdminRequest(request);
+                AdminRequest incoming = ToAdminRequest(request);
+                incoming.Upgrade = true;
+                incoming.Id = AdminRouter::NewRequestId();
+                auto const refuse = [&](AdminResponse answer)
+                {
+                    _router.Finish(incoming, answer);
+                    refusal = ToCrowResponse(answer);
+                };
+                if (!_router.HostAllowed(incoming.Host))
+                {
+                    refuse(AdminRouter::HostRefused(incoming.Host));
+                    return;
+                }
                 AdminAuthResult const result = _router.Authenticate(incoming);
                 if (result != AdminAuthResult::Ok)
                 {
-                    refusal = ToCrowResponse(AdminRouter::Refused(result));
+                    refuse(AdminRouter::Refused(result));
                     return;
                 }
                 AdminSocketRoute const* const route = FindSocket(incoming.Path);
                 if (!route)
                 {
-                    refusal = ToCrowResponse(AdminResponse::Problem(404, "not_found", "The admin API has no WebSocket on " + incoming.Path));
+                    refuse(AdminResponse::Problem(404, "not_found", "The admin API has no WebSocket on " + incoming.Path));
                     return;
                 }
                 *userdata = new SocketBinding{ route, nullptr };
@@ -588,6 +693,7 @@ bool AdminServer::Open(AdminSettings const& settings, std::string const& token, 
 
 void AdminServer::Close()
 {
+    _sessions.CloseAll();
     if (_listener)
     {
         _listener->App.stop();

@@ -1,10 +1,11 @@
 /*
  * Project Ambrose by Imjustchico
- * Reads the Admin options from config, clamping out-of-range values and reporting each problem, judges a bind address against the remote-access rule, where anything but loopback needs TLS, which this build does not serve yet, or the plain-HTTP opt-in with no TLS files set, and collects the warnings a binding the rule allows still carries: plain HTTP off this machine, and TLS files that name a certificate nothing serves yet.
+ * Reads the Admin options from config, clamping out-of-range values and reporting each problem, judges a bind address against the remote-access rule, where anything but loopback needs TLS, which this build does not serve yet, or the plain-HTTP opt-in with no TLS files set, collects the warnings a binding the rule allows still carries: plain HTTP off this machine, and TLS files that name a certificate nothing serves yet, and finds the built panel beside the executable when no folder is set.
  */
 
 #include "AdminSettings.h"
 #include "ConfigMgr.h"
+#include "Environment.h"
 #include "IpAddress.h"
 #include "StringUtil.h"
 
@@ -50,7 +51,34 @@ AdminSettings AdminSettings::Load(ConfigMgr const& config, uint16 defaultPort, s
     if (settings.Threads != threads)
         report(fmt::format("Admin.Threads = {} is outside {}-{}; using {}", threads, MinThreads, MaxThreads, settings.Threads));
 
+    settings.DashboardDir = ConfigMgr::PathFromUtf8(Ambrose::Trim(config.GetOption<std::string>("Admin.DashboardDir", "", true)));
+
+    std::string const hostList = config.GetOption<std::string>("Admin.AllowedHosts", "", true);
+    for (std::string_view rest = hostList; !rest.empty();)
+    {
+        std::size_t const comma = rest.find(',');
+        std::string_view const name = Ambrose::Trim(rest.substr(0, comma));
+        if (!name.empty())
+            settings.AllowedHosts.push_back(Ambrose::ToLower(name));
+        rest = comma == std::string_view::npos ? std::string_view() : rest.substr(comma + 1);
+    }
+
+    uint32 const idle = config.GetOption<uint32>("Admin.SessionIdleMinutes", settings.SessionIdleMinutes, true);
+    settings.SessionIdleMinutes = std::clamp<uint32>(idle, MinSessionIdleMinutes, MaxSessionIdleMinutes);
+    if (settings.SessionIdleMinutes != idle)
+        report(fmt::format("Admin.SessionIdleMinutes = {} is outside {}-{}; using {}", idle, MinSessionIdleMinutes, MaxSessionIdleMinutes, settings.SessionIdleMinutes));
+
+    uint32 const lifetime = config.GetOption<uint32>("Admin.SessionLifetimeHours", settings.SessionLifetimeHours, true);
+    settings.SessionLifetimeHours = std::clamp<uint32>(lifetime, MinSessionLifetimeHours, MaxSessionLifetimeHours);
+    if (settings.SessionLifetimeHours != lifetime)
+        report(fmt::format("Admin.SessionLifetimeHours = {} is outside {}-{}; using {}", lifetime, MinSessionLifetimeHours, MaxSessionLifetimeHours, settings.SessionLifetimeHours));
+
     return settings;
+}
+
+std::filesystem::path AdminSettings::DashboardFolder() const
+{
+    return DashboardDir.empty() ? Ambrose::GetExecutableDirectory() / "dashboard" : DashboardDir;
 }
 
 bool AdminSettings::BindsBeyondThisMachine() const

@@ -1,15 +1,22 @@
 /*
  * Project Ambrose by Imjustchico
- * Answers an admin API request: the token is checked first, so an unauthenticated caller learns nothing about which paths exist, an oversized body is refused next, then the table picks the handler for the method and path, and anything else becomes a JSON problem with the right status.
+ * Answers every admin API request in one order: a request id, the host check, the panel's files for paths outside /api, public routes, then the bearer token or a browser session with its origin and CSRF checks, the body limit and the route, and finally the security headers, the request id in the answer and in any error body, and the error log.
  */
 
 #include "AdminRouter.h"
+#include "AdminSessions.h"
+#include "Base64.h"
+#include "ConstantTime.h"
+#include "CryptoRandom.h"
+#include "IpAddress.h"
 #include "StringUtil.h"
 
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <array>
 #include <exception>
+#include <mutex>
 #include <string>
 #include <utility>
 
@@ -21,6 +28,37 @@ namespace
         body["error"] = code;
         body["message"] = message;
         return body.dump();
+    }
+
+    bool IsApiPath(std::string_view path)
+    {
+        return path == "/api" || path.starts_with("/api/");
+    }
+
+    bool Unsafe(std::string_view method)
+    {
+        return method != "GET" && method != "HEAD" && method != "OPTIONS";
+    }
+
+    bool HasHeader(AdminResponse const& response, std::string_view name)
+    {
+        return std::any_of(response.Headers.begin(), response.Headers.end(), [name](std::pair<std::string, std::string> const& header) { return Ambrose::EqualsIgnoreCase(header.first, name); });
+    }
+
+    std::optional<std::string> CookieValue(std::string_view header, std::string_view name)
+    {
+        while (!header.empty())
+        {
+            std::size_t const semicolon = header.find(';');
+            std::string_view const pair = Ambrose::Trim(header.substr(0, semicolon));
+            std::size_t const equals = pair.find('=');
+            if (equals != std::string_view::npos && Ambrose::Trim(pair.substr(0, equals)) == name)
+                return std::string(Ambrose::Trim(pair.substr(equals + 1)));
+            if (semicolon == std::string_view::npos)
+                break;
+            header.remove_prefix(semicolon + 1);
+        }
+        return std::nullopt;
     }
 }
 
@@ -37,11 +75,22 @@ AdminResponse AdminResponse::Problem(int status, std::string code, std::string m
     return Json(status, ProblemBody(code, message));
 }
 
+AdminResponse AdminResponse::Invalid(std::string message, std::vector<std::pair<std::string, std::string>> fields)
+{
+    nlohmann::json body;
+    body["error"] = "invalid";
+    body["message"] = std::move(message);
+    body["fields"] = nlohmann::json::object();
+    for (auto& [field, problem] : fields)
+        body["fields"][field] = std::move(problem);
+    return Json(422, body.dump());
+}
+
 AdminRouter::AdminRouter(AdminAuth& auth) : _auth(auth)
 {
 }
 
-void AdminRouter::Add(std::string method, std::string path, Handler handler)
+void AdminRouter::Put(std::string method, std::string path, Handler handler, bool isPublic)
 {
     std::unique_lock const lock(_mutex);
     std::string const upper = Ambrose::ToUpper(method);
@@ -49,9 +98,53 @@ void AdminRouter::Add(std::string method, std::string path, Handler handler)
     if (existing != _routes.end())
     {
         existing->Run = std::move(handler);
+        existing->Public = isPublic;
         return;
     }
-    _routes.push_back({ upper, std::move(path), std::move(handler) });
+    _routes.push_back({ upper, std::move(path), std::move(handler), isPublic });
+}
+
+void AdminRouter::Add(std::string method, std::string path, Handler handler)
+{
+    Put(std::move(method), std::move(path), std::move(handler), false);
+}
+
+void AdminRouter::AddPublic(std::string method, std::string path, Handler handler)
+{
+    Put(std::move(method), std::move(path), std::move(handler), true);
+}
+
+void AdminRouter::SetFiles(Handler files)
+{
+    std::unique_lock const lock(_mutex);
+    _files = std::move(files);
+}
+
+void AdminRouter::SetAllowedHosts(std::vector<std::string> names)
+{
+    for (std::string& name : names)
+        name = Ambrose::ToLower(Ambrose::Trim(name));
+    std::erase_if(names, [](std::string const& name) { return name.empty(); });
+    std::unique_lock const lock(_mutex);
+    _allowedHosts = std::move(names);
+}
+
+void AdminRouter::SetBrowserAccess(AdminBrowserAccess access)
+{
+    std::unique_lock const lock(_mutex);
+    _browser = std::move(access);
+}
+
+AdminBrowserAccess AdminRouter::GetBrowserAccess() const
+{
+    std::shared_lock const lock(_mutex);
+    return _browser;
+}
+
+void AdminRouter::SetProblemLog(ProblemLog log)
+{
+    std::unique_lock const lock(_mutex);
+    _problemLog = std::move(log);
 }
 
 void AdminRouter::SetMaxBodyBytes(std::size_t bytes)
@@ -77,8 +170,69 @@ std::vector<std::string> AdminRouter::Describe() const
     return lines;
 }
 
-AdminAuthResult AdminRouter::Authenticate(AdminRequest const& request) const
+std::string AdminRouter::HostName(std::string_view host)
 {
+    host = Ambrose::Trim(host);
+    if (host.starts_with('['))
+    {
+        std::size_t const close = host.find(']');
+        return close == std::string_view::npos ? std::string() : Ambrose::ToLower(host.substr(1, close - 1));
+    }
+    std::size_t const colon = host.find(':');
+    if (colon != std::string_view::npos && host.find(':', colon + 1) == std::string_view::npos)
+        host = host.substr(0, colon);
+    return Ambrose::ToLower(host);
+}
+
+bool AdminRouter::HostAllowed(std::string_view host) const
+{
+    if (Ambrose::Trim(host).empty())
+        return true;
+    std::string const name = HostName(host);
+    if (name.empty())
+        return false;
+    if (name == "localhost" || Ambrose::Asio::MakeAddress(name))
+        return true;
+    std::shared_lock const lock(_mutex);
+    return std::find(_allowedHosts.begin(), _allowedHosts.end(), name) != _allowedHosts.end();
+}
+
+std::string AdminRouter::ExpectedOrigin(AdminRequest const& request) const
+{
+    return std::string(GetBrowserAccess().Secure ? "https://" : "http://") + Ambrose::ToLower(Ambrose::Trim(request.Host));
+}
+
+std::optional<std::string> AdminRouter::SessionSecret(AdminRequest const& request) const
+{
+    AdminBrowserAccess const browser = GetBrowserAccess();
+    if (!browser.Sessions || browser.CookieName.empty() || request.Cookie.empty())
+        return std::nullopt;
+    return CookieValue(request.Cookie, browser.CookieName);
+}
+
+AdminAuthResult AdminRouter::Authenticate(AdminRequest& request) const
+{
+    if (!request.Authorization.empty())
+        return _auth.Check(request.RemoteAddress, request.Authorization);
+
+    AdminBrowserAccess const browser = GetBrowserAccess();
+    if (browser.Sessions)
+    {
+        if (std::optional<std::string> const secret = SessionSecret(request))
+        {
+            if (std::optional<std::string> const csrf = browser.Sessions->Find(*secret))
+            {
+                std::string const method = Ambrose::ToUpper(request.Method);
+                bool const changes = Unsafe(method);
+                if ((changes || request.Upgrade) && !Ambrose::EqualsIgnoreCase(request.Origin, ExpectedOrigin(request)))
+                    return AdminAuthResult::Forbidden;
+                if (changes && !request.Upgrade && !Ambrose::Crypto::ConstantTimeEquals(request.Csrf, *csrf))
+                    return AdminAuthResult::Forbidden;
+                request.SessionCsrf = *csrf;
+                return AdminAuthResult::Ok;
+            }
+        }
+    }
     return _auth.Check(request.RemoteAddress, request.Authorization);
 }
 
@@ -90,20 +244,117 @@ AdminResponse AdminRouter::Refused(AdminAuthResult result)
         response.Headers.emplace_back("Retry-After", "1");
         return response;
     }
-    AdminResponse response = AdminResponse::Problem(401, "unauthorized", "The admin API needs an Authorization header holding its bearer token");
+    if (result == AdminAuthResult::Forbidden)
+        return AdminResponse::Problem(403, "cross_origin", "The request did not come from this listener's own page: its origin or its CSRF token does not match the session");
+    AdminResponse response = AdminResponse::Problem(401, "unauthorized", "The admin API needs its bearer token in an Authorization header, or a signed-in browser session");
     response.Headers.emplace_back("WWW-Authenticate", "Bearer");
     return response;
 }
 
-AdminResponse AdminRouter::Dispatch(AdminRequest const& request) const
+AdminResponse AdminRouter::HostRefused(std::string_view host)
 {
+    return AdminResponse::Problem(400, "host_not_allowed", "The admin API does not answer for " + HostName(host) + "; add that name to Admin.AllowedHosts to reach it by that name");
+}
+
+std::string AdminRouter::NewRequestId()
+{
+    std::array<uint8, 12> const bytes = Ambrose::Crypto::GetRandomArray<12>();
+    return Base64::Encode(bytes, Base64::Alphabet::UrlSafe, Base64::Padding::Omitted);
+}
+
+AdminResponse AdminRouter::Dispatch(AdminRequest const& incoming) const
+{
+    AdminRequest request = incoming;
+    if (request.Id.empty())
+        request.Id = NewRequestId();
+    AdminResponse response = Answer(request);
+    Finish(request, response);
+    return response;
+}
+
+AdminResponse AdminRouter::Answer(AdminRequest& request) const
+{
+    if (!HostAllowed(request.Host))
+        return HostRefused(request.Host);
+
+    if (!IsApiPath(request.Path))
+    {
+        Handler files;
+        {
+            std::shared_lock const lock(_mutex);
+            files = _files;
+        }
+        if (!files)
+            return AdminResponse::Problem(404, "not_found", "The admin API has no " + request.Path);
+        return files(request);
+    }
+
+    std::size_t const limit = _maxBodyBytes.load();
+    Handler open;
+    {
+        std::shared_lock const lock(_mutex);
+        std::string const method = Ambrose::ToUpper(request.Method);
+        for (Route const& route : _routes)
+        {
+            if (route.Public && route.Path == request.Path && route.Method == method)
+            {
+                open = route.Run;
+                break;
+            }
+        }
+    }
+    if (open)
+    {
+        if (limit != 0 && request.Body.size() > limit)
+            return AdminResponse::Problem(413, "payload_too_large", "The admin API takes at most " + std::to_string(limit) + " bytes of request body");
+        try
+        {
+            return open(request);
+        }
+        catch (std::exception const& failure)
+        {
+            return AdminResponse::Problem(500, "handler_failed", std::string("The admin API handler failed: ") + failure.what());
+        }
+    }
+
     AdminAuthResult const authenticated = Authenticate(request);
     if (authenticated != AdminAuthResult::Ok)
         return Refused(authenticated);
-    std::size_t const limit = _maxBodyBytes.load();
     if (limit != 0 && request.Body.size() > limit)
         return AdminResponse::Problem(413, "payload_too_large", "The admin API takes at most " + std::to_string(limit) + " bytes of request body");
     return Serve(request);
+}
+
+void AdminRouter::Finish(AdminRequest const& request, AdminResponse& response) const
+{
+    response.Headers.emplace_back("X-Request-Id", request.Id);
+    response.Headers.emplace_back("Content-Security-Policy", std::string(SecurityPolicy));
+    response.Headers.emplace_back("X-Content-Type-Options", "nosniff");
+    response.Headers.emplace_back("X-Frame-Options", "DENY");
+    response.Headers.emplace_back("Referrer-Policy", "same-origin");
+    response.Headers.emplace_back("Cross-Origin-Opener-Policy", "same-origin");
+    response.Headers.emplace_back("Cross-Origin-Resource-Policy", "same-origin");
+    if (!HasHeader(response, "Cache-Control"))
+        response.Headers.emplace_back("Cache-Control", "no-store");
+
+    if (response.Status < 400)
+        return;
+    if (response.ContentType == "application/json")
+    {
+        nlohmann::json body = nlohmann::json::parse(response.Body, nullptr, false);
+        if (body.is_object())
+        {
+            body["request_id"] = request.Id;
+            response.Body = body.dump();
+        }
+    }
+    ProblemLog log;
+    {
+        std::shared_lock const lock(_mutex);
+        log = _problemLog;
+    }
+    if (log)
+        log(request, response);
 }
 
 AdminResponse AdminRouter::Serve(AdminRequest const& request) const

@@ -1,10 +1,11 @@
 /*
  * Project Ambrose by Imjustchico
- * Tests admin API routing without sockets: authentication runs before the table, a wrong token is rate limited while the right one still answers, a request naming no caller address is refused, an oversized body is refused before the handler, a known method and path reaches its handler, another method answers 405, an unknown path answers 404, and a handler that throws becomes a 500 problem.
+ * Tests admin API routing without sockets: authentication runs before the table, a wrong token is rate limited while the right one still answers, a request naming no caller address is refused, an oversized body is refused before the handler, a known method and path reaches its handler, another method answers 405, an unknown path answers 404, a handler that throws becomes a 500 problem, a host header is read down to its name and only an IP address, localhost or an allowed name is answered, every answer carries a request id and the security headers with the id in any error body, a 422 names each field, paths outside /api and public routes need no token, and a browser session authenticates by cookie with its origin and CSRF token checked where a request changes something or upgrades.
  */
 
 #include "AdminAuth.h"
 #include "AdminRouter.h"
+#include "AdminSessions.h"
 
 #include <nlohmann/json.hpp>
 
@@ -165,4 +166,152 @@ TEST(AdminRouterTest, RefusesABodyOverTheLimitAfterTheToken)
     router.SetMaxBodyBytes(0);
     request.Authorization = std::string("Bearer ") + Token;
     EXPECT_EQ(router.Dispatch(request).Status, 200);
+}
+
+TEST(AdminRouterTest, ReadsTheHostNameOutOfAHostHeader)
+{
+    EXPECT_EQ(AdminRouter::HostName("127.0.0.1:12080"), "127.0.0.1");
+    EXPECT_EQ(AdminRouter::HostName("[::1]:12080"), "::1");
+    EXPECT_EQ(AdminRouter::HostName("[::1]"), "::1");
+    EXPECT_EQ(AdminRouter::HostName("::1"), "::1");
+    EXPECT_EQ(AdminRouter::HostName("LocalHost:1"), "localhost");
+    EXPECT_EQ(AdminRouter::HostName(" Panel.Example "), "panel.example");
+    EXPECT_EQ(AdminRouter::HostName("[::1"), "");
+}
+
+TEST(AdminRouterTest, AnswersOnlyForItsOwnHosts)
+{
+    AdminAuth auth(10, 1.0);
+    auth.SetToken(Token);
+    AdminRouter router(auth);
+    router.Add("GET", "/api/health", [](AdminRequest const&) { return AdminResponse::Json(200, "{}"); });
+
+    AdminRequest request = Get("/api/health");
+    for (std::string const host : { "", "127.0.0.1:1", "localhost:1", "[::1]:1", "10.0.0.5" })
+    {
+        request.Host = host;
+        EXPECT_EQ(router.Dispatch(request).Status, 200) << host;
+    }
+
+    request.Host = "evil.example:1";
+    AdminResponse const refused = router.Dispatch(request);
+    EXPECT_EQ(refused.Status, 400);
+    EXPECT_EQ(nlohmann::json::parse(refused.Body)["error"], "host_not_allowed");
+
+    router.SetAllowedHosts({ " Panel.Example ", "" });
+    request.Host = "panel.example:443";
+    EXPECT_EQ(router.Dispatch(request).Status, 200);
+    request.Host = "evil.example";
+    EXPECT_EQ(router.Dispatch(request).Status, 400);
+}
+
+TEST(AdminRouterTest, StampsARequestIdAndTheSecurityHeaders)
+{
+    AdminAuth auth(10, 1.0);
+    auth.SetToken(Token);
+    AdminRouter router(auth);
+    router.Add("GET", "/api/health", [](AdminRequest const&) { return AdminResponse::Json(200, "{}"); });
+    std::vector<std::string> logged;
+    router.SetProblemLog([&logged](AdminRequest const& request, AdminResponse const& response) { logged.push_back(request.Id + " " + std::to_string(response.Status)); });
+
+    AdminResponse const served = router.Dispatch(Get("/api/health"));
+    EXPECT_EQ(served.Status, 200);
+    EXPECT_EQ(HeaderValue(served, "X-Request-Id").size(), 16u);
+    EXPECT_EQ(HeaderValue(served, "Content-Security-Policy"), std::string(AdminRouter::SecurityPolicy));
+    EXPECT_EQ(HeaderValue(served, "X-Content-Type-Options"), "nosniff");
+    EXPECT_EQ(HeaderValue(served, "Referrer-Policy"), "same-origin");
+    EXPECT_EQ(HeaderValue(served, "Cache-Control"), "no-store");
+    EXPECT_TRUE(logged.empty());
+
+    AdminResponse const missing = router.Dispatch(Get("/api/nothing"));
+    std::string const id = HeaderValue(missing, "X-Request-Id");
+    EXPECT_EQ(missing.Status, 404);
+    EXPECT_EQ(nlohmann::json::parse(missing.Body)["request_id"], id);
+    ASSERT_EQ(logged.size(), 1u);
+    EXPECT_EQ(logged.front(), id + " 404");
+    EXPECT_NE(HeaderValue(router.Dispatch(Get("/api/health")), "X-Request-Id"), HeaderValue(served, "X-Request-Id"));
+}
+
+TEST(AdminRouterTest, AnInvalidAnswerNamesEachField)
+{
+    AdminResponse const invalid = AdminResponse::Invalid("Two things are wrong", { { "token", "Enter the token" }, { "extra", "Not taken" } });
+    EXPECT_EQ(invalid.Status, 422);
+    nlohmann::json const body = nlohmann::json::parse(invalid.Body);
+    EXPECT_EQ(body["error"], "invalid");
+    EXPECT_EQ(body["message"], "Two things are wrong");
+    EXPECT_EQ(body["fields"]["token"], "Enter the token");
+    EXPECT_EQ(body["fields"]["extra"], "Not taken");
+}
+
+TEST(AdminRouterTest, ServesFilesAndPublicRoutesWithoutTheToken)
+{
+    AdminAuth auth(10, 1.0);
+    auth.SetToken(Token);
+    AdminRouter router(auth);
+    router.Add("GET", "/api/session", [](AdminRequest const&) { return AdminResponse::Json(200, "{}"); });
+    router.AddPublic("POST", "/api/session", [](AdminRequest const&) { return AdminResponse::Json(201, "{}"); });
+
+    EXPECT_EQ(router.Dispatch(Get("/", "")).Status, 404);
+    router.SetFiles([](AdminRequest const& request) { return AdminResponse::Json(200, request.Path); });
+    AdminResponse const file = router.Dispatch(Get("/assets/app.js", ""));
+    EXPECT_EQ(file.Status, 200);
+    EXPECT_EQ(file.Body, "/assets/app.js");
+
+    AdminRequest signIn = Get("/api/session", "");
+    signIn.Method = "POST";
+    EXPECT_EQ(router.Dispatch(signIn).Status, 201);
+    EXPECT_EQ(router.Dispatch(Get("/api/session", "")).Status, 401);
+    EXPECT_EQ(router.Dispatch(Get("/api/session")).Status, 200);
+}
+
+TEST(AdminRouterTest, ASessionCookieAuthenticatesWithItsOriginAndCsrfToken)
+{
+    AdminAuth auth(10, 0.0);
+    auth.SetToken(Token);
+    AdminRouter router(auth);
+    AdminSessions sessions;
+    router.SetBrowserAccess({ &sessions, "ambrose_admin_1", false });
+    router.Add("GET", "/api/health", [](AdminRequest const& request) { return AdminResponse::Json(200, request.SessionCsrf.value_or("none")); });
+    router.Add("POST", "/api/echo", [](AdminRequest const& request) { return AdminResponse::Json(200, request.Body); });
+    AdminSession const opened = sessions.Open();
+
+    AdminRequest read = Get("/api/health", "");
+    read.Host = "127.0.0.1:1";
+    read.Cookie = "theme=dark; ambrose_admin_1=" + opened.Secret + "; other=1";
+    AdminResponse const served = router.Dispatch(read);
+    EXPECT_EQ(served.Status, 200);
+    EXPECT_EQ(served.Body, opened.Csrf);
+
+    AdminRequest change = read;
+    change.Path = "/api/echo";
+    change.Method = "POST";
+    change.Body = "sent";
+    EXPECT_EQ(router.Dispatch(change).Status, 403);
+    change.Csrf = opened.Csrf;
+    EXPECT_EQ(router.Dispatch(change).Status, 403);
+    change.Origin = "http://evil.example";
+    EXPECT_EQ(router.Dispatch(change).Status, 403);
+    change.Origin = "http://127.0.0.1:1";
+    AdminResponse const echoed = router.Dispatch(change);
+    EXPECT_EQ(echoed.Status, 200);
+    EXPECT_EQ(echoed.Body, "sent");
+    change.Csrf = opened.Secret;
+    EXPECT_EQ(router.Dispatch(change).Status, 403);
+
+    AdminRequest upgrade = read;
+    upgrade.Upgrade = true;
+    EXPECT_EQ(router.Authenticate(upgrade), AdminAuthResult::Forbidden);
+    upgrade.Origin = "http://127.0.0.1:1";
+    EXPECT_EQ(router.Authenticate(upgrade), AdminAuthResult::Ok);
+
+    AdminRequest keyed = read;
+    keyed.Authorization = "Bearer wrong-token-wrong-token-wrong";
+    EXPECT_EQ(router.Dispatch(keyed).Status, 401);
+
+    AdminRequest otherCookie = read;
+    otherCookie.Cookie = "ambrose_admin_2=" + opened.Secret;
+    EXPECT_EQ(router.Dispatch(otherCookie).Status, 401);
+
+    sessions.CloseAll();
+    EXPECT_EQ(router.Dispatch(read).Status, 401);
 }

@@ -1,13 +1,15 @@
 /*
  * Project Ambrose by Imjustchico
- * The optional admin API listener every operations feature builds on: it binds only where the remote-access rule allows, keeps a generated token in the data folder or, where the machine names none, beside the config file, holds the route table, the bearer token and the failure limiter, answers the same 401 on every path and every method without it, serves GET /api/health, and takes the WebSocket routes later milestones register, before or after it opens.
+ * The optional admin API listener every operations feature builds on: it binds only where the remote-access rule allows, keeps a generated token in the data folder or, where the machine names none, beside the config file, holds the route table, the bearer token and the failure limiter, answers the same 401 on every path and every method without it, serves GET /api/health, serves the built panel at / without a token and lets it sign in by trading the token once for a browser session, and takes the WebSocket routes later milestones register, before or after it opens.
  */
 
 #ifndef AMBROSE_ADMINSERVER_H
 #define AMBROSE_ADMINSERVER_H
 
 #include "AdminAuth.h"
+#include "AdminFiles.h"
 #include "AdminRouter.h"
+#include "AdminSessions.h"
 #include "AdminSettings.h"
 #include "Types.h"
 
@@ -76,12 +78,17 @@ private:
     bool Open(AdminSettings const& settings, std::string const& token, std::string& error);
     void Close();
     AdminSocketRoute const* FindSocket(std::string const& path) const;
+    void ApplyLiveSettings(AdminSettings const& settings);
+    AdminResponse SignIn(AdminRequest const& request);
+    std::string SessionCookie(std::string const& value, bool clear) const;
 
     Log& _log;
     std::string _appName;
     std::filesystem::path _dataFolder;
     std::filesystem::path _configFolder;
     AdminAuth _auth;
+    AdminSessions _sessions;
+    AdminFiles _files;
     AdminRouter _router;
     std::function<AdminHealth()> _health;
     mutable std::mutex _socketMutex;

@@ -57,7 +57,10 @@ costs about 12 kB compressed. No Svelte 6 is announced.
 **Plain Vite 8.3.0 in single-page mode, not SvelteKit.** Four reasons, and the first is the one that decides it.
 doc/PANEL.md requires a strict Content-Security-Policy on every response from the listener in 17.14. A plain
 Vite build emits an index.html with no inline script and no inline style, so `script-src 'self'; style-src
-'self'` works with no nonce and no hash. SvelteKit's static adapter puts an inline bootstrap script into its
+'self'` works with no nonce and no hash. Measured on 2026-09-22 against the built panel, it needs one relaxation: Bits UI's scroll lock writes
+the page body's style attribute when a dialog, menu, select or sheet opens and writes it back when it closes, which
+`style-src 'self'` blocks, leaving the page unable to take a click, so the policy adds `style-src-attr 'unsafe-inline'`.
+Style elements and every script stay `'self'`. SvelteKit's static adapter puts an inline bootstrap script into its
 fallback page, which under a strict policy needs Kit's hash mode, which writes a second policy as a meta tag
 that the C++ header must then be kept in agreement with, and the hash changes every build. That is permanent
 friction against a security rule the panel has already fixed. Second, size: the same hello-world app is about

@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * The admin API request and response shapes and the route table every endpoint registers in, which authenticates a request, rate limits it and refuses an oversized body before it picks the handler for its method and path.
+ * The admin API's route table and front door: every request gets a request id that its answer and any error body carry, a host that is no IP address, localhost or a name the operator allows is refused so a page elsewhere cannot rebind a name onto this listener, paths outside /api go to the panel's files without a token, public routes such as signing in run without one, and every other path needs the bearer token or a browser session whose unsafe requests and socket upgrades name this listener's own origin and carry the session's CSRF token, with every answer stamped with the panel's security headers and every error handed to a log.
  */
 
 #ifndef AMBROSE_ADMINROUTER_H
@@ -11,10 +11,14 @@
 #include <atomic>
 #include <cstddef>
 #include <functional>
+#include <optional>
 #include <shared_mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
+
+class AdminSessions;
 
 struct AdminRequest
 {
@@ -23,6 +27,13 @@ struct AdminRequest
     std::string RemoteAddress;
     std::string Authorization;
     std::string Body;
+    std::string Host;
+    std::string Origin;
+    std::string Cookie;
+    std::string Csrf;
+    bool Upgrade = false;
+    std::string Id;
+    std::optional<std::string> SessionCsrf;
 };
 
 struct AdminResponse
@@ -34,12 +45,25 @@ struct AdminResponse
 
     static AdminResponse Json(int status, std::string body);
     static AdminResponse Problem(int status, std::string code, std::string message);
+    static AdminResponse Invalid(std::string message, std::vector<std::pair<std::string, std::string>> fields);
+};
+
+struct AdminBrowserAccess
+{
+    AdminSessions* Sessions = nullptr;
+    std::string CookieName;
+    bool Secure = false;
 };
 
 class AdminRouter
 {
 public:
     using Handler = std::function<AdminResponse(AdminRequest const&)>;
+    using ProblemLog = std::function<void(AdminRequest const&, AdminResponse const&)>;
+
+    static constexpr std::string_view SecurityPolicy =
+        "default-src 'none'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; "
+        "base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 
     explicit AdminRouter(AdminAuth& auth);
 
@@ -47,13 +71,26 @@ public:
     AdminRouter& operator=(AdminRouter const&) = delete;
 
     void Add(std::string method, std::string path, Handler handler);
+    void AddPublic(std::string method, std::string path, Handler handler);
+    void SetFiles(Handler files);
+    void SetAllowedHosts(std::vector<std::string> names);
+    void SetBrowserAccess(AdminBrowserAccess access);
+    void SetProblemLog(ProblemLog log);
     void SetMaxBodyBytes(std::size_t bytes);
     bool Has(std::string const& method, std::string const& path) const;
     std::vector<std::string> Describe() const;
 
-    AdminAuthResult Authenticate(AdminRequest const& request) const;
+    bool HostAllowed(std::string_view host) const;
+    std::string ExpectedOrigin(AdminRequest const& request) const;
+    AdminAuthResult Authenticate(AdminRequest& request) const;
     AdminResponse Dispatch(AdminRequest const& request) const;
+    void Finish(AdminRequest const& request, AdminResponse& response) const;
+    std::optional<std::string> SessionSecret(AdminRequest const& request) const;
+    AdminBrowserAccess GetBrowserAccess() const;
     static AdminResponse Refused(AdminAuthResult result);
+    static AdminResponse HostRefused(std::string_view host);
+    static std::string NewRequestId();
+    static std::string HostName(std::string_view host);
 
 private:
     struct Route
@@ -61,14 +98,21 @@ private:
         std::string Method;
         std::string Path;
         Handler Run;
+        bool Public = false;
     };
 
+    AdminResponse Answer(AdminRequest& request) const;
     AdminResponse Serve(AdminRequest const& request) const;
+    void Put(std::string method, std::string path, Handler handler, bool isPublic);
 
     AdminAuth& _auth;
     std::atomic<std::size_t> _maxBodyBytes{ 0 };
     mutable std::shared_mutex _mutex;
     std::vector<Route> _routes;
+    Handler _files;
+    std::vector<std::string> _allowedHosts;
+    AdminBrowserAccess _browser;
+    ProblemLog _problemLog;
 };
 
 #endif

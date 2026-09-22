@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Tests the admin API listener on a loopback port the operating system picks: health needs the token, wrong tokens are rate limited while the right one still answers, every path answers the same way without one whatever method it carries, whatever upgrade it claims and wherever it falls on a kept-alive connection, TLS files that name a certificate nothing serves yet are warned about, a reload rotates the token without a restart and keeps the old listener when the new port is taken, an unsafe remote bind is refused, WebSocket routes registered before or after the listener opens take the same token and carry frames both ways, a machine with no data folder keeps its generated token beside the config file, an app reloads the listener from its own config, and an app whose admin binding is unsafe exits with a failure.
+ * Tests the admin API listener on a loopback port the operating system picks: health needs the token, wrong tokens are rate limited while the right one still answers, every /api path answers the same way without one whatever method it carries, whatever upgrade it claims and wherever it falls on a kept-alive connection, TLS files that name a certificate nothing serves yet are warned about, a reload rotates the token without a restart and keeps the old listener when the new port is taken, an unsafe remote bind is refused, WebSocket routes registered before or after the listener opens take the same token and carry frames both ways, a machine with no data folder keeps its generated token beside the config file, an app reloads the listener from its own config, an app whose admin binding is unsafe exits with a failure, the built panel is served without a token and with the security headers, a browser signs in only from its own origin by trading the token for a cookie named after the port, with each wrong field named beside the request id, the cookie's unsafe requests and socket upgrades need its own origin and CSRF token, signing out and rotating the token end the session, and a host the listener does not answer for is refused.
  */
 
 #include "AdminServer.h"
@@ -147,6 +147,45 @@ namespace
     HttpReply Upgrade(uint16 port, std::string const& path, std::string const& token)
     {
         return Send(port, UpgradeRequest(path, token));
+    }
+
+    std::string OwnOrigin(uint16 port)
+    {
+        return "http://127.0.0.1:" + std::to_string(port);
+    }
+
+    HttpReply Call(uint16 port, std::string const& method, std::string const& path, std::vector<std::string> const& headers, std::string const& body = std::string())
+    {
+        std::string request = method + " " + path + " HTTP/1.1\r\nHost: 127.0.0.1:" + std::to_string(port) + "\r\nConnection: close\r\n";
+        for (std::string const& header : headers)
+            request += header + "\r\n";
+        if (!body.empty())
+            request += "Content-Length: " + std::to_string(body.size()) + "\r\n";
+        request += "\r\n" + body;
+        return Send(port, request);
+    }
+
+    std::string HeaderOf(HttpReply const& reply, std::string const& name)
+    {
+        std::string lowered = reply.Head;
+        for (char& character : lowered)
+            character = static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
+        std::string wanted = "\r\n" + name + ":";
+        for (char& character : wanted)
+            character = static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
+        std::size_t const at = lowered.find(wanted);
+        if (at == std::string::npos)
+            return {};
+        std::size_t start = at + wanted.size();
+        while (start < reply.Head.size() && reply.Head[start] == ' ')
+            ++start;
+        std::size_t const end = reply.Head.find("\r\n", start);
+        return reply.Head.substr(start, end == std::string::npos ? std::string::npos : end - start);
+    }
+
+    std::string TokenBody(std::string const& token)
+    {
+        return nlohmann::json{ { "token", token } }.dump();
     }
 
     class Conversation
@@ -608,7 +647,7 @@ TEST_F(AdminServerTest, AnswersEveryPathTheSameWayWithoutTheToken)
     ASSERT_TRUE(server.Start(Loopback(), error)) << error;
     uint16 const port = server.GetPort();
 
-    std::vector<std::string> const paths{ "/api/health", "/api/socket", "/api/nothing", "/static/notes.txt", "/" };
+    std::vector<std::string> const paths{ "/api/health", "/api/socket", "/api/nothing", "/api" };
     for (std::string const& path : paths)
     {
         HttpReply const refused = Ask(port, "GET", path, "");
@@ -619,16 +658,37 @@ TEST_F(AdminServerTest, AnswersEveryPathTheSameWayWithoutTheToken)
     }
 }
 
-TEST_F(AdminServerTest, ServesNoStaticFilesEvenWithTheToken)
+TEST_F(AdminServerTest, ServesTheBuiltPanelWithoutTheToken)
 {
+    LogTestDirectory panel;
+    panel.Write("dist/index.html", "<!doctype html><title>Ambrose</title>");
+    panel.Write("dist/assets/app-1a2b.js", "console.log(1);");
     AdminServer server = Make();
     server.SetHealthSource([] { return AdminHealth{ "testserver", "", "rev", 0, "running" }; });
+    AdminSettings settings = Loopback();
+    settings.DashboardDir = panel.Path() / "dist";
     std::string error;
-    ASSERT_TRUE(server.Start(Loopback(), error)) << error;
+    ASSERT_TRUE(server.Start(settings, error)) << error;
+    uint16 const port = server.GetPort();
 
-    HttpReply const refused = Get(server.GetPort(), "/static/notes.txt", Token);
-    EXPECT_EQ(refused.Status, 404) << refused.Head;
-    EXPECT_NE(refused.Body.find("not_found"), std::string::npos) << refused.Body;
+    HttpReply const index = Call(port, "GET", "/", {});
+    EXPECT_EQ(index.Status, 200) << index.Head;
+    EXPECT_EQ(index.Body, "<!doctype html><title>Ambrose</title>");
+    EXPECT_EQ(HeaderOf(index, "Content-Type"), "text/html; charset=utf-8");
+    EXPECT_EQ(HeaderOf(index, "Cache-Control"), "no-cache");
+    EXPECT_EQ(HeaderOf(index, "Content-Security-Policy"), std::string(AdminRouter::SecurityPolicy));
+    EXPECT_EQ(HeaderOf(index, "X-Content-Type-Options"), "nosniff");
+    EXPECT_EQ(HeaderOf(index, "X-Frame-Options"), "DENY");
+    EXPECT_FALSE(HeaderOf(index, "X-Request-Id").empty());
+
+    HttpReply const script = Call(port, "GET", "/assets/app-1a2b.js", {});
+    EXPECT_EQ(script.Status, 200) << script.Head;
+    EXPECT_EQ(script.Body, "console.log(1);");
+    EXPECT_EQ(HeaderOf(script, "Cache-Control"), "public, max-age=31536000, immutable");
+
+    EXPECT_EQ(Call(port, "GET", "/static/notes.txt", {}).Status, 404);
+    EXPECT_EQ(Call(port, "POST", "/", {}).Status, 405);
+    EXPECT_EQ(Call(port, "GET", "/api/health", {}).Status, 401);
 }
 
 TEST_F(AdminServerTest, RefusesARequestBodyOverTheLimit)
@@ -812,7 +872,7 @@ TEST_F(AdminServerTest, AnswersEveryPathTheSameWayWhenARequestClaimsAnUpgrade)
     ASSERT_TRUE(server.Start(Loopback(), error)) << error;
     uint16 const port = server.GetPort();
 
-    std::vector<std::string> const paths{ "/api/health", "/api/socket", "/api/nothing", "/static/notes.txt", "/" };
+    std::vector<std::string> const paths{ "/api/health", "/api/socket", "/api/nothing", "/api" };
     for (std::string const& path : paths)
     {
         HttpReply const options = Send(port, "OPTIONS " + path + " HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\nUpgrade: websocket\r\n\r\n");
@@ -937,4 +997,150 @@ TEST_F(AdminServerTest, AnAppReloadsItsAdminApiFromItsOwnConfig)
     runner.join();
     EXPECT_EQ(exitCode, EXIT_SUCCESS);
     EXPECT_EQ(app.GetAdminApi(), nullptr);
+}
+
+TEST_F(AdminServerTest, SignsABrowserInAndServesItByCookie)
+{
+    AdminServer server = Make();
+    server.SetHealthSource([] { return AdminHealth{ "testserver", "", "rev", 0, "running" }; });
+    server.Routes().Add("POST", "/api/echo", [](AdminRequest const& request) { return AdminResponse::Json(200, request.Body); });
+    std::string error;
+    ASSERT_TRUE(server.Start(Loopback(), error)) << error;
+    uint16 const port = server.GetPort();
+
+    HttpReply const signedIn = Call(port, "POST", "/api/session", { "Origin: " + OwnOrigin(port) }, TokenBody(Token));
+    ASSERT_EQ(signedIn.Status, 201) << signedIn.Head << signedIn.Body;
+    std::string const setCookie = HeaderOf(signedIn, "Set-Cookie");
+    EXPECT_EQ(setCookie.rfind("ambrose_admin_" + std::to_string(port) + "=", 0), 0u) << setCookie;
+    EXPECT_NE(setCookie.find("; Path=/"), std::string::npos) << setCookie;
+    EXPECT_NE(setCookie.find("; HttpOnly"), std::string::npos) << setCookie;
+    EXPECT_NE(setCookie.find("; SameSite=Strict"), std::string::npos) << setCookie;
+    EXPECT_EQ(signedIn.Body.find(Token), std::string::npos);
+    std::string const cookie = "Cookie: " + setCookie.substr(0, setCookie.find(';'));
+    std::string const csrf = nlohmann::json::parse(signedIn.Body)["csrf"];
+    ASSERT_FALSE(csrf.empty());
+
+    EXPECT_EQ(Call(port, "GET", "/api/health", { cookie }).Status, 200);
+    HttpReply const session = Call(port, "GET", "/api/session", { cookie });
+    EXPECT_EQ(nlohmann::json::parse(session.Body)["csrf"], csrf);
+    EXPECT_EQ(nlohmann::json::parse(session.Body)["signed_in_with"], "session");
+    EXPECT_EQ(nlohmann::json::parse(Get(port, "/api/session", Token).Body)["signed_in_with"], "token");
+
+    EXPECT_EQ(Call(port, "POST", "/api/echo", { cookie, "Origin: " + OwnOrigin(port) }, "x").Status, 403);
+    EXPECT_EQ(Call(port, "POST", "/api/echo", { cookie, "X-CSRF-Token: " + csrf }, "x").Status, 403);
+    EXPECT_EQ(Call(port, "POST", "/api/echo", { cookie, "X-CSRF-Token: " + csrf, "Origin: http://evil.example" }, "x").Status, 403);
+    HttpReply const echoed = Call(port, "POST", "/api/echo", { cookie, "X-CSRF-Token: " + csrf, "Origin: " + OwnOrigin(port) }, "x");
+    EXPECT_EQ(echoed.Status, 200) << echoed.Body;
+    EXPECT_EQ(echoed.Body, "x");
+
+    HttpReply const signedOut = Call(port, "DELETE", "/api/session", { cookie, "X-CSRF-Token: " + csrf, "Origin: " + OwnOrigin(port) });
+    EXPECT_EQ(signedOut.Status, 204) << signedOut.Head;
+    EXPECT_NE(HeaderOf(signedOut, "Set-Cookie").find("Max-Age=0"), std::string::npos);
+    EXPECT_EQ(Call(port, "GET", "/api/health", { cookie }).Status, 401);
+}
+
+TEST_F(AdminServerTest, SignsInOnlyFromItsOwnOriginAndNamesEachWrongField)
+{
+    AdminServer server = Make();
+    server.SetHealthSource([] { return AdminHealth{ "testserver", "", "rev", 0, "running" }; });
+    std::string error;
+    ASSERT_TRUE(server.Start(Loopback(), error)) << error;
+    uint16 const port = server.GetPort();
+
+    EXPECT_EQ(Call(port, "POST", "/api/session", {}, TokenBody(Token)).Status, 403);
+    EXPECT_EQ(Call(port, "POST", "/api/session", { "Origin: http://evil.example" }, TokenBody(Token)).Status, 403);
+
+    HttpReply const invalid = Call(port, "POST", "/api/session", { "Origin: " + OwnOrigin(port) }, R"({"token":"  ","remember":true})");
+    EXPECT_EQ(invalid.Status, 422) << invalid.Body;
+    nlohmann::json const problem = nlohmann::json::parse(invalid.Body);
+    EXPECT_EQ(problem["error"], "invalid");
+    EXPECT_TRUE(problem["fields"].contains("token"));
+    EXPECT_TRUE(problem["fields"].contains("remember"));
+    EXPECT_EQ(problem["request_id"], HeaderOf(invalid, "X-Request-Id"));
+    EXPECT_FALSE(problem["request_id"].get<std::string>().empty());
+
+    EXPECT_EQ(Call(port, "POST", "/api/session", { "Origin: " + OwnOrigin(port) }, "not json").Status, 422);
+    HttpReply const wrong = Call(port, "POST", "/api/session", { "Origin: " + OwnOrigin(port) }, TokenBody(OtherToken));
+    EXPECT_EQ(wrong.Status, 401);
+    EXPECT_EQ(nlohmann::json::parse(wrong.Body)["error"], "wrong_token");
+    EXPECT_TRUE(HeaderOf(wrong, "Set-Cookie").empty());
+}
+
+TEST_F(AdminServerTest, EndsEveryBrowserSessionWhenTheTokenRotates)
+{
+    AdminServer server = Make();
+    server.SetHealthSource([] { return AdminHealth{ "testserver", "", "rev", 0, "running" }; });
+    std::string error;
+    ASSERT_TRUE(server.Start(Loopback(), error)) << error;
+    uint16 const port = server.GetPort();
+
+    HttpReply const signedIn = Call(port, "POST", "/api/session", { "Origin: " + OwnOrigin(port) }, TokenBody(Token));
+    ASSERT_EQ(signedIn.Status, 201);
+    std::string const setCookie = HeaderOf(signedIn, "Set-Cookie");
+    std::string const cookie = "Cookie: " + setCookie.substr(0, setCookie.find(';'));
+    ASSERT_EQ(Call(port, "GET", "/api/health", { cookie }).Status, 200);
+
+    AdminSettings rotated = Loopback();
+    rotated.Port = port;
+    rotated.Token = OtherToken;
+    ASSERT_TRUE(server.Reload(rotated));
+    EXPECT_EQ(Call(port, "GET", "/api/health", { cookie }).Status, 401);
+}
+
+TEST_F(AdminServerTest, RefusesAHostItDoesNotAnswerFor)
+{
+    AdminServer server = Make();
+    server.SetHealthSource([] { return AdminHealth{ "testserver", "", "rev", 0, "running" }; });
+    AdminSocketRoute route;
+    route.Path = "/api/socket";
+    server.AddSocket(route);
+    std::string error;
+    ASSERT_TRUE(server.Start(Loopback(), error)) << error;
+    uint16 const port = server.GetPort();
+    std::string const suffix = ":" + std::to_string(port) + "\r\nConnection: close\r\nAuthorization: Bearer " + std::string(Token) + "\r\n\r\n";
+
+    HttpReply const refused = Send(port, "GET /api/health HTTP/1.1\r\nHost: evil.example" + suffix);
+    EXPECT_EQ(refused.Status, 400) << refused.Head;
+    EXPECT_EQ(nlohmann::json::parse(refused.Body)["error"], "host_not_allowed");
+    EXPECT_EQ(Send(port, "GET /api/health HTTP/1.1\r\nHost: localhost" + suffix).Status, 200);
+    EXPECT_EQ(Send(port, "GET / HTTP/1.1\r\nHost: evil.example" + suffix).Status, 400);
+    EXPECT_EQ(Send(port, "GET /api/socket HTTP/1.1\r\nHost: evil.example:" + std::to_string(port) + "\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+        "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\nAuthorization: Bearer " + std::string(Token) + "\r\n\r\n").Status, 400);
+
+    AdminSettings named = Loopback();
+    named.Port = port;
+    named.AllowedHosts = { "panel.example" };
+    ASSERT_TRUE(server.Reload(named));
+    EXPECT_EQ(Send(port, "GET /api/health HTTP/1.1\r\nHost: panel.example" + suffix).Status, 200);
+    EXPECT_EQ(Send(port, "GET /api/health HTTP/1.1\r\nHost: evil.example" + suffix).Status, 400);
+}
+
+TEST_F(AdminServerTest, AcceptsASocketUpgradeByCookieOnlyFromItsOwnOrigin)
+{
+    AdminServer server = Make();
+    server.SetHealthSource([] { return AdminHealth{ "testserver", "", "rev", 0, "running" }; });
+    AdminSocketRoute route;
+    route.Path = "/api/socket";
+    server.AddSocket(route);
+    std::string error;
+    ASSERT_TRUE(server.Start(Loopback(), error)) << error;
+    uint16 const port = server.GetPort();
+
+    HttpReply const signedIn = Call(port, "POST", "/api/session", { "Origin: " + OwnOrigin(port) }, TokenBody(Token));
+    ASSERT_EQ(signedIn.Status, 201);
+    std::string const setCookie = HeaderOf(signedIn, "Set-Cookie");
+    std::string const cookie = "Cookie: " + setCookie.substr(0, setCookie.find(';'));
+
+    auto const upgrade = [&](std::string const& origin)
+    {
+        std::string request = "GET /api/socket HTTP/1.1\r\nHost: 127.0.0.1:" + std::to_string(port) + "\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+            "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n" + cookie + "\r\n";
+        if (!origin.empty())
+            request += "Origin: " + origin + "\r\n";
+        request += "\r\n";
+        return Send(port, request);
+    };
+    EXPECT_EQ(upgrade("").Status, 403);
+    EXPECT_EQ(upgrade("http://evil.example").Status, 403);
+    EXPECT_EQ(upgrade(OwnOrigin(port)).Status, 101);
 }

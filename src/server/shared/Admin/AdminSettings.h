@@ -25,6 +25,10 @@ struct AdminSettings
     static constexpr std::size_t MaxTokenLength = 512;
     static constexpr uint32 MinRequestBytes = 1024;
     static constexpr uint32 MaxRequestBytesLimit = 16777216;
+    static constexpr uint32 MinSessionIdleMinutes = 5;
+    static constexpr uint32 MaxSessionIdleMinutes = 10080;
+    static constexpr uint32 MinSessionLifetimeHours = 1;
+    static constexpr uint32 MaxSessionLifetimeHours = 720;
 
     bool Enable = false;
     std::string BindIp = "127.0.0.1";
@@ -38,6 +42,10 @@ struct AdminSettings
     double AuthFailuresPerSecond = 1.0;
     uint32 MaxRequestBytes = 262144;
     uint32 Threads = 2;
+    std::filesystem::path DashboardDir;
+    std::vector<std::string> AllowedHosts;
+    uint32 SessionIdleMinutes = 720;
+    uint32 SessionLifetimeHours = 168;
 
     static AdminSettings Load(ConfigMgr const& config, uint16 defaultPort, std::vector<std::string>* problems = nullptr);
 
@@ -48,6 +56,7 @@ struct AdminSettings
     std::optional<std::string> TlsNotServedWarning() const;
     std::vector<std::string> Warnings() const;
     bool ListenerEquals(AdminSettings const& other) const;
+    std::filesystem::path DashboardFolder() const;
 };
 
 #endif

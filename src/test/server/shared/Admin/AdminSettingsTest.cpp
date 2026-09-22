@@ -1,11 +1,12 @@
 /*
  * Project Ambrose by Imjustchico
- * Tests the Admin options: defaults, clamped values with their problems, the remote-access rule that refuses a non-loopback bind without TLS or the plain-HTTP opt-in and names what to change when both are set, the warnings a binding it allows still carries, and the token that comes from config or a file the current user alone can read, beside the config file where the machine names no data folder.
+ * Tests the Admin options: defaults, clamped values with their problems, the remote-access rule that refuses a non-loopback bind without TLS or the plain-HTTP opt-in and names what to change when both are set, the warnings a binding it allows still carries, and the token that comes from config or a file the current user alone can read, beside the config file where the machine names no data folder, and the panel options: its folder, found beside the executable by default, the host names allowed beside IP addresses, and the clamped session lifetimes.
  */
 
 #include "AdminSettings.h"
 #include "AdminToken.h"
 #include "ConfigMgr.h"
+#include "Environment.h"
 #include "LogTestDirectory.h"
 
 #include <gtest/gtest.h>
@@ -398,4 +399,35 @@ TEST(AdminTokenTest, KeepsAGeneratedTokenBesideTheConfigWithNoDataFolder)
     ASSERT_TRUE(std::filesystem::is_regular_file(generated.File));
     EXPECT_FALSE(AdminToken::Validate(generated.Token).has_value());
     EXPECT_EQ(AdminToken::DefaultFile("loginserver", directory.Path(), "elsewhere"), AdminToken::DefaultFile("loginserver", directory.Path()));
+}
+
+TEST(AdminSettingsTest, ReadsThePanelOptionsAndClampsTheSessionLifetimes)
+{
+    LogTestDirectory directory;
+    std::filesystem::path const file = directory.Write("admin.conf",
+        "Admin.DashboardDir = web/panel\n"
+        "Admin.AllowedHosts = Panel.Example, other.example ,,\n"
+        "Admin.SessionIdleMinutes = 1\n"
+        "Admin.SessionLifetimeHours = 1000\n");
+    ConfigMgr config(NoEnvironment());
+    ASSERT_TRUE(config.LoadInitial(file).Succeeded());
+
+    std::vector<std::string> problems;
+    AdminSettings const settings = AdminSettings::Load(config, 12010, &problems);
+    EXPECT_EQ(ConfigMgr::PathToUtf8(settings.DashboardDir), "web/panel");
+    EXPECT_EQ(settings.DashboardFolder(), settings.DashboardDir);
+    EXPECT_EQ(settings.AllowedHosts, (std::vector<std::string>{ "panel.example", "other.example" }));
+    EXPECT_EQ(settings.SessionIdleMinutes, AdminSettings::MinSessionIdleMinutes);
+    EXPECT_EQ(settings.SessionLifetimeHours, AdminSettings::MaxSessionLifetimeHours);
+    EXPECT_EQ(problems.size(), 2u);
+}
+
+TEST(AdminSettingsTest, FindsThePanelBesideTheExecutableByDefault)
+{
+    AdminSettings const settings;
+    EXPECT_TRUE(settings.DashboardDir.empty());
+    EXPECT_EQ(settings.DashboardFolder(), Ambrose::GetExecutableDirectory() / "dashboard");
+    EXPECT_TRUE(settings.AllowedHosts.empty());
+    EXPECT_EQ(settings.SessionIdleMinutes, 720u);
+    EXPECT_EQ(settings.SessionLifetimeHours, 168u);
 }
