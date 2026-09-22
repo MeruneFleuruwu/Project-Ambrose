@@ -10,7 +10,8 @@
 #include "AdminFiles.h"
 #include "AdminRouter.h"
 #include "AdminSessions.h"
-#include "AdminSettings.h"
+#include "ListenerSettings.h"
+#include "Log.h"
 #include "Types.h"
 
 #include <deque>
@@ -20,7 +21,6 @@
 #include <mutex>
 #include <string>
 
-class Log;
 
 struct AdminHealth
 {
@@ -63,8 +63,8 @@ public:
     void AddSocket(AdminSocketRoute route);
     AdminRouter& Routes() { return _router; }
 
-    bool Start(AdminSettings const& settings, std::string& error);
-    bool Reload(AdminSettings const& settings);
+    bool Start(ListenerSettings const& settings, std::string& error);
+    bool Reload(ListenerSettings const& settings);
     void Stop();
 
     bool IsRunning() const;
@@ -75,11 +75,21 @@ public:
 private:
     struct Listener;
 
-    bool Open(AdminSettings const& settings, std::string const& token, std::string& error);
+    template<typename... Args>
+    void LogPanelOrAdmin(LogLevel level, fmt::format_string<Args...> format, Args&&... args) const
+    {
+        _log.Write(std::string_view(_active.LogCategory), level, format, std::forward<Args>(args)...);
+    }
+
+    void AdoptIdentity(ListenerSettings const& settings);
+    std::string_view Label() const { return _active.Label; }
+    std::string Capitalised() const;
+
+    bool Open(ListenerSettings const& settings, std::string const& token, std::string& error);
     bool SwapCertificate();
     void Close();
     AdminSocketRoute const* FindSocket(std::string const& path) const;
-    void ApplyLiveSettings(AdminSettings const& settings);
+    void ApplyLiveSettings(ListenerSettings const& settings);
     AdminResponse SignIn(AdminRequest const& request);
     std::string SessionCookie(std::string const& value, bool clear) const;
 
@@ -95,7 +105,7 @@ private:
     mutable std::mutex _socketMutex;
     std::deque<AdminSocketRoute> _sockets;
     std::unique_ptr<Listener> _listener;
-    AdminSettings _active;
+    ListenerSettings _active;
     std::string _token;
 };
 

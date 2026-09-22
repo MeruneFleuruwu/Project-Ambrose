@@ -5,7 +5,7 @@
 
 #include "AdminCapabilities.h"
 #include "AdminServer.h"
-#include "AdminSettings.h"
+#include "ListenerSettings.h"
 #include "AdminStatus.h"
 #include "ConfigMgr.h"
 #include "LogTestDirectory.h"
@@ -143,9 +143,9 @@ namespace
             sStats.Unpublish("sessions");
         }
 
-        AdminSettings Loopback() const
+        ListenerSettings Loopback() const
         {
-            AdminSettings settings;
+            ListenerSettings settings;
             settings.Enable = true;
             settings.BindIp = "127.0.0.1";
             settings.Port = 0;

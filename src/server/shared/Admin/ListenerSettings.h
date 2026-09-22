@@ -1,21 +1,22 @@
 /*
  * Project Ambrose by Imjustchico
- * Admin API listener settings loaded from config: whether it runs, where it binds, its token and token file, the plain-HTTP opt-in, the certificate and key it serves TLS with, the failed-authentication limit, the largest request it takes, the remote-access rule that judges a bind address, and the warnings a binding the rule allows still has to say out loud.
+ * One HTTP listener's settings, read from config under the prefix that names it, Admin for an app's admin API and Panel for the supervisor's panel: whether it runs, where it binds, its token and token file, what it carries that must not be read off the wire, the plain-HTTP opt-in, the certificate and key it serves TLS with, the failed-authentication limit, the largest request it takes, the remote-access rule that judges a bind address in its own option names, and the warnings a binding the rule allows still has to say out loud.
  */
 
-#ifndef AMBROSE_ADMINSETTINGS_H
-#define AMBROSE_ADMINSETTINGS_H
+#ifndef AMBROSE_LISTENERSETTINGS_H
+#define AMBROSE_LISTENERSETTINGS_H
 
 #include "Types.h"
 
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 class ConfigMgr;
 
-struct AdminSettings
+struct ListenerSettings
 {
     static constexpr uint32 MinThreads = 2;
     static constexpr uint32 MaxThreads = 64;
@@ -30,6 +31,10 @@ struct AdminSettings
     static constexpr uint32 MinSessionLifetimeHours = 1;
     static constexpr uint32 MaxSessionLifetimeHours = 720;
 
+    std::string Prefix = "Admin";
+    std::string Label = "the admin API";
+    std::string LogCategory = "server.admin";
+    std::string Secrets = "the token, commands and logs";
     bool Enable = false;
     std::string BindIp = "127.0.0.1";
     uint16 Port = 0;
@@ -47,14 +52,16 @@ struct AdminSettings
     uint32 SessionIdleMinutes = 720;
     uint32 SessionLifetimeHours = 168;
 
-    static AdminSettings Load(ConfigMgr const& config, uint16 defaultPort, std::vector<std::string>* problems = nullptr);
+    static ListenerSettings Load(ConfigMgr const& config, std::string_view prefix, uint16 defaultPort, std::vector<std::string>* problems = nullptr);
+
+    std::string Option(std::string_view name) const;
 
     bool BindsBeyondThisMachine() const;
     bool HasTls() const;
     std::optional<std::string> RemoteAccessError() const;
     std::optional<std::string> PlainHttpRemoteWarning() const;
     std::vector<std::string> Warnings() const;
-    bool ListenerEquals(AdminSettings const& other) const;
+    bool ListenerEquals(ListenerSettings const& other) const;
     std::filesystem::path DashboardFolder() const;
 };
 

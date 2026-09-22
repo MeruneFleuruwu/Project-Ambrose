@@ -11,7 +11,7 @@
 #include <string>
 #include <string_view>
 
-struct AdminSettings;
+struct ListenerSettings;
 
 struct AdminTokenResult
 {
@@ -32,7 +32,7 @@ namespace AdminToken
     std::filesystem::path DefaultFile(std::string const& appName, std::filesystem::path const& dataFolder, std::filesystem::path const& fallbackFolder = {});
     bool WriteSecretFile(std::filesystem::path const& file, std::string_view text, std::string& error);
     bool SecureFile(std::filesystem::path const& file, std::string& error);
-    AdminTokenResult Resolve(AdminSettings const& settings, std::string const& appName, std::filesystem::path const& dataFolder, std::filesystem::path const& fallbackFolder = {});
+    AdminTokenResult Resolve(ListenerSettings const& settings, std::string const& appName, std::filesystem::path const& dataFolder, std::filesystem::path const& fallbackFolder = {});
 }
 
 #endif

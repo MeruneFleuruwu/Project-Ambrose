@@ -5,7 +5,7 @@
 
 #include "AdminClient.h"
 #include "AdminServer.h"
-#include "AdminSettings.h"
+#include "ListenerSettings.h"
 #include "ConfigMgr.h"
 #include "Environment.h"
 #include "GitRevision.h"
@@ -403,9 +403,9 @@ namespace
     class AdminServerTest : public testing::Test
     {
     protected:
-        AdminSettings Loopback() const
+        ListenerSettings Loopback() const
         {
-            AdminSettings settings;
+            ListenerSettings settings;
             settings.Enable = true;
             settings.BindIp = "127.0.0.1";
             settings.Port = 0;
@@ -490,7 +490,7 @@ TEST_F(AdminServerTest, RotatesTheTokenOnReloadWithoutRestarting)
     uint16 const port = server.GetPort();
     ASSERT_EQ(Get(port, "/api/health", Token).Status, 200);
 
-    AdminSettings rotated = Loopback();
+    ListenerSettings rotated = Loopback();
     rotated.Port = port;
     rotated.Token = OtherToken;
     ASSERT_TRUE(server.Reload(rotated));
@@ -509,7 +509,7 @@ TEST_F(AdminServerTest, ChangingTheThreadCountRebindsTheSamePort)
     uint16 const port = server.GetPort();
     ASSERT_EQ(Get(port, "/api/health", Token).Status, 200);
 
-    AdminSettings threads = Loopback();
+    ListenerSettings threads = Loopback();
     threads.Threads = 4;
     ASSERT_TRUE(server.Reload(threads));
     EXPECT_EQ(server.GetPort(), port);
@@ -524,7 +524,7 @@ TEST_F(AdminServerTest, ReloadKeepsTheOldListenerWhenTheNewBindIsUnsafe)
     ASSERT_TRUE(server.Start(Loopback(), error)) << error;
     uint16 const port = server.GetPort();
 
-    AdminSettings remote = Loopback();
+    ListenerSettings remote = Loopback();
     remote.Port = port;
     remote.BindIp = "0.0.0.0";
     EXPECT_FALSE(server.Reload(remote));
@@ -532,7 +532,7 @@ TEST_F(AdminServerTest, ReloadKeepsTheOldListenerWhenTheNewBindIsUnsafe)
     EXPECT_EQ(server.GetPort(), port);
     EXPECT_EQ(Get(port, "/api/health", Token).Status, 200);
 
-    AdminSettings off = Loopback();
+    ListenerSettings off = Loopback();
     off.Enable = false;
     EXPECT_TRUE(server.Reload(off));
     EXPECT_FALSE(server.IsRunning());
@@ -541,7 +541,7 @@ TEST_F(AdminServerTest, ReloadKeepsTheOldListenerWhenTheNewBindIsUnsafe)
 TEST_F(AdminServerTest, RefusesAnUnsafeRemoteBindAtStart)
 {
     AdminServer server = Make();
-    AdminSettings settings = Loopback();
+    ListenerSettings settings = Loopback();
     settings.BindIp = "0.0.0.0";
     std::string error;
     EXPECT_FALSE(server.Start(settings, error));
@@ -552,7 +552,7 @@ TEST_F(AdminServerTest, RefusesAnUnsafeRemoteBindAtStart)
 TEST_F(AdminServerTest, StaysOffWhenDisabled)
 {
     AdminServer server = Make();
-    AdminSettings settings = Loopback();
+    ListenerSettings settings = Loopback();
     settings.Enable = false;
     std::string error;
     EXPECT_TRUE(server.Start(settings, error)) << error;
@@ -579,7 +579,7 @@ TEST_F(AdminServerTest, GeneratesATokenWhenConfigHasNone)
 {
     AdminServer server = Make();
     server.SetHealthSource([] { return AdminHealth{ "testserver", "", "rev", 0, "running" }; });
-    AdminSettings settings = Loopback();
+    ListenerSettings settings = Loopback();
     settings.Token.clear();
 
     std::string error;
@@ -668,7 +668,7 @@ TEST_F(AdminServerTest, ServesTheBuiltPanelWithoutTheToken)
     panel.Write("dist/assets/app-1a2b.js", "console.log(1);");
     AdminServer server = Make();
     server.SetHealthSource([] { return AdminHealth{ "testserver", "", "rev", 0, "running" }; });
-    AdminSettings settings = Loopback();
+    ListenerSettings settings = Loopback();
     settings.DashboardDir = panel.Path() / "dist";
     std::string error;
     ASSERT_TRUE(server.Start(settings, error)) << error;
@@ -698,15 +698,15 @@ TEST_F(AdminServerTest, RefusesARequestBodyOverTheLimit)
 {
     AdminServer server = Make();
     server.SetHealthSource([] { return AdminHealth{ "testserver", "", "rev", 0, "running" }; });
-    AdminSettings settings = Loopback();
-    settings.MaxRequestBytes = AdminSettings::MinRequestBytes;
+    ListenerSettings settings = Loopback();
+    settings.MaxRequestBytes = ListenerSettings::MinRequestBytes;
     std::string error;
     ASSERT_TRUE(server.Start(settings, error)) << error;
 
     server.Routes().Add("POST", "/api/echo", [](AdminRequest const& request) { return AdminResponse::Json(200, request.Body); });
     EXPECT_EQ(Ask(server.GetPort(), "POST", "/api/echo", Token, std::string(16, 'a')).Status, 200);
-    EXPECT_EQ(Ask(server.GetPort(), "POST", "/api/echo", Token, std::string(AdminSettings::MinRequestBytes + 1, 'a')).Status, 413);
-    EXPECT_EQ(Ask(server.GetPort(), "POST", "/api/echo", "", std::string(AdminSettings::MinRequestBytes + 1, 'a')).Status, 401);
+    EXPECT_EQ(Ask(server.GetPort(), "POST", "/api/echo", Token, std::string(ListenerSettings::MinRequestBytes + 1, 'a')).Status, 413);
+    EXPECT_EQ(Ask(server.GetPort(), "POST", "/api/echo", "", std::string(ListenerSettings::MinRequestBytes + 1, 'a')).Status, 401);
 }
 
 TEST_F(AdminServerTest, TakesASocketRouteAfterTheListenerOpens)
@@ -828,7 +828,7 @@ TEST_F(AdminServerTest, ReloadKeepsTheOldListenerWhenTheNewPortIsTaken)
     uint16 const held = taken.local_endpoint(code).port();
     ASSERT_FALSE(code);
 
-    AdminSettings moved = Loopback();
+    ListenerSettings moved = Loopback();
     moved.Port = held;
     EXPECT_FALSE(server.Reload(moved));
     EXPECT_TRUE(server.IsRunning());
@@ -847,7 +847,7 @@ TEST_F(AdminServerTest, StartsBeyondThisMachineWithThePlainHttpOptIn)
     _harness.ApplyOrFail("Appender.Capture = 200,1,0\nLogger.root = 1,Capture\n");
     AdminServer server = Make();
     server.SetHealthSource([] { return AdminHealth{ "testserver", "", "rev", 0, "running" }; });
-    AdminSettings settings = Loopback();
+    ListenerSettings settings = Loopback();
     settings.BindIp = *address;
     settings.AllowPlainHttpRemote = true;
 
@@ -924,7 +924,7 @@ TEST_F(AdminServerTest, ServesOverTlsWithHstsAndTheCertificateItWasGiven)
     AdminServer server = Make();
     server.SetHealthSource([] { return AdminHealth{ "testserver", "", "rev", 0, "running" }; });
 
-    AdminSettings settings = Loopback();
+    ListenerSettings settings = Loopback();
     settings.CertificateFile = _directory.Path() / "admin.crt";
     settings.PrivateKeyFile = _directory.Path() / "admin.key";
     std::string error;
@@ -972,7 +972,7 @@ TEST_F(AdminServerTest, AReloadSwapsTheCertificateAndKeepsTheOldOneWhenTheNewPai
     AdminServer server = Make();
     server.SetHealthSource([] { return AdminHealth{ "testserver", "", "rev", 0, "running" }; });
 
-    AdminSettings settings = Loopback();
+    ListenerSettings settings = Loopback();
     settings.CertificateFile = _directory.Path() / "admin.crt";
     settings.PrivateKeyFile = _directory.Path() / "admin.key";
     std::string error;
@@ -1015,7 +1015,7 @@ TEST_F(AdminServerTest, RefusesToOpenWithACertificateItCannotServe)
     AdminServer server = Make();
     server.SetHealthSource([] { return AdminHealth{ "testserver", "", "rev", 0, "running" }; });
 
-    AdminSettings settings = Loopback();
+    ListenerSettings settings = Loopback();
     settings.CertificateFile = _directory.Write("broken.crt", "not a certificate\n");
     settings.PrivateKeyFile = _directory.Write("broken.key", "not a key\n");
 
@@ -1030,7 +1030,7 @@ TEST_F(AdminServerTest, KeepsAGeneratedTokenBesideTheConfigWithNoDataFolder)
 {
     AdminServer server(_harness.GetLog(), "testserver", std::filesystem::path(), _directory.Path());
     server.SetHealthSource([] { return AdminHealth{ "testserver", "", "rev", 0, "running" }; });
-    AdminSettings settings = Loopback();
+    ListenerSettings settings = Loopback();
     settings.Token.clear();
 
     std::string error;
@@ -1169,7 +1169,7 @@ TEST_F(AdminServerTest, EndsEveryBrowserSessionWhenTheTokenRotates)
     std::string const cookie = "Cookie: " + setCookie.substr(0, setCookie.find(';'));
     ASSERT_EQ(Call(port, "GET", "/api/health", { cookie }).Status, 200);
 
-    AdminSettings rotated = Loopback();
+    ListenerSettings rotated = Loopback();
     rotated.Port = port;
     rotated.Token = OtherToken;
     ASSERT_TRUE(server.Reload(rotated));
@@ -1196,7 +1196,7 @@ TEST_F(AdminServerTest, RefusesAHostItDoesNotAnswerFor)
     EXPECT_EQ(Send(port, "GET /api/socket HTTP/1.1\r\nHost: evil.example:" + std::to_string(port) + "\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
         "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\nAuthorization: Bearer " + std::string(Token) + "\r\n\r\n").Status, 400);
 
-    AdminSettings named = Loopback();
+    ListenerSettings named = Loopback();
     named.Port = port;
     named.AllowedHosts = { "panel.example" };
     ASSERT_TRUE(server.Reload(named));

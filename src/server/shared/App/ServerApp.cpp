@@ -7,7 +7,7 @@
 #include "AdminCapabilities.h"
 #include "AdminConfigView.h"
 #include "AdminServer.h"
-#include "AdminSettings.h"
+#include "ListenerSettings.h"
 #include "AppOptions.h"
 #include "Banner.h"
 #include "ClientLocator.h"
@@ -247,7 +247,7 @@ std::string_view ServerApp::LifecycleName(AppLifecycle state) noexcept
 bool ServerApp::StartAdminApi()
 {
     std::vector<std::string> problems;
-    AdminSettings const settings = AdminSettings::Load(_config, _info.AdminPort, &problems);
+    ListenerSettings const settings = ListenerSettings::Load(_config, "Admin", _info.AdminPort, &problems);
     for (std::string const& problem : problems)
         AMBROSE_LOG(_log, LogLevel::Warn, "server.admin", "{}", problem);
 
@@ -337,7 +337,7 @@ bool ServerApp::ReloadAdminApi()
     if (!_admin)
         return false;
     std::vector<std::string> problems;
-    AdminSettings const settings = AdminSettings::Load(_config, _info.AdminPort, &problems);
+    ListenerSettings const settings = ListenerSettings::Load(_config, "Admin", _info.AdminPort, &problems);
     for (std::string const& problem : problems)
         AMBROSE_LOG(_log, LogLevel::Warn, "server.admin", "{}", problem);
     return _admin->Reload(settings);

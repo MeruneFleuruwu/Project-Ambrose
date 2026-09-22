@@ -4,7 +4,7 @@
  */
 
 #include "ManagedApp.h"
-#include "AdminSettings.h"
+#include "ListenerSettings.h"
 #include "AdminToken.h"
 #include "ConfigMgr.h"
 #include "Log.h"
@@ -265,7 +265,7 @@ void ManagedApp::LoadAdmin()
         problem = fmt::format("its config {} could not be read, so its admin API is unknown", ConfigMgr::PathToUtf8(_definition.Config));
     else
     {
-        AdminSettings const settings = AdminSettings::Load(config, 0);
+        ListenerSettings const settings = ListenerSettings::Load(config, "Admin", 0);
         if (!settings.Enable)
             problem = "its admin API is off (Admin.Enable = 0), so the supervisor goes by its output";
         else if (settings.Port == 0)

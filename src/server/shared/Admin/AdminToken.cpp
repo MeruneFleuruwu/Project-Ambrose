@@ -4,7 +4,7 @@
  */
 
 #include "AdminToken.h"
-#include "AdminSettings.h"
+#include "ListenerSettings.h"
 #include "ConfigMgr.h"
 #include "CryptoRandom.h"
 #include "StringUtil.h"
@@ -206,10 +206,10 @@ std::string AdminToken::Generate()
 
 std::optional<std::string> AdminToken::Validate(std::string_view token)
 {
-    if (token.size() < AdminSettings::MinTokenLength)
-        return fmt::format("is shorter than {} characters", AdminSettings::MinTokenLength);
-    if (token.size() > AdminSettings::MaxTokenLength)
-        return fmt::format("is longer than {} characters", AdminSettings::MaxTokenLength);
+    if (token.size() < ListenerSettings::MinTokenLength)
+        return fmt::format("is shorter than {} characters", ListenerSettings::MinTokenLength);
+    if (token.size() > ListenerSettings::MaxTokenLength)
+        return fmt::format("is longer than {} characters", ListenerSettings::MaxTokenLength);
     for (char const character : token)
         if (static_cast<unsigned char>(character) <= 0x20 || static_cast<unsigned char>(character) >= 0x7F)
             return std::string("holds a character that is not printable ASCII");
@@ -251,7 +251,7 @@ bool AdminToken::SecureFile(std::filesystem::path const& file, std::string& erro
     return SecureOwnerOnly(file, error);
 }
 
-AdminTokenResult AdminToken::Resolve(AdminSettings const& settings, std::string const& appName, std::filesystem::path const& dataFolder, std::filesystem::path const& fallbackFolder)
+AdminTokenResult AdminToken::Resolve(ListenerSettings const& settings, std::string const& appName, std::filesystem::path const& dataFolder, std::filesystem::path const& fallbackFolder)
 {
     AdminTokenResult result;
     if (!settings.Token.empty())

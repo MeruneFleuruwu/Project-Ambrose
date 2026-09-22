@@ -3,7 +3,7 @@
  * Tests the Admin options: defaults, clamped values with their problems, the remote-access rule that refuses a non-loopback bind without TLS or the plain-HTTP opt-in and names what to change when both are set, the warnings a binding it allows still carries, and the token that comes from config or a file the current user alone can read, beside the config file where the machine names no data folder, and the panel options: its folder, found beside the executable by default, the host names allowed beside IP addresses, and the clamped session lifetimes.
  */
 
-#include "AdminSettings.h"
+#include "ListenerSettings.h"
 #include "AdminToken.h"
 #include "ConfigMgr.h"
 #include "Environment.h"
@@ -34,9 +34,9 @@ namespace
         return [](std::string const&) { return std::optional<std::string>(); };
     }
 
-    AdminSettings Loopback()
+    ListenerSettings Loopback()
     {
-        AdminSettings settings;
+        ListenerSettings settings;
         settings.Enable = true;
         settings.BindIp = "127.0.0.1";
         settings.Port = 0;
@@ -45,7 +45,7 @@ namespace
     }
 }
 
-TEST(AdminSettingsTest, ReadsEveryOptionAndClampsTheRest)
+TEST(ListenerSettingsTest, ReadsEveryOptionAndClampsTheRest)
 {
     LogTestDirectory directory;
     std::filesystem::path const file = directory.Write("admin.conf",
@@ -64,7 +64,7 @@ TEST(AdminSettingsTest, ReadsEveryOptionAndClampsTheRest)
     ASSERT_TRUE(config.LoadInitial(file).Succeeded());
 
     std::vector<std::string> problems;
-    AdminSettings const settings = AdminSettings::Load(config, 12010, &problems);
+    ListenerSettings const settings = ListenerSettings::Load(config, "Admin", 12010, &problems);
     EXPECT_TRUE(settings.Enable);
     EXPECT_EQ(settings.BindIp, "127.0.0.2");
     EXPECT_EQ(settings.Port, 12345);
@@ -74,11 +74,11 @@ TEST(AdminSettingsTest, ReadsEveryOptionAndClampsTheRest)
     EXPECT_TRUE(settings.HasTls());
     EXPECT_EQ(settings.AuthFailureBurst, 1u);
     EXPECT_DOUBLE_EQ(settings.AuthFailuresPerSecond, 2.5);
-    EXPECT_EQ(settings.Threads, AdminSettings::MinThreads);
+    EXPECT_EQ(settings.Threads, ListenerSettings::MinThreads);
     EXPECT_EQ(problems.size(), 2u);
 }
 
-TEST(AdminSettingsTest, DefaultsAreOffAndLoopback)
+TEST(ListenerSettingsTest, DefaultsAreOffAndLoopback)
 {
     LogTestDirectory directory;
     std::filesystem::path const file = directory.Write("admin.conf", "LogsDir = logs\n");
@@ -86,7 +86,7 @@ TEST(AdminSettingsTest, DefaultsAreOffAndLoopback)
     ASSERT_TRUE(config.LoadInitial(file).Succeeded());
 
     std::vector<std::string> problems;
-    AdminSettings const settings = AdminSettings::Load(config, 12010, &problems);
+    ListenerSettings const settings = ListenerSettings::Load(config, "Admin", 12010, &problems);
     EXPECT_FALSE(settings.Enable);
     EXPECT_EQ(settings.BindIp, "127.0.0.1");
     EXPECT_EQ(settings.Port, 12010);
@@ -97,9 +97,9 @@ TEST(AdminSettingsTest, DefaultsAreOffAndLoopback)
     EXPECT_TRUE(problems.empty());
 }
 
-TEST(AdminSettingsTest, RefusesAnUnsafeRemoteBind)
+TEST(ListenerSettingsTest, RefusesAnUnsafeRemoteBind)
 {
-    AdminSettings settings = Loopback();
+    ListenerSettings settings = Loopback();
     settings.BindIp = "0.0.0.0";
     std::optional<std::string> const refused = settings.RemoteAccessError();
     ASSERT_TRUE(refused.has_value());
@@ -115,9 +115,9 @@ TEST(AdminSettingsTest, RefusesAnUnsafeRemoteBind)
     EXPECT_FALSE(settings.RemoteAccessError().has_value());
 }
 
-TEST(AdminSettingsTest, PlainHttpRemoteIsAnOptInThatWarns)
+TEST(ListenerSettingsTest, PlainHttpRemoteIsAnOptInThatWarns)
 {
-    AdminSettings settings = Loopback();
+    ListenerSettings settings = Loopback();
     settings.BindIp = "0.0.0.0";
     settings.AllowPlainHttpRemote = true;
     EXPECT_FALSE(settings.RemoteAccessError().has_value());
@@ -130,9 +130,9 @@ TEST(AdminSettingsTest, PlainHttpRemoteIsAnOptInThatWarns)
     EXPECT_FALSE(settings.PlainHttpRemoteWarning().has_value());
 }
 
-TEST(AdminSettingsTest, TlsFilesMustComeInPairsAndAreNotServedYet)
+TEST(ListenerSettingsTest, TlsFilesMustComeInPairsAndAreNotServedYet)
 {
-    AdminSettings settings = Loopback();
+    ListenerSettings settings = Loopback();
     settings.CertificateFile = "admin.crt";
     std::optional<std::string> refused = settings.RemoteAccessError();
     ASSERT_TRUE(refused.has_value());
@@ -146,19 +146,19 @@ TEST(AdminSettingsTest, TlsFilesMustComeInPairsAndAreNotServedYet)
     EXPECT_TRUE(settings.Warnings().empty());
 }
 
-TEST(AdminSettingsTest, AnAddressThatIsNotAnIpIsRefused)
+TEST(ListenerSettingsTest, AnAddressThatIsNotAnIpIsRefused)
 {
-    AdminSettings settings = Loopback();
+    ListenerSettings settings = Loopback();
     settings.BindIp = "localhost";
     std::optional<std::string> const refused = settings.RemoteAccessError();
     ASSERT_TRUE(refused.has_value());
     EXPECT_NE(refused->find("Admin.BindIP"), std::string::npos);
 }
 
-TEST(AdminSettingsTest, ListenerEqualsIgnoresTheToken)
+TEST(ListenerSettingsTest, ListenerEqualsIgnoresTheToken)
 {
-    AdminSettings const first = Loopback();
-    AdminSettings second = first;
+    ListenerSettings const first = Loopback();
+    ListenerSettings second = first;
     second.Token = "fedcba9876543210fedcba9876543210";
     EXPECT_TRUE(first.ListenerEquals(second));
     second.Port = 1;
@@ -178,7 +178,7 @@ TEST(AdminTokenTest, RefusesAWeakOrUnprintableToken)
 {
     EXPECT_TRUE(AdminToken::Validate("").has_value());
     EXPECT_TRUE(AdminToken::Validate("short").has_value());
-    EXPECT_TRUE(AdminToken::Validate(std::string(AdminSettings::MaxTokenLength + 1, 'a')).has_value());
+    EXPECT_TRUE(AdminToken::Validate(std::string(ListenerSettings::MaxTokenLength + 1, 'a')).has_value());
     EXPECT_TRUE(AdminToken::Validate("0123456789abc def").has_value());
     EXPECT_TRUE(AdminToken::Validate(std::string("0123456789abcdef\n")).has_value());
     EXPECT_FALSE(AdminToken::Validate("0123456789abcdef").has_value());
@@ -187,7 +187,7 @@ TEST(AdminTokenTest, RefusesAWeakOrUnprintableToken)
 TEST(AdminTokenTest, TakesTheTokenFromConfig)
 {
     LogTestDirectory directory;
-    AdminSettings settings = Loopback();
+    ListenerSettings settings = Loopback();
     AdminTokenResult const resolved = AdminToken::Resolve(settings, "loginserver", directory.Path());
     ASSERT_TRUE(resolved.Succeeded()) << resolved.Error;
     EXPECT_EQ(resolved.Token, Token);
@@ -203,7 +203,7 @@ TEST(AdminTokenTest, TakesTheTokenFromConfig)
 TEST(AdminTokenTest, GeneratesAFileTheCurrentUserAloneCanRead)
 {
     LogTestDirectory directory;
-    AdminSettings settings = Loopback();
+    ListenerSettings settings = Loopback();
     settings.Token.clear();
 
     AdminTokenResult const generated = AdminToken::Resolve(settings, "loginserver", directory.Path());
@@ -228,7 +228,7 @@ TEST(AdminTokenTest, GeneratesAFileTheCurrentUserAloneCanRead)
 TEST(AdminTokenTest, RefusesATokenFileThatHoldsNoUsableToken)
 {
     LogTestDirectory directory;
-    AdminSettings settings = Loopback();
+    ListenerSettings settings = Loopback();
     settings.Token.clear();
     settings.TokenFile = directory.Write("broken.token", "nope\n");
 
@@ -239,7 +239,7 @@ TEST(AdminTokenTest, RefusesATokenFileThatHoldsNoUsableToken)
 
 TEST(AdminTokenTest, ReportsWhenThereIsNowhereToKeepAToken)
 {
-    AdminSettings settings = Loopback();
+    ListenerSettings settings = Loopback();
     settings.Token.clear();
     AdminTokenResult const refused = AdminToken::Resolve(settings, "loginserver", {});
     EXPECT_FALSE(refused.Succeeded());
@@ -283,9 +283,9 @@ namespace
 #endif
 }
 
-TEST(AdminSettingsTest, TlsCarriesARemoteBindWithoutThePlainHttpOptIn)
+TEST(ListenerSettingsTest, TlsCarriesARemoteBindWithoutThePlainHttpOptIn)
 {
-    AdminSettings settings = Loopback();
+    ListenerSettings settings = Loopback();
     settings.BindIp = "0.0.0.0";
     settings.CertificateFile = "admin.crt";
     settings.PrivateKeyFile = "admin.key";
@@ -303,14 +303,14 @@ TEST(AdminSettingsTest, TlsCarriesARemoteBindWithoutThePlainHttpOptIn)
     EXPECT_TRUE(settings.PlainHttpRemoteWarning().has_value());
 }
 
-TEST(AdminSettingsTest, ClampsTheRequestSizeLimit)
+TEST(ListenerSettingsTest, ClampsTheRequestSizeLimit)
 {
     LogTestDirectory directory;
     ConfigMgr config(NoEnvironment());
     std::vector<std::string> problems;
     ASSERT_TRUE(config.LoadInitial(directory.Write("clamp.conf", "Admin.MaxRequestBytes = 8\n")).Succeeded());
-    AdminSettings const settings = AdminSettings::Load(config, 12343, &problems);
-    EXPECT_EQ(settings.MaxRequestBytes, AdminSettings::MinRequestBytes);
+    ListenerSettings const settings = ListenerSettings::Load(config, "Admin", 12343, &problems);
+    EXPECT_EQ(settings.MaxRequestBytes, ListenerSettings::MinRequestBytes);
     ASSERT_EQ(problems.size(), 1u);
     EXPECT_NE(problems[0].find("Admin.MaxRequestBytes"), std::string::npos);
 }
@@ -318,7 +318,7 @@ TEST(AdminSettingsTest, ClampsTheRequestSizeLimit)
 TEST(AdminTokenTest, PutsOwnerOnlyPermissionsBackOnAnExistingTokenFile)
 {
     LogTestDirectory directory;
-    AdminSettings settings = Loopback();
+    ListenerSettings settings = Loopback();
     settings.Token.clear();
     settings.TokenFile = directory.Write("shared.token", "0123456789abcdef0123456789abcdef\n");
 #ifndef _WIN32
@@ -336,7 +336,7 @@ TEST(AdminTokenTest, PutsOwnerOnlyPermissionsBackOnAnExistingTokenFile)
 TEST(AdminTokenTest, WritesAGeneratedTokenOnlyIntoAFileItCreates)
 {
     LogTestDirectory directory;
-    AdminSettings settings = Loopback();
+    ListenerSettings settings = Loopback();
     settings.Token.clear();
 
     AdminTokenResult const generated = AdminToken::Resolve(settings, "loginserver", directory.Path());
@@ -353,9 +353,9 @@ TEST(AdminTokenTest, WritesAGeneratedTokenOnlyIntoAFileItCreates)
     EXPECT_FALSE(error.empty());
 }
 
-TEST(AdminSettingsTest, TlsFilesLetABindReachBeyondThisMachineWithNothingToSayOutLoud)
+TEST(ListenerSettingsTest, TlsFilesLetABindReachBeyondThisMachineWithNothingToSayOutLoud)
 {
-    AdminSettings settings = Loopback();
+    ListenerSettings settings = Loopback();
     EXPECT_TRUE(settings.Warnings().empty());
 
     settings.CertificateFile = "admin.crt";
@@ -369,9 +369,9 @@ TEST(AdminSettingsTest, TlsFilesLetABindReachBeyondThisMachineWithNothingToSayOu
     EXPECT_TRUE(settings.Warnings().empty());
 }
 
-TEST(AdminSettingsTest, WarningsNameThePlainHttpOptInOnARemoteBind)
+TEST(ListenerSettingsTest, WarningsNameThePlainHttpOptInOnARemoteBind)
 {
-    AdminSettings settings = Loopback();
+    ListenerSettings settings = Loopback();
     settings.BindIp = "0.0.0.0";
     settings.AllowPlainHttpRemote = true;
     ASSERT_FALSE(settings.RemoteAccessError().has_value());
@@ -386,7 +386,7 @@ TEST(AdminSettingsTest, WarningsNameThePlainHttpOptInOnARemoteBind)
 TEST(AdminTokenTest, KeepsAGeneratedTokenBesideTheConfigWithNoDataFolder)
 {
     LogTestDirectory directory;
-    AdminSettings settings = Loopback();
+    ListenerSettings settings = Loopback();
     settings.Token.clear();
 
     AdminTokenResult const generated = AdminToken::Resolve(settings, "loginserver", {}, directory.Path());
@@ -399,7 +399,7 @@ TEST(AdminTokenTest, KeepsAGeneratedTokenBesideTheConfigWithNoDataFolder)
     EXPECT_EQ(AdminToken::DefaultFile("loginserver", directory.Path(), "elsewhere"), AdminToken::DefaultFile("loginserver", directory.Path()));
 }
 
-TEST(AdminSettingsTest, ReadsThePanelOptionsAndClampsTheSessionLifetimes)
+TEST(ListenerSettingsTest, ReadsThePanelOptionsAndClampsTheSessionLifetimes)
 {
     LogTestDirectory directory;
     std::filesystem::path const file = directory.Write("admin.conf",
@@ -411,18 +411,18 @@ TEST(AdminSettingsTest, ReadsThePanelOptionsAndClampsTheSessionLifetimes)
     ASSERT_TRUE(config.LoadInitial(file).Succeeded());
 
     std::vector<std::string> problems;
-    AdminSettings const settings = AdminSettings::Load(config, 12010, &problems);
+    ListenerSettings const settings = ListenerSettings::Load(config, "Admin", 12010, &problems);
     EXPECT_EQ(ConfigMgr::PathToUtf8(settings.DashboardDir), "web/panel");
     EXPECT_EQ(settings.DashboardFolder(), settings.DashboardDir);
     EXPECT_EQ(settings.AllowedHosts, (std::vector<std::string>{ "panel.example", "other.example" }));
-    EXPECT_EQ(settings.SessionIdleMinutes, AdminSettings::MinSessionIdleMinutes);
-    EXPECT_EQ(settings.SessionLifetimeHours, AdminSettings::MaxSessionLifetimeHours);
+    EXPECT_EQ(settings.SessionIdleMinutes, ListenerSettings::MinSessionIdleMinutes);
+    EXPECT_EQ(settings.SessionLifetimeHours, ListenerSettings::MaxSessionLifetimeHours);
     EXPECT_EQ(problems.size(), 2u);
 }
 
-TEST(AdminSettingsTest, FindsThePanelBesideTheExecutableByDefault)
+TEST(ListenerSettingsTest, FindsThePanelBesideTheExecutableByDefault)
 {
-    AdminSettings const settings;
+    ListenerSettings const settings;
     EXPECT_TRUE(settings.DashboardDir.empty());
     EXPECT_EQ(settings.DashboardFolder(), Ambrose::GetExecutableDirectory() / "dashboard");
     EXPECT_TRUE(settings.AllowedHosts.empty());

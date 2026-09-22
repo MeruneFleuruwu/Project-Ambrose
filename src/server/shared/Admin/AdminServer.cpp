@@ -23,6 +23,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <future>
 #include <mutex>
@@ -308,9 +309,9 @@ struct AdminServer::Listener
 };
 
 AdminServer::AdminServer(Log& log, std::string appName, std::filesystem::path dataFolder, std::filesystem::path configFolder)
-    : _log(log), _appName(std::move(appName)), _dataFolder(std::move(dataFolder)), _configFolder(std::move(configFolder)), _auth(AdminSettings{}.AuthFailureBurst, AdminSettings{}.AuthFailuresPerSecond), _router(_auth)
+    : _log(log), _appName(std::move(appName)), _dataFolder(std::move(dataFolder)), _configFolder(std::move(configFolder)), _auth(ListenerSettings{}.AuthFailureBurst, ListenerSettings{}.AuthFailuresPerSecond), _router(_auth)
 {
-    _router.SetMaxBodyBytes(AdminSettings{}.MaxRequestBytes);
+    _router.SetMaxBodyBytes(ListenerSettings{}.MaxRequestBytes);
     _router.Add("GET", "/api/health", [this](AdminRequest const&)
     {
         if (!_health)
@@ -404,7 +405,7 @@ AdminResponse AdminServer::SignIn(AdminRequest const& request)
         return AdminResponse::Problem(401, "wrong_token", "That is not this app's admin token");
 
     AdminSession const opened = _sessions.Open();
-    AMBROSE_LOG(_log, LogLevel::Info, "server.admin", "A browser signed in to the admin API from {} (request {})", request.RemoteAddress, request.Id);
+    LogPanelOrAdmin(LogLevel::Info, "A browser signed in to {} from {} (request {})", Label(), request.RemoteAddress, request.Id);
     nlohmann::json answer;
     answer["app"] = _appName;
     answer["signed_in"] = true;
@@ -423,7 +424,7 @@ std::string AdminServer::SessionCookie(std::string const& value, bool clear) con
     return fmt::format("{}={}; Path=/; HttpOnly; SameSite=Strict{}{}", browser.CookieName, value, browser.Secure ? "; Secure" : "", clear ? "; Max-Age=0" : "");
 }
 
-void AdminServer::ApplyLiveSettings(AdminSettings const& settings)
+void AdminServer::ApplyLiveSettings(ListenerSettings const& settings)
 {
     _files.SetRoot(settings.DashboardFolder());
     _router.SetAllowedHosts(settings.AllowedHosts);
@@ -475,8 +476,17 @@ std::string AdminServer::GetToken() const
     return _token;
 }
 
-bool AdminServer::Start(AdminSettings const& settings, std::string& error)
+void AdminServer::AdoptIdentity(ListenerSettings const& settings)
 {
+    _active.Prefix = settings.Prefix;
+    _active.Label = settings.Label;
+    _active.LogCategory = settings.LogCategory;
+    _active.Secrets = settings.Secrets;
+}
+
+bool AdminServer::Start(ListenerSettings const& settings, std::string& error)
+{
+    AdoptIdentity(settings);
     if (!settings.Enable)
     {
         Close();
@@ -495,10 +505,18 @@ bool AdminServer::Start(AdminSettings const& settings, std::string& error)
         return false;
     }
     if (!token.Warning.empty())
-        AMBROSE_LOG(_log, LogLevel::Warn, "server.admin", "{}", token.Warning);
+        LogPanelOrAdmin(LogLevel::Warn, "{}", token.Warning);
     if (token.Generated)
-        AMBROSE_LOG(_log, LogLevel::Info, "server.admin", "The admin API generated a token in {}, readable only by this user", ConfigMgr::PathToUtf8(token.File));
+        LogPanelOrAdmin(LogLevel::Info, "{} generated a token in {}, readable only by this user", Capitalised(), ConfigMgr::PathToUtf8(token.File));
     return Open(settings, token.Token, error);
+}
+
+std::string AdminServer::Capitalised() const
+{
+    std::string text = _active.Label;
+    if (!text.empty())
+        text.front() = static_cast<char>(std::toupper(static_cast<unsigned char>(text.front())));
+    return text;
 }
 
 bool AdminServer::SwapCertificate()
@@ -510,25 +528,26 @@ bool AdminServer::SwapCertificate()
     if (!fresh.Load(_listener->Certificate.GetCertificateFile(), _listener->Certificate.GetKeyFile(), problem)
         || !_listener->Tls.Swap(fresh, problem))
     {
-        AMBROSE_LOG(_log, LogLevel::Error, "server.admin", "The admin API keeps serving its old certificate: {}", problem);
+        LogPanelOrAdmin(LogLevel::Error, "{} keeps serving its old certificate: {}", Capitalised(), problem);
         return false;
     }
     if (fresh.GetInfo().Fingerprint != _listener->Certificate.GetInfo().Fingerprint)
     {
         _listener->Certificate = std::move(fresh);
-        AMBROSE_LOG(_log, LogLevel::Info, "server.admin", "The admin API now serves {}", _listener->Certificate.Describe());
+        LogPanelOrAdmin(LogLevel::Info, "{} now serves {}", Capitalised(), _listener->Certificate.Describe());
         for (std::string const& warning : _listener->Certificate.Warnings(static_cast<int64>(std::time(nullptr))))
-            AMBROSE_LOG(_log, LogLevel::Warn, "server.admin", "{}", warning);
+            LogPanelOrAdmin(LogLevel::Warn, "{}", warning);
     }
     return true;
 }
 
-bool AdminServer::Reload(AdminSettings const& settings)
+bool AdminServer::Reload(ListenerSettings const& settings)
 {
+    AdoptIdentity(settings);
     if (!settings.Enable)
     {
         if (IsRunning())
-            AMBROSE_LOG(_log, LogLevel::Info, "server.admin", "Admin.Enable = 0 stopped the admin API");
+            LogPanelOrAdmin(LogLevel::Info, "{} = 0 stopped {}", settings.Option("Enable"), Label());
         Close();
         _active = settings;
         return true;
@@ -536,7 +555,7 @@ bool AdminServer::Reload(AdminSettings const& settings)
 
     if (std::optional<std::string> const refused = settings.RemoteAccessError())
     {
-        AMBROSE_LOG(_log, LogLevel::Error, "server.admin", "{}; the admin API keeps {}", *refused,
+        LogPanelOrAdmin(LogLevel::Error, "{}; {} keeps {}", *refused, Label(),
             IsRunning() ? fmt::format("its binding on {}:{}", _listener->BindIp, _listener->Port) : std::string("its current state"));
         return false;
     }
@@ -544,15 +563,15 @@ bool AdminServer::Reload(AdminSettings const& settings)
     AdminTokenResult const token = AdminToken::Resolve(settings, _appName, _dataFolder, _configFolder);
     if (!token.Succeeded())
     {
-        AMBROSE_LOG(_log, LogLevel::Error, "server.admin", "{}; the admin API keeps its current token", token.Error);
+        LogPanelOrAdmin(LogLevel::Error, "{}; {} keeps its current token", token.Error, Label());
         return false;
     }
     if (!token.Warning.empty())
-        AMBROSE_LOG(_log, LogLevel::Warn, "server.admin", "{}", token.Warning);
+        LogPanelOrAdmin(LogLevel::Warn, "{}", token.Warning);
     if (token.Generated)
-        AMBROSE_LOG(_log, LogLevel::Info, "server.admin", "The admin API generated a token in {}, readable only by this user", ConfigMgr::PathToUtf8(token.File));
+        LogPanelOrAdmin(LogLevel::Info, "{} generated a token in {}, readable only by this user", Capitalised(), ConfigMgr::PathToUtf8(token.File));
 
-    AdminSettings effective = settings;
+    ListenerSettings effective = settings;
     if (IsRunning() && effective.Port == 0)
         effective.Port = _listener->Port;
     bool const rebinds = !IsRunning() || !_active.ListenerEquals(effective);
@@ -568,7 +587,7 @@ bool AdminServer::Reload(AdminSettings const& settings)
             _token = token.Token;
             _auth.SetToken(_token);
             _sessions.CloseAll();
-            AMBROSE_LOG(_log, LogLevel::Info, "server.admin", "The admin API token changed; the old one no longer answers and every browser session it opened has ended");
+            LogPanelOrAdmin(LogLevel::Info, "{} token changed; the old one no longer answers and every browser session it opened has ended", Capitalised());
         }
         _active = effective;
         return true;
@@ -578,29 +597,29 @@ bool AdminServer::Reload(AdminSettings const& settings)
     std::string reserveError;
     if (!sameEndpoint && !ReserveEndpoint(settings.BindIp, settings.Port, reserveError))
     {
-        AMBROSE_LOG(_log, LogLevel::Error, "server.admin", "The admin API cannot bind {}:{}: {}; it keeps {}", settings.BindIp, settings.Port, reserveError,
+        LogPanelOrAdmin(LogLevel::Error, "{} cannot bind {}:{}: {}; it keeps {}", Capitalised(), settings.BindIp, settings.Port, reserveError,
             IsRunning() ? fmt::format("its binding on {}:{}", _listener->BindIp, _listener->Port) : std::string("its current state"));
         return false;
     }
 
-    AdminSettings opening = settings;
+    ListenerSettings opening = settings;
     if (sameEndpoint)
         opening.Port = effective.Port;
-    AdminSettings const previous = _active;
+    ListenerSettings const previous = _active;
     std::string const previousToken = _token;
     bool const wasRunning = IsRunning();
     Close();
     std::string error;
     if (!Open(opening, token.Token, error))
     {
-        AMBROSE_LOG(_log, LogLevel::Error, "server.admin", "The admin API cannot listen on {}:{}: {}", opening.BindIp, opening.Port, error);
+        LogPanelOrAdmin(LogLevel::Error, "{} cannot listen on {}:{}: {}", Capitalised(), opening.BindIp, opening.Port, error);
         if (wasRunning)
         {
             std::string restoreError;
             if (Open(previous, previousToken, restoreError))
-                AMBROSE_LOG(_log, LogLevel::Warn, "server.admin", "The admin API serves its old binding on {}:{} again", previous.BindIp, previous.Port);
+                LogPanelOrAdmin(LogLevel::Warn, "{} serves its old binding on {}:{} again", Capitalised(), previous.BindIp, previous.Port);
             else
-                AMBROSE_LOG(_log, LogLevel::Error, "server.admin", "The admin API cannot serve its old binding on {}:{} either: {}; nothing is listening", previous.BindIp, previous.Port, restoreError);
+                LogPanelOrAdmin(LogLevel::Error, "{} cannot serve its old binding on {}:{} either: {}; nothing is listening", Capitalised(), previous.BindIp, previous.Port, restoreError);
         }
         return false;
     }
@@ -610,11 +629,11 @@ bool AdminServer::Reload(AdminSettings const& settings)
 void AdminServer::Stop()
 {
     if (IsRunning())
-        AMBROSE_LOG(_log, LogLevel::Info, "server.admin", "The admin API on {}:{} is closing", _listener->BindIp, _listener->Port);
+        LogPanelOrAdmin(LogLevel::Info, "{} on {}:{} is closing", Capitalised(), _listener->BindIp, _listener->Port);
     Close();
 }
 
-bool AdminServer::Open(AdminSettings const& settings, std::string const& token, std::string& error)
+bool AdminServer::Open(ListenerSettings const& settings, std::string const& token, std::string& error)
 {
     std::optional<uint16> const reserved = ReserveEndpoint(settings.BindIp, settings.Port, error);
     if (!reserved)
@@ -631,7 +650,7 @@ bool AdminServer::Open(AdminSettings const& settings, std::string const& token, 
     _router.SetSecure(settings.HasTls());
     ApplyLiveSettings(settings);
     _sessions.CloseAll();
-    _router.SetBrowserAccess({ &_sessions, fmt::format("ambrose_admin_{}", *reserved), false });
+    _router.SetBrowserAccess({ &_sessions, fmt::format("ambrose_{}_{}", Ambrose::ToLower(settings.Prefix), *reserved), false });
 
     LogBridge().Attach(&_log);
     crow::logger::setHandler(&LogBridge());
@@ -764,15 +783,15 @@ bool AdminServer::Open(AdminSettings const& settings, std::string const& token, 
     _listener = std::move(listener);
     _active = settings;
     _active.Port = bound;
-    AMBROSE_LOG(_log, LogLevel::Info, "server.admin", "The admin API is listening on {}://{}:{}", secure ? "https" : "http", _listener->BindIp, _listener->Port);
+    LogPanelOrAdmin(LogLevel::Info, "{} is listening on {}://{}:{}", Capitalised(), secure ? "https" : "http", _listener->BindIp, _listener->Port);
     if (secure)
-        AMBROSE_LOG(_log, LogLevel::Info, "server.admin", "It serves {}", _listener->Certificate.Describe());
+        LogPanelOrAdmin(LogLevel::Info, "It serves {}", _listener->Certificate.Describe());
     for (std::string const& warning : settings.Warnings())
-        AMBROSE_LOG(_log, LogLevel::Warn, "server.admin", "{}", warning);
+        LogPanelOrAdmin(LogLevel::Warn, "{}", warning);
     if (secure)
     {
         for (std::string const& warning : _listener->Certificate.Warnings(static_cast<int64>(std::time(nullptr))))
-            AMBROSE_LOG(_log, LogLevel::Warn, "server.admin", "{}", warning);
+            LogPanelOrAdmin(LogLevel::Warn, "{}", warning);
     }
     return true;
 }
