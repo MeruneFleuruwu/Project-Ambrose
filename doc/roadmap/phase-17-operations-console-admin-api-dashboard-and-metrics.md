@@ -198,12 +198,12 @@ The roadmap critic flagged these. Resolve each one before or while implementing 
 
 **Acceptance**
 
-- [ ] Two fake clients from the 1.22 test harness show `sessions: 2`, and disconnecting both shows 0 within one second
-- [ ] Reported memory is within 10 percent of the operating system's own figure
-- [ ] A schema test confirms fields are only ever added, never renamed or removed
-- [ ] With the type dump removed, the status response carries the stale or missing type dump problem, and it clears once the dump is rebuilt
-- [ ] `GET /api/capabilities` lists every reload target and problem code the build registers, and a test fails when a registry gains an entry the response leaves out
-- [ ] `GET /api/apps` from a single app returns exactly that app, with no field the supervisor's answer lacks
+- [x] Two fake clients from the 1.22 test harness show `sessions: 2`, and disconnecting both shows 0 within one second (AdminStatusTest.TwoLoopbackClientsShowAsTwoSessionsAndNoneWithinASecondOfClosing: two loopback sockets against a SocketMgr, the status route reads 2, both close, and it reads 0 inside one second of polling; passes on Windows and on Ubuntu 24.04)
+- [x] Reported memory is within 10 percent of the operating system's own figure (AdminStatusTest.ReportedMemoryIsWithinTenPercentOfTheOperatingSystemsFigure, against GetProcessMemoryInfo on Windows and /proc/self/statm on Linux, read independently by the test)
+- [x] A schema test confirms fields are only ever added, never renamed or removed (AdminStatusTest.FieldsAreOnlyEverAdded holds the version-one field lists of all three routes as literals and fails when a response or the declared field list loses one)
+- [x] With the type dump removed, the status response carries the stale or missing type dump problem, and it clears once the dump is rebuilt (AdminStatusTest.AMissingTypeDumpIsAProblemUntilOneIsInUse on a running app: type_dump_missing appears with the setup's own message, clears when a dump is in use, and type_dump_stale and install_missing take their turns)
+- [x] `GET /api/capabilities` lists every reload target and problem code the build registers, and a test fails when a registry gains an entry the response leaves out (AdminStatusTest.CapabilitiesListEveryEntryTheRegistriesHold compares each list in the response with the registry itself after adding an entry to every registry, so an entry the response left out fails it)
+- [x] `GET /api/apps` from a single app returns exactly that app, with no field the supervisor's answer lacks (AdminStatusTest.AnAppAnswersTheAppsListWithExactlyItself: one element, and its key set equals AdminStatus::AppFields, which is the shape 17.14's supervisor answers with)
 
 ## 17.04 Live log stream
 

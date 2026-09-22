@@ -4,6 +4,7 @@
  */
 
 #include "ServerApp.h"
+#include "AdminCapabilities.h"
 #include "AdminServer.h"
 #include "AdminSettings.h"
 #include "AppOptions.h"
@@ -24,6 +25,7 @@
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
@@ -129,6 +131,86 @@ void ServerApp::OnAdminApiReady(AdminServer&)
 {
 }
 
+void ServerApp::OnProblems(std::vector<AdminProblem>&)
+{
+}
+
+void ServerApp::SetListener(std::string address, uint16 port)
+{
+    std::lock_guard const lock(_statusMutex);
+    _listenerAddress = std::move(address);
+    _listenerPort = port;
+}
+
+void ServerApp::SetClientSetup(bool installFound, bool typeDumpInUse, bool typeDumpStale, std::string typeDumpError)
+{
+    std::lock_guard const lock(_statusMutex);
+    _installFound = installFound;
+    _typeDumpInUse = typeDumpInUse;
+    _typeDumpStale = typeDumpStale;
+    _typeDumpError = std::move(typeDumpError);
+}
+
+std::optional<AdminTickWindow> ServerApp::GetTickWindow() const
+{
+    if (GetUpdateInterval().count() <= 0)
+        return std::nullopt;
+    AdminTickWindow window;
+    std::lock_guard const lock(_statusMutex);
+    auto const cutoff = std::chrono::steady_clock::now() - std::chrono::seconds(window.WindowSeconds);
+    double total = 0.0;
+    for (auto const& [when, milliseconds] : _ticks)
+    {
+        if (when < cutoff)
+            continue;
+        total += milliseconds;
+        window.MaxMs = std::max(window.MaxMs, milliseconds);
+        ++window.Samples;
+    }
+    window.AverageMs = window.Samples ? total / window.Samples : 0.0;
+    return window;
+}
+
+std::vector<AdminProblem> ServerApp::CollectProblems() const
+{
+    std::vector<AdminProblem> problems;
+    {
+        std::lock_guard const lock(_statusMutex);
+        if (!_installFound)
+            problems.push_back({ std::string(AdminProblemCodes::InstallMissing), "No client installation was found", "client" });
+        else if (!_typeDumpInUse)
+            problems.push_back({ std::string(AdminProblemCodes::TypeDumpMissing), _typeDumpError.empty() ? "No type dump is in use" : _typeDumpError, "type dump" });
+        else if (_typeDumpStale)
+            problems.push_back({ std::string(AdminProblemCodes::TypeDumpStale), _typeDumpError.empty() ? "The type dump does not match the installed client program" : _typeDumpError, "type dump" });
+    }
+    const_cast<ServerApp*>(this)->OnProblems(problems);
+    return problems;
+}
+
+AdminStatusSnapshot ServerApp::BuildStatus() const
+{
+    AdminStatusSnapshot snapshot;
+    snapshot.App.Name = _info.Name;
+    snapshot.App.Role = _info.Name;
+    snapshot.App.Realm = GetRealmName();
+    snapshot.App.Revision = GitRevision::GetHash();
+    {
+        std::lock_guard const lock(_statusMutex);
+        snapshot.App.Address = _listenerAddress;
+        snapshot.App.Port = _listenerPort;
+    }
+    snapshot.State = std::string(LifecycleName(GetLifecycleState()));
+    snapshot.UptimeSeconds = static_cast<uint64>(GetUptime().count());
+    snapshot.Process = Ambrose::ProcessInfo::Snapshot();
+    if (std::optional<Ambrose::StatValue> const sessions = sStats.Get("sessions"))
+        if (int64 const* const count = std::get_if<int64>(&*sessions))
+            snapshot.Sessions = static_cast<uint64>(std::max<int64>(0, *count));
+    snapshot.Tick = GetTickWindow();
+    snapshot.Stats = sStats.Collect();
+    snapshot.Problems = CollectProblems();
+    return snapshot;
+}
+
 Seconds ServerApp::GetUptime() const noexcept
 {
     std::chrono::steady_clock::time_point const started = _startedAt.load();
@@ -172,6 +254,9 @@ bool ServerApp::StartAdminApi()
         health.State = LifecycleName(GetLifecycleState());
         return health;
     });
+    sAdminCapabilities.RegisterStandardProblems();
+    sAdminCapabilities.AddReloadTarget("admin");
+    AdminStatus::Register(_admin->Routes(), [this] { return BuildStatus(); });
 
     OnAdminApiReady(*_admin);
 
@@ -455,7 +540,16 @@ void ServerApp::ScheduleUpdate()
         auto const diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - _lastUpdate);
         _lastUpdate = now;
         if (GetUpdateInterval().count() > 0)
+        {
             OnUpdate(diff);
+            auto const finished = std::chrono::steady_clock::now();
+            double const tookMs = std::chrono::duration<double, std::milli>(finished - now).count();
+            std::lock_guard const lock(_statusMutex);
+            _ticks.emplace_back(finished, tookMs);
+            auto const cutoff = finished - std::chrono::seconds(AdminTickWindow{}.WindowSeconds);
+            while (!_ticks.empty() && _ticks.front().first < cutoff)
+                _ticks.pop_front();
+        }
         ScheduleUpdate();
     });
 }

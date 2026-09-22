@@ -719,6 +719,16 @@ Moving an app or realm to another node (17.42) has a record with source, target,
 
 These pages have no counterpart in a generic hosting panel. Each relays to the apps' admin APIs and CommandMgr, so the panel and the in-game GM commands change the same state the same way.
 
+### Status API
+
+Every app answers three GET routes on its admin API (17.03), each behind the same token as `GET /api/health`, and every dashboard page is built from them rather than from anything the panel stores itself.
+
+- `GET /api/status` is the live picture of one app: `schema`, `app`, `role`, `realm`, `revision`, `state`, `uptime` in seconds, `memory.resident_bytes` and `threads` as the operating system reports them, `sessions` (null until the app publishes one), `tick` with `average_ms`, `max_ms`, `samples` and `window_seconds` over the last sixty seconds for an app that ticks and null for one that does not, `stats` holding every value a subsystem has published into the process's stats registry under its own name and JSON type, and `problems`, each a `code`, a `message` and a `subject`. Later milestones add fields as their systems exist: players online and the settings generation from 4.01 and 4.16, sessions at character select from 4.05, realms from 4.03, zones with players per zone from 4.09, database pool usage from 2.01, pending SQL updates from 2.06 and the last reload result per target from 4.15.
+- `GET /api/apps` is the one app list every page reads: an app answers with itself as `name`, `role`, `realm`, `address`, `port` and `revision`, and the supervisor (17.14) answers the same shape with the apps the signed-in user may see, so nothing stores a second list.
+- `GET /api/capabilities` says what this build can do, from the registries the build itself fills: `reload_targets`, `schedule_actions`, `announcement_channels` and `problem_codes`, each code with the description an operator reads beside it. The panel offers only what is listed and follows a newer build after an update without a change of its own.
+
+A field, once written, is never renamed or removed; it may only be added, and `schema` counts up when a shape changes in a way a reader has to know about. A test holds every version-one field of all three routes, and a build that loses one fails it. A problem's `code` is always one the build registered, so the panel can name every code it may ever see before it sees one.
+
 ### Overview
 
 The overview (17.06) shows one card per app: a status bar color, name, role (login, game, patch), realm, address and port, uptime, build, sessions, players against the realm's player limit, tick time average and maximum, and usage against limits. Badges show disabled, maintenance, setting up, restoring, updating, moving, crash loop, restart required, update available, pending SQL updates, client revision mismatch and open problems. Cards update from the event socket and show a visible stale state after missed updates. Owners and admins can switch between the apps they are granted and all apps, remembered per user.

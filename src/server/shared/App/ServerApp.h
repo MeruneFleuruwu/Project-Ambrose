@@ -6,6 +6,7 @@
 #ifndef AMBROSE_SERVERAPP_H
 #define AMBROSE_SERVERAPP_H
 
+#include "AdminStatus.h"
 #include "ConsoleCommandTable.h"
 #include "Duration.h"
 #include "IoContext.h"
@@ -75,9 +76,16 @@ public:
     AdminServer* GetAdminApi() const noexcept { return _admin.get(); }
     bool ReloadAdminApi();
 
+    void SetListener(std::string address, uint16 port);
+    void SetClientSetup(bool installFound, bool typeDumpInUse, bool typeDumpStale, std::string typeDumpError);
+    std::optional<AdminTickWindow> GetTickWindow() const;
+    std::vector<AdminProblem> CollectProblems() const;
+    AdminStatusSnapshot BuildStatus() const;
+
     static std::string_view LifecycleName(AppLifecycle state) noexcept;
 
 protected:
+    virtual void OnProblems(std::vector<AdminProblem>& problems);
     virtual bool OnStart();
     virtual void OnUpdate(std::chrono::milliseconds diff);
     virtual std::chrono::milliseconds GetUpdateInterval() const;
@@ -133,6 +141,14 @@ private:
     std::atomic<bool> _stopRequested{ false };
     std::atomic<bool> _starting{ false };
     std::mutex _pollMutex;
+    mutable std::mutex _statusMutex;
+    std::string _listenerAddress;
+    uint16 _listenerPort = 0;
+    bool _installFound = true;
+    bool _typeDumpInUse = true;
+    bool _typeDumpStale = false;
+    std::string _typeDumpError;
+    std::deque<std::pair<std::chrono::steady_clock::time_point, double>> _ticks;
 };
 
 #endif

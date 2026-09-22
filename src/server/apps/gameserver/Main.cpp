@@ -56,6 +56,7 @@ namespace
                 { "gameserver", true, true, false }, report);
             if (PollStopRequested())
                 return false;
+            SetClientSetup(setup.Install.has_value(), setup.TypeDump.has_value(), false, setup.TypeDumpError);
 
             std::vector<std::string> limitProblems;
             SerializerLimits::Apply(SerializerLimits::Load(Config(), &limitProblems));

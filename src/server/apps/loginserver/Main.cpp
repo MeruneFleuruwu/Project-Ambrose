@@ -8,6 +8,7 @@
 #include "AppenderDB.h"
 #include "ClientLocator.h"
 #include "ClientSetup.h"
+#include "StatsRegistry.h"
 #include "ConfigMgr.h"
 #include "DatabaseEnv.h"
 #include "DatabaseLoader.h"
@@ -172,6 +173,9 @@ namespace
                 _databases.reset();
                 return false;
             }
+            SetListener(network.BindIp, _sockets->GetPort());
+            SetClientSetup(setup.Install.has_value(), setup.TypeDump.has_value(), false, setup.TypeDumpError);
+            sStats.Publish("sessions", [this] { return Ambrose::StatValue(static_cast<int64>(_sockets ? _sockets->GetConnectionCount() : 0)); });
             AccountCommands::Register(Commands());
             return true;
         }
@@ -183,6 +187,7 @@ namespace
 
         void OnStop() override
         {
+            sStats.Unpublish("sessions");
             AccountCommands::Unregister(Commands());
             if (_sockets)
                 LoginShutdown::NotifyAndDrain(*_sockets, sLoginMgr.GetSettings()->ShutdownGrace);
