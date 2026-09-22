@@ -40,16 +40,16 @@
     }: Props = $props();
 
     const looks: Record<string, string> = {
-        action: "ambrose-inset bg-fill-action text-on-fill font-display font-semibold hover:bg-fill-action-pressed active:bg-fill-action-pressed",
-        quiet: "bg-surface-sunken text-fg-body border border-edge-strong hover:border-action",
-        danger: "bg-fill-danger text-on-fill font-semibold hover:opacity-90",
-        ghost: "text-fg-muted hover:text-fg-body",
+        action: "bg-fill-action text-on-fill font-semibold shadow-[0_1px_0_0_rgb(255_255_255/0.18)_inset,0_1px_2px_0_rgb(0_0_0/0.35)] ring-1 ring-inset ring-black/10 hover:brightness-110 active:bg-fill-action-pressed active:brightness-100",
+        quiet: "bg-surface-card text-fg-body font-medium ring-1 ring-inset ring-edge-strong/70 shadow-[0_1px_2px_0_rgb(0_0_0/0.25)] hover:bg-surface-sunken hover:ring-action/50",
+        danger: "bg-state-wrong/10 text-state-wrong font-medium ring-1 ring-inset ring-state-wrong/30 hover:bg-state-wrong/20",
+        ghost: "text-fg-muted font-medium hover:bg-fg-muted/10 hover:text-fg-body",
     };
     const shapes: Record<string, string> = {
-        regular: "px-16 rounded-input",
+        regular: "px-14 rounded-input",
         wide: "px-28 text-17 rounded-action",
     };
-    const shared = "ambrose-hover inline-flex min-h-44 items-center justify-center gap-8 text-15 select-none disabled:opacity-50 disabled:pointer-events-none";
+    const shared = "ambrose-hover inline-flex min-h-44 items-center justify-center gap-8 text-15 select-none disabled:opacity-50 disabled:pointer-events-none [&_svg]:size-16 [&_svg]:shrink-0";
     const all = $derived(classes(shared, looks[variant], shapes[size], extra));
 </script>
 

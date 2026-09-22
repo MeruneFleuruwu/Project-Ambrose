@@ -15,7 +15,7 @@
         <StatTile label="Players online" value={String(players)} state="healthy" word="Across every realm" />
         <StatTile label="Open problems" value={String(problems)} state={problems > 0 ? "wrong" : "healthy"} word={problems > 0 ? "Needs a look" : "None"} />
     </div>
-    <div class="grid grid-cols-1 gap-16 lg:grid-cols-2">
+    <div class="grid grid-cols-1 items-start gap-16 lg:grid-cols-2">
         {#each apps as app (app.name)}
             <Card title={app.name}>
                 {#snippet actions()}
