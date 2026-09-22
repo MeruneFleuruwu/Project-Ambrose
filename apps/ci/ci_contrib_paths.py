@@ -11,6 +11,8 @@ ALLOWED_PREFIXES = (
     "contrib/notes/",
     "contrib/proposals/",
     "contrib/locale/",
+    "contrib/fixtures/",
+    "contrib/schemas/",
     "apps/clientdriver/scenarios/",
     "data/sql/updates/pending_db_world/",
     "data/fuzz/",
