@@ -44,9 +44,9 @@ The roadmap critic flagged these. Resolve each one before or while implementing 
 
 **Acceptance**
 
-- [ ] A WorldScript OnUpdate registered through AddSC_ runs every tick
-- [ ] A module in modules/ is discovered by CMake with no core edits
-- [ ] GameSession queue drains on the world thread (thread-id test)
+- [x] A WorldScript OnUpdate registered through AddSC_ runs every tick. `ScriptMgrTest.TheGeneratedLoaderBringsInTheScriptsThatAreMerelyPresent` finds world_heartbeat through the loader CMake wrote, and `EveryHookReachesEveryScriptInTheOrderTheyRegistered` and `WorldTest.EverySessionIsDrainedBeforeTheScriptsRun` show the tick reaching it; the game server's OnUpdate is `sWorld.Update`, which carries it
+- [x] A module in modules/ is discovered by CMake with no core edits. modules/example is a folder and nothing else: configure reported "1 in src/server/scripts, 1 in modules", the generated loader calls Addmodules_example beside the script, and `ScriptMgrTest.AModuleUnderModulesIsLoadedTheSameWayAScriptIs` fails if it stops being found
+- [x] GameSession queue drains on the world thread (thread-id test). `WorldTest.QueuedWorkRunsOnTheThreadThatCallsUpdate` queues from another thread and records the thread the work ran on, asserting it is the one that called Update and not the one that queued it, and `TheWorldThreadIsTheOneThatCalledUpdateAndNoOther` shows another thread is never mistaken for it
 
 ## 4.02 CommandMgr and security levels, console first (new; WIZ-5 core)
 

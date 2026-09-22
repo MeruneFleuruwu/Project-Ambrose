@@ -39,6 +39,8 @@ target_link_libraries(unit_tests
         accounts
         characters
         globals
+        scripts
+        world
         nlohmann_json::nlohmann_json
         GTest::gmock)
 

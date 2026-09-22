@@ -38,6 +38,7 @@ Network.LongFrameLength = BodyOnly
 Network.OutKBuff = -1
 Network.TcpNoDelay = 1
 World.UpdateInterval = 50
+World.Heartbeat = 60
 Admin.Enable = 0
 Admin.BindIP = 127.0.0.1
 Admin.Port = 12343

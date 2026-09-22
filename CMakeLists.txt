@@ -34,6 +34,7 @@ option(AMBROSE_BUILD_FUZZERS "Build libFuzzer targets for decoders of untrusted 
 include(PlatformDetect)
 include(CompilerFlags)
 include(AmbroseMacros)
+include(Scripts)
 include(Frontend)
 
 find_package(fmt CONFIG REQUIRED)

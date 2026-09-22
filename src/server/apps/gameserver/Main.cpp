@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Game server entry point: runs setup in Setup.Mode for the install and type dump, stopping cleanly when a stop arrives meanwhile, loads the type dump and the locale text of the install's Root.wad in Locale.Default, brings the login, characters and world databases current and opens them, which the admin API reports, lists the updates of and applies data-only updates to while the server runs, reloading the character name tables after the world database takes one, loads the character name tables when the world database is open and, when they are empty, extracts them from the install and reloads them, automatically in auto mode, after a yes in ask mode and never in off mode, then runs the world update tick whose interval follows World.UpdateInterval live.
+ * Game server entry point: runs setup in Setup.Mode for the install and type dump, stopping cleanly when a stop arrives meanwhile, loads the type dump and the locale text of the install's Root.wad in Locale.Default, brings the login, characters and world databases current and opens them, which the admin API reports, lists the updates of and applies data-only updates to while the server runs, reloading the character name tables after the world database takes one, loads the character name tables when the world database is open and, when they are empty, extracts them from the install and reloads them, automatically in auto mode, after a yes in ask mode and never in off mode, loads the scripts and tells them the server has started, then runs the world update tick whose interval follows World.UpdateInterval live and carries every script's OnUpdate, and tells them it is shutting down before the databases close.
  */
 
 #include "AdminDatabaseView.h"
@@ -17,6 +17,9 @@
 #include "Log.h"
 #include "LocaleStore.h"
 #include "ObjectSerializer.h"
+#include "ScriptLoader.h"
+#include "ScriptMgr.h"
+#include "World.h"
 #include "ServerApp.h"
 #include "TypeRegistry.h"
 
@@ -154,6 +157,9 @@ namespace
                     LOG_WARN("server.gameserver", "Character name tables: {}", warning);
             }
             AppenderDB::Enable(Logger(), Config().GetOption<uint32>("RealmID", 1, true));
+            sScriptMgr.LoadScripts(&AddScripts);
+            sScriptMgr.OnConfigLoad(false);
+            sScriptMgr.OnStartup();
             return true;
         }
 
@@ -204,6 +210,9 @@ namespace
 
         void OnStop() override
         {
+            sWorld.Clear();
+            sScriptMgr.OnShutdown();
+            sScriptMgr.Unload();
             AppenderDB::Disable(Logger());
             _databases.Close();
         }
@@ -217,8 +226,9 @@ namespace
             return std::chrono::milliseconds(interval);
         }
 
-        void OnUpdate(std::chrono::milliseconds) override
+        void OnUpdate(std::chrono::milliseconds diff) override
         {
+            sWorld.Update(diff);
         }
 
     private:
