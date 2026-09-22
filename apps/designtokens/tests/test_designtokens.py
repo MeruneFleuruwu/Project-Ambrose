@@ -149,7 +149,15 @@ class GeneratedFileTests(unittest.TestCase):
 
     def test_every_generated_file_is_written(self):
         self.assertEqual(sorted(self.outputs), sorted(
-            [designtokens.CSS_PATH, designtokens.TS_PATH, designtokens.HEADER_PATH, designtokens.DESIGN_PATH]))
+            [designtokens.CSS_PATH, designtokens.VARIABLES_PATH, designtokens.TS_PATH, designtokens.HEADER_PATH, designtokens.DESIGN_PATH]))
+
+    def test_the_variables_sheet_carries_the_palette_without_touching_tailwinds_scales(self):
+        variables = self.outputs[designtokens.VARIABLES_PATH]
+        self.assertNotIn("@theme", variables)
+        self.assertNotIn("initial;", variables)
+        self.assertIn("--ambrose-color-surface-page:", variables)
+        self.assertIn(':root[data-theme="light"]', variables)
+        self.assertIn(variables[variables.index(":root {"):], self.outputs[designtokens.CSS_PATH])
 
     def test_the_stylesheet_deletes_the_stock_palette_before_it_writes_ours(self):
         css = self.outputs[designtokens.CSS_PATH]

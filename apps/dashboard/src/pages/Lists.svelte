@@ -1,42 +1,115 @@
-<!-- Project Ambrose by Imjustchico: The list pages that are one table and a few actions each: players online, accounts and bans, realms, backups, panel users and activity. -->
+<!-- Project Ambrose by Imjustchico: The list pages that are one table and a few actions each: players online, accounts and bans, realms, backups, panel users and activity, with a search box where the list is long. -->
 <script lang="ts">
-    import { Button, DataTable, Heading, TextField } from "@ambrose/ui";
+    import * as Card from "$lib/components/ui/card/index.js";
+    import * as Table from "$lib/components/ui/table/index.js";
+    import { Button } from "$lib/components/ui/button/index.js";
+    import { Input } from "$lib/components/ui/input/index.js";
+    import DownloadIcon from "@lucide/svelte/icons/download";
+    import PlusIcon from "@lucide/svelte/icons/plus";
+    import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
+    import SearchIcon from "@lucide/svelte/icons/search";
+    import ShieldBanIcon from "@lucide/svelte/icons/shield-ban";
+    import type { Component } from "svelte";
+    import PageHeader from "../components/PageHeader.svelte";
+    import StatusBadge from "../components/StatusBadge.svelte";
     import { accounts, activity, backups, panelUsers, players, realms } from "../sample";
 
     type Props = { which: string; title: string };
     let { which, title }: Props = $props();
 
     type Row = Record<string, string>;
-    type Page = { caption: string; rows: Row[]; columns: [string, string][]; mono?: string[]; actions: { label: string; icon: "plus" | "download" | "refresh-cw" | "user" | "shield" }[]; search?: string };
+    type Column = { id: string; header: string; mono?: boolean; status?: boolean; hideBelow?: "sm" | "md" | "lg" };
+    type Page = { description: string; rows: Row[]; columns: Column[]; actions: { label: string; icon: Component; primary?: boolean }[]; search?: string };
 
     const pages: Record<string, Page> = {
-        players: { caption: "Wizards in the world now", rows: players, columns: [["name", "Wizard"], ["level", "Level"], ["school", "School"], ["zone", "Zone"], ["session", "Online for"], ["realm", "Realm"]], actions: [{ label: "Message everyone", icon: "user" }], search: "Find a wizard" },
-        accounts: { caption: "Game accounts", rows: accounts, columns: [["username", "Account"], ["created", "Created"], ["lastSeen", "Last seen"], ["level", "Security level"], ["state", "State"]], actions: [{ label: "New account", icon: "plus" }, { label: "Ban", icon: "shield" }], search: "Find an account by name, address or machine" },
-        realms: { caption: "Realms in the realm list", rows: realms, columns: [["name", "Realm"], ["address", "Address"], ["flags", "Flags"], ["population", "Population"], ["heartbeat", "Heartbeat"], ["zones", "Zones loaded"]], mono: ["address"], actions: [{ label: "Refresh", icon: "refresh-cw" }] },
-        backups: { caption: "Backups kept on this machine", rows: backups, columns: [["name", "Backup"], ["taken", "Taken"], ["size", "Size"], ["verified", "Check"], ["kept", "Kept for"]], mono: ["name"], actions: [{ label: "Back up now", icon: "plus" }, { label: "Download", icon: "download" }] },
-        users: { caption: "People who can sign in to this panel", rows: panelUsers, columns: [["name", "User"], ["role", "Role"], ["twoFactor", "Two-factor"], ["lastSignIn", "Last sign-in"]], actions: [{ label: "Invite", icon: "plus" }] },
-        activity: { caption: "What people did in the panel", rows: activity, columns: [["when", "When"], ["who", "Who"], ["what", "What"], ["where", "Where"]], actions: [{ label: "Export", icon: "download" }] },
+        players: {
+            description: "Wizards in the world right now.",
+            rows: players,
+            columns: [{ id: "name", header: "Wizard" }, { id: "level", header: "Level" }, { id: "school", header: "School", hideBelow: "sm" }, { id: "zone", header: "Zone", hideBelow: "md" }, { id: "session", header: "Online for", hideBelow: "lg" }],
+            actions: [{ label: "Message everyone", icon: PlusIcon, primary: true }],
+            search: "Find a wizard",
+        },
+        accounts: {
+            description: "Game accounts, their security level and any ban.",
+            rows: accounts,
+            columns: [{ id: "username", header: "Account" }, { id: "level", header: "Security level", hideBelow: "sm" }, { id: "created", header: "Created", hideBelow: "md" }, { id: "lastSeen", header: "Last seen", hideBelow: "lg" }, { id: "state", header: "State", status: true }],
+            actions: [{ label: "Ban", icon: ShieldBanIcon }, { label: "New account", icon: PlusIcon, primary: true }],
+            search: "Find an account by name, address or machine",
+        },
+        realms: {
+            description: "Every realm in the realm list and how full it is.",
+            rows: realms,
+            columns: [{ id: "name", header: "Realm" }, { id: "address", header: "Address", mono: true, hideBelow: "md" }, { id: "flags", header: "Flags", hideBelow: "sm" }, { id: "population", header: "Population" }, { id: "heartbeat", header: "Heartbeat", hideBelow: "lg" }],
+            actions: [{ label: "Refresh", icon: RefreshCwIcon }],
+        },
+        backups: {
+            description: "Backups kept on this machine, checked after they are taken.",
+            rows: backups,
+            columns: [{ id: "name", header: "Backup", mono: true }, { id: "taken", header: "Taken", hideBelow: "sm" }, { id: "size", header: "Size", hideBelow: "md" }, { id: "verified", header: "Check", status: true }, { id: "kept", header: "Kept for", hideBelow: "lg" }],
+            actions: [{ label: "Download", icon: DownloadIcon }, { label: "Back up now", icon: PlusIcon, primary: true }],
+        },
+        users: {
+            description: "People who can sign in to this panel and what they may do.",
+            rows: panelUsers,
+            columns: [{ id: "name", header: "User" }, { id: "role", header: "Role" }, { id: "twoFactor", header: "Two-factor", status: true, hideBelow: "sm" }, { id: "lastSignIn", header: "Last sign-in", hideBelow: "md" }],
+            actions: [{ label: "Invite", icon: PlusIcon, primary: true }],
+        },
+        activity: {
+            description: "What people did in the panel, newest first.",
+            rows: activity,
+            columns: [{ id: "when", header: "When", mono: true }, { id: "who", header: "Who" }, { id: "what", header: "What" }, { id: "where", header: "Where", hideBelow: "md" }],
+            actions: [{ label: "Export", icon: DownloadIcon }],
+        },
     };
 
     const page = $derived(pages[which]);
-    const columns = $derived(page ? page.columns.map(([id, header]) => ({ id, header, value: (row: Row) => row[id] ?? "", sortable: true, mono: page.mono?.includes(id) ?? false })) : []);
+    const hide: Record<string, string> = { sm: "hidden sm:table-cell", md: "hidden md:table-cell", lg: "hidden lg:table-cell" };
+
+    function tone(value: string) {
+        if (/^(Active|Verified|On)$/.test(value)) return "healthy" as const;
+        if (/Banned|Failed|Off/.test(value)) return "wrong" as const;
+        return "unknown" as const;
+    }
 </script>
 
-<div class="flex flex-col gap-20">
-    <div class="flex flex-wrap items-center justify-between gap-12">
-        <Heading level={1}>{title}</Heading>
-        {#if page}
-            <div class="flex flex-wrap gap-8">
-                {#each page.actions as action, index (action.label)}
-                    <Button variant={index === 0 ? "action" : "quiet"} icon={action.icon}>{action.label}</Button>
-                {/each}
-            </div>
-        {/if}
-    </div>
-    {#if page}
-        {#if page.search}
-            <TextField id={`${which}-search`} label="Search" type="search" placeholder={page.search} class="max-w-480" />
-        {/if}
-        <DataTable caption={page.caption} {columns} rows={page.rows} />
+{#if page}
+    <PageHeader {title} description={page.description}>
+        {#snippet actions()}
+            {#each page.actions as action (action.label)}
+                <Button variant={action.primary ? "default" : "outline"}><action.icon />{action.label}</Button>
+            {/each}
+        {/snippet}
+    </PageHeader>
+    {#if page.search}
+        <div class="relative max-w-md">
+            <SearchIcon class="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input type="search" placeholder={page.search} class="pl-8" aria-label={page.search} />
+        </div>
     {/if}
-</div>
+    <Card.Root class="py-0 shadow-xs">
+        <Table.Root>
+            <Table.Header>
+                <Table.Row class="hover:bg-transparent">
+                    {#each page.columns as column, index (column.id)}
+                        <Table.Head class={`${index === 0 ? "pl-6" : ""} ${column.hideBelow ? hide[column.hideBelow] : ""}`}>{column.header}</Table.Head>
+                    {/each}
+                </Table.Row>
+            </Table.Header>
+            <Table.Body>
+                {#each page.rows as row, rowIndex (rowIndex)}
+                    <Table.Row>
+                        {#each page.columns as column, index (column.id)}
+                            <Table.Cell class={`${index === 0 ? "pl-6 font-medium" : ""} ${column.mono ? "font-mono text-xs" : ""} ${column.hideBelow ? hide[column.hideBelow] : ""}`}>
+                                {#if column.status}
+                                    <StatusBadge tone={tone(row[column.id] ?? "")}>{row[column.id]}</StatusBadge>
+                                {:else}
+                                    {row[column.id]}
+                                {/if}
+                            </Table.Cell>
+                        {/each}
+                    </Table.Row>
+                {/each}
+            </Table.Body>
+        </Table.Root>
+    </Card.Root>
+{/if}

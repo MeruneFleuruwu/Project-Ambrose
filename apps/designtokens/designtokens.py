@@ -14,6 +14,7 @@ ANSI_KEY = {"dark": "ambrose.ansi16", "light": "ambrose.ansi16-light"}
 
 TOKENS_PATH = "design/tokens.json"
 CSS_PATH = "packages/ui/src/tokens/tokens.css"
+VARIABLES_PATH = "packages/ui/src/tokens/variables.css"
 TS_PATH = "packages/ui/src/tokens/tokens.ts"
 HEADER_PATH = "src/common/Design/Tokens.h"
 DESIGN_PATH = "doc/DESIGN.md"
@@ -283,6 +284,25 @@ def generate_css(tokens):
     lines.append("}")
     lines.append("")
 
+    lines.extend(variable_lines(tokens))
+    return "\n".join(lines)
+
+
+def generate_variables(tokens):
+    lines = [
+        "/*",
+        f" * {BRAND}",
+        " * Generated from design/tokens.json: the semantic colours, sizes and durations as plain custom properties with the light remap, and no Tailwind theme, for a surface that keeps Tailwind's own scales.",
+        " */",
+        "",
+    ]
+    lines.extend(variable_lines(tokens))
+    return "\n".join(lines)
+
+
+def variable_lines(tokens):
+    lines = []
+
     def theme_block(selector, theme, scheme):
         block = [f"{selector} {{", f"    color-scheme: {scheme};"]
         for name, value in tokens.colors("semantic.color", theme):
@@ -332,7 +352,7 @@ def generate_css(tokens):
     lines.append("    }")
     lines.append("}")
     lines.append("")
-    return "\n".join(lines)
+    return lines
 
 
 def ts_string(value):
@@ -570,6 +590,7 @@ def generate(root):
         design = handle.read().replace("\r\n", "\n")
     return {
         CSS_PATH: generate_css(tokens),
+        VARIABLES_PATH: generate_variables(tokens),
         TS_PATH: generate_ts(tokens, pairs),
         HEADER_PATH: generate_header(tokens),
         DESIGN_PATH: replace_tables(design, design_tables(tokens)),

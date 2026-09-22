@@ -1,9 +1,9 @@
 /*
  * Project Ambrose by Imjustchico
- * Where the panel starts: the shared stylesheet, then the shell mounted on the one element the page holds.
+ * Where the panel starts: its own stylesheet, then the shell mounted on the one element the page holds.
  */
 
-import "@ambrose/ui/styles.css";
+import "./app.css";
 import { mount } from "svelte";
 import App from "./App.svelte";
 

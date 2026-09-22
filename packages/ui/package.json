@@ -36,6 +36,8 @@
     },
     "./styles.css": "./src/styles/app.css",
     "./tokens.css": "./src/tokens/tokens.css",
+    "./variables.css": "./src/tokens/variables.css",
+    "./fonts.css": "./src/fonts/fonts.css",
     "./package.json": "./package.json"
   },
   "dependencies": {

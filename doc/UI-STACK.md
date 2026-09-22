@@ -24,6 +24,10 @@ computed from the exact values in doc/DESIGN.md with the WCAG 2.x formula.
 | Tokens | Ambrose generator in Python from design/tokens.json | ours | ours |
 | Primitives | Bits UI | 2.19.2 | MIT |
 | Component starting points | shadcn-svelte, copied in and owned | CLI 1.7.0 | MIT |
+| Panel class helpers | tailwind-variants, tailwind-merge and clsx, which the copied shadcn-svelte components are written against | 3.3.1 / 3.7.0 / 2.1.1 | MIT |
+| Panel animations | tw-animate-css, the enter and leave keyframes shadcn-svelte's menus and drawers use | 1.4.0 | MIT |
+| Panel icons | @lucide/svelte, the same Lucide set as the vendored icons, imported per icon | 1.47.0 | ISC |
+| Dates in pickers | @internationalized/date, which Bits UI's date parts take | 3.12.4 | Apache-2.0 |
 | Tables | TanStack Table, headless | 9.2.4 | MIT |
 | Virtualisation | virtua | 0.51.3 | MIT |
 | ANSI in logs | anser | 2.3.5 | MIT |

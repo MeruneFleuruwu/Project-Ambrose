@@ -23,7 +23,9 @@
       "@ambrose/ui/tokens": ["./packages/ui/src/tokens/tokens.ts"],
       "@ambrose/ui/motion": ["./packages/ui/src/motion/motion.svelte.ts"],
       "@ambrose/ui/bridge": ["./packages/ui/src/bridge/bridge.ts"],
-      "@ambrose/ui/icons": ["./packages/ui/src/icons/icons.ts"]
+      "@ambrose/ui/icons": ["./packages/ui/src/icons/icons.ts"],
+      "$lib": ["./apps/dashboard/src/lib"],
+      "$lib/*": ["./apps/dashboard/src/lib/*"]
     }
   },
   "include": [

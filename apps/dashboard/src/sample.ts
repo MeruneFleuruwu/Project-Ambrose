@@ -22,7 +22,7 @@ export type SampleApp = {
     tickMax: number | null;
     age: string;
     stale: boolean;
-    badges: { tone: "healthy" | "waiting" | "wrong" | "neutral"; text: string }[];
+    badges: { tone: "healthy" | "waiting" | "wrong" | "unknown"; text: string }[];
     problems: { code: string; message: string; fix: string; fixLabel: string }[];
     ticks: number[];
 };
@@ -47,7 +47,7 @@ export const apps: SampleApp[] = [
         name: "patchserver", role: "patch", realm: "", address: "127.0.0.1", port: 12500,
         state: "unknown", word: "Offline", uptime: "", revision: "573f769",
         sessions: null, players: null, limit: null, tickAverage: null, tickMax: null,
-        age: "4 min ago", stale: true, badges: [{ tone: "neutral", text: "Stopped" }], problems: [], ticks: [],
+        age: "4 min ago", stale: true, badges: [{ tone: "unknown", text: "Stopped" }], problems: [], ticks: [],
     },
 ];
 
