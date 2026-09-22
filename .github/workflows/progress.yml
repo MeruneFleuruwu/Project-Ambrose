@@ -1,5 +1,5 @@
 # Project Ambrose by Imjustchico
-# Keeps one Discord message showing the project's progress: when a push to main changes the generated numbers it renders the card, edits that message in place rather than posting another, and remembers its id on the progress-state branch, doing nothing at all when the repository has no webhook secret.
+# Keeps one Discord message showing the project's progress: when a push to main changes the generated numbers it renders the card, edits that message in place rather than posting another, and remembers its id on the progress-state branch, falling back to the id committed on main so losing that branch cannot start a second message, doing nothing at all when the repository has no webhook secret.
 name: progress
 
 on:
@@ -51,6 +51,10 @@ jobs:
         run: |
           if git fetch origin progress-state:progress-state 2>/dev/null; then
             git show progress-state:discord-message.json > remembered.json 2>/dev/null || rm -f remembered.json
+          fi
+          if [ ! -s remembered.json ] && [ -s doc/progress/discord-message.json ]; then
+            cp doc/progress/discord-message.json remembered.json
+            echo "the state branch had nothing, taking the message id committed on main"
           fi
           test -s remembered.json && echo "the message to edit is remembered" || echo "no message remembered yet, one will be posted"
       - name: Update the Discord message
