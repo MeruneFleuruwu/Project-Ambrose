@@ -1,5 +1,5 @@
 # Project Ambrose by Imjustchico
-# Self-tests for the forbidden file scan, including the key, store, log and token material it keeps out, the contributor track path check, the commit trailer check, the build stages, the vcpkg cache key, the usage count, and the build leg selection against fakes, a real git repository and a fake Actions API.
+# Self-tests for the forbidden file scan, including the key, store, log and token material it keeps out, the contributor track path check, the commit trailer check, the build stages, the vcpkg cache key, the usage count, and the build leg selection against fakes, a real git repository and a fake Actions API, and the milestone track, where a branch named for a milestone is allowed the source tree and the track's open list is held to the milestones that are really ready.
 import argparse
 import datetime
 import json
@@ -15,6 +15,7 @@ import urllib.error
 from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "progress"))
 
 import ci_build
 import ci_commit_trailer
@@ -24,6 +25,7 @@ import ci_forbidden_files
 import ci_select_legs
 import ci_usage
 import ci_vcpkg_cache
+import ready as ready_report
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 UTC = datetime.timezone.utc
@@ -582,6 +584,95 @@ class ContributorPathTests(unittest.TestCase):
         self.assertEqual(ci_contrib_paths.check([windows.replace("\\", "/")]), [])
         self.assertEqual(ci_contrib_paths.check([windows]), [windows])
 
+
+
+class MilestoneTrackTests(unittest.TestCase):
+    PHASE = "doc/roadmap/phase-04-a-wizard-stands-in-ravenwood.md"
+
+    def track(self):
+        with io.open(os.path.join(ROOT, "doc", "MILESTONE-TRACK.md"), encoding="utf-8") as handle:
+            return handle.read()
+
+    def section(self, name):
+        return self.track().split("## " + name, 1)[1].split("\n## ", 1)[0]
+
+    def test_a_branch_named_for_a_milestone_is_recognised(self):
+        self.assertEqual(ci_contrib_paths.milestone_of("milestone/4.04-world-wire-math"), "4.04")
+        self.assertEqual(ci_contrib_paths.milestone_of("milestone/17.106"), "17.106")
+        self.assertEqual(ci_contrib_paths.milestone_of("refs/heads/milestone/1.6-lang"), "1.06")
+
+    def test_any_other_branch_is_not_a_milestone_branch(self):
+        for branch in ("contrib/C-60-watcher", "milestone/four", "milestones/4.04", "main", "", None):
+            self.assertIsNone(ci_contrib_paths.milestone_of(branch), branch)
+
+    def test_a_milestone_branch_may_change_the_source_tree(self):
+        paths = [
+            "src/server/game/Movement/MovementPacking.cpp",
+            "src/test/server/game/Movement/MovementPackingTest.cpp",
+            "src/server/game/CMakeLists.txt",
+            "data/sql/updates/db_world/2026_09_22_00.sql",
+            "src/server/apps/gameserver/gameserver.conf.dist",
+            self.PHASE,
+        ]
+        self.assertEqual(ci_contrib_paths.check_milestone(paths, "4.04"), [])
+        self.assertEqual(ci_contrib_paths.check(paths), paths)
+
+    def test_a_milestone_branch_keeps_off_the_files_the_maintainer_holds(self):
+        for path in ("README.md", "vcpkg.json", "doc/ROADMAP.md", "doc/MILESTONE-TRACK.md",
+                     "contrib/AI-MILESTONES-HERE.md", ".github/workflows/core-build.yml",
+                     "apps/ci/ci_contrib_paths.py", "apps/progress/progress.py", "doc/progress/progress.svg"):
+            self.assertEqual([entry[0] for entry in ci_contrib_paths.check_milestone([path], "4.04")], [path], path)
+
+    def test_a_milestone_branch_stays_inside_its_own_phase_file(self):
+        other = "doc/roadmap/phase-05-the-zone-comes-alive-for-one-player.md"
+        refused = ci_contrib_paths.check_milestone([self.PHASE, other], "4.04")
+        self.assertEqual([entry[0] for entry in refused], [other])
+        self.assertEqual(ci_contrib_paths.check_milestone([other], "5.01"), [])
+
+    def test_the_source_tree_needs_the_branch_name_to_be_allowed(self):
+        source = ["src/server/game/Movement/MovementPacking.cpp"]
+        self.assertEqual(ci_contrib_paths.main(["--paths"] + source), 1)
+        self.assertEqual(ci_contrib_paths.main(["--paths"] + source + ["--branch", "milestone/4.04-world-wire-math"]), 0)
+        self.assertEqual(ci_contrib_paths.main(["--paths", "README.md", "--branch", "milestone/4.04-x"]), 1)
+
+    def test_both_documents_name_every_file_the_checker_holds_back(self):
+        prompt = io.open(os.path.join(ROOT, "contrib", "AI-MILESTONES-HERE.md"), encoding="utf-8").read()
+        track = self.track()
+        for held in ci_contrib_paths.RESERVED_PREFIXES + ci_contrib_paths.RESERVED_FILES:
+            self.assertIn("`" + held + "`", track, held)
+            self.assertIn("`" + held + "`", prompt, held)
+
+    def test_the_track_opens_only_milestones_that_exist_and_are_ready(self):
+        ready, blocked = ready_report.state(ROOT)
+        known = {row["id"] for row in ready} | {row["id"] for row in blocked}
+        opened = [row["id"] for row in ready if row["status"] == "open"]
+        self.assertGreater(len(opened), 0)
+        for identifier in re.findall(r"^\| ([\d., ]+) \|", self.section("Open now"), re.M):
+            for one in re.findall(r"\d+\.\d+", identifier):
+                self.assertIn(one, known, one + " is opened by the track but is not a milestone")
+                self.assertIn(one, opened, one + " is opened by the track but its dependencies are not built")
+
+    def test_a_milestone_is_not_open_and_reserved_at_once(self):
+        tables = {name: set(re.findall(r"\d+\.\d+", self.section(name)))
+                  for name in ("Open now", "Reserved", "In flight", "Landed")}
+        for name, other in (("Open now", "Reserved"), ("Open now", "In flight"), ("Reserved", "In flight")):
+            both = sorted(tables[name] & tables[other])
+            self.assertEqual(both, [], ", ".join(both) + " is listed under " + name + " and " + other)
+
+    def test_a_milestone_the_track_does_not_name_is_reserved(self):
+        ready, _blocked = ready_report.state(ROOT)
+        opened = {row["id"] for row in ready if row["status"] == "open"}
+        named = set(re.findall(r"\d+\.\d+", self.section("Open now")))
+        self.assertEqual(opened, named)
+        for row in ready:
+            self.assertIn(row["status"], ("open", "reserved", "claimed", "landed"), row["id"])
+
+    def test_every_ready_milestone_names_a_phase_file_that_holds_it(self):
+        ready, _blocked = ready_report.state(ROOT)
+        for row in ready[:5]:
+            text = io.open(os.path.join(ROOT, row["file"].replace("/", os.sep)), encoding="utf-8").read()
+            self.assertIn("## " + row["id"] + " ", text)
+            self.assertFalse(row["done"], row["id"])
 
 
 class GapRecordTests(unittest.TestCase):

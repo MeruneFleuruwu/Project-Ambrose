@@ -12,4 +12,6 @@ Work from outside the maintainer's own milestones lands here. doc/CONTRIBUTOR-TR
 
 Contributing with an AI assistant is expected here: `AI-START-HERE.md` is a prompt to paste into yours, and it carries what that assistant needs to know about this repository before it writes anything.
 
+The roadmap's own milestones are the other track. `AI-MILESTONES-HERE.md` is the prompt for those, and doc/MILESTONE-TRACK.md says which ones are open, how one is claimed and what finishing one means. That work lands in `src/`, not here.
+
 Nothing here is built by the repository's own CMake, and nothing here is loaded by a server. A tool that the project later needs inside a server is rebuilt in `src/` under the architecture's rules, with your note kept.

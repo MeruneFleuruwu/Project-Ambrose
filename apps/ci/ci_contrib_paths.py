@@ -1,7 +1,8 @@
 # Project Ambrose by Imjustchico
-# Checks that a change stays inside the contributor track's own folders, exactly the ones doc/CONTRIBUTOR-TRACK.md's table names, so outside work cannot collide with a milestone in flight and a green check means a mergeable change.
+# Checks that a change stays inside the contributor track's own folders, exactly the ones doc/CONTRIBUTOR-TRACK.md's table names, so outside work cannot collide with a milestone in flight, and that a branch named for a milestone, which is allowed the source tree instead, keeps off the files that govern the project and out of every phase file but its own.
 import argparse
 import os
+import re
 import subprocess
 import sys
 
@@ -22,6 +23,37 @@ ALLOWED_PREFIXES = (
 ALLOWED_FILES = ()
 
 TRACK = "doc/CONTRIBUTOR-TRACK.md"
+MILESTONE_TRACK = "doc/MILESTONE-TRACK.md"
+MILESTONE_BRANCH = re.compile(r"^(?:.*/)?milestone/(\d+)\.(\d+)(?:-.*)?$")
+ROADMAP_DIR = "doc/roadmap/"
+
+RESERVED_PREFIXES = (
+    ".github/",
+    "apps/ci/",
+    "apps/codestyle/",
+    "apps/progress/",
+    "doc/progress/",
+    "packages/ui/src/tokens/",
+)
+
+RESERVED_FILES = (
+    ".gitignore",
+    "CLAUDE.md",
+    "CMakePresets.json",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "README.md",
+    "THIRD-PARTY-NOTICES.md",
+    "contrib/AI-MILESTONES-HERE.md",
+    "contrib/AI-START-HERE.md",
+    "contrib/README.md",
+    "doc/ARCHITECTURE.md",
+    "doc/CONTRIBUTOR-TRACK.md",
+    "doc/MILESTONE-TRACK.md",
+    "doc/REVIEWING.md",
+    "doc/ROADMAP.md",
+    "vcpkg.json",
+)
 
 
 def run(arguments, root):
@@ -46,12 +78,48 @@ def check(paths):
     return [path for path in paths if not allowed(path)]
 
 
-def main():
+def milestone_of(branch):
+    if not branch:
+        return None
+    found = MILESTONE_BRANCH.match(branch.strip())
+    return f"{found.group(1)}.{int(found.group(2)):02d}" if found else None
+
+
+def phase_prefix(milestone):
+    return f"{ROADMAP_DIR}phase-{int(milestone.split('.')[0]):02d}-"
+
+
+def check_milestone(paths, milestone):
+    refused = []
+    for path in paths:
+        if any(path.startswith(prefix) for prefix in RESERVED_PREFIXES) or path in RESERVED_FILES:
+            refused.append((path, "the maintainer keeps this file; say in the pull request what it needs"))
+        elif path.startswith(ROADMAP_DIR) and not path.startswith(phase_prefix(milestone)):
+            refused.append((path, f"another phase than {milestone}'s own"))
+    return refused
+
+
+def report_milestone(paths, milestone):
+    refused = check_milestone(paths, milestone)
+    for path, reason in refused:
+        print(f"{path}: {reason}")
+    ticks = [path for path in paths if path.startswith(phase_prefix(milestone))]
+    print(f"milestone {milestone}: {len(paths)} path(s) checked, {len(refused)} refused")
+    if not ticks:
+        print(f"note: nothing in {phase_prefix(milestone)}*.md changed, so no acceptance check is ticked by this branch")
+    if refused:
+        print(f"A milestone branch may change the source tree, but not the files above; see {MILESTONE_TRACK}")
+        return 1
+    return 0
+
+
+def main(argv=None):
     parser = argparse.ArgumentParser(description="Project Ambrose contributor track path check")
     parser.add_argument("--root", default=os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     parser.add_argument("--range", dest="commit_range", help="a commit range such as main..HEAD")
     parser.add_argument("--paths", nargs="*", help="paths to check instead of a commit range")
-    arguments = parser.parse_args()
+    parser.add_argument("--branch", help="the branch the change is on, so a milestone/<id> branch is checked as a milestone")
+    arguments = parser.parse_args(argv)
 
     if arguments.paths is not None:
         paths = [path.replace("\\", "/") for path in arguments.paths]
@@ -64,12 +132,17 @@ def main():
         print("contributor paths: nothing changed")
         return 0
 
+    milestone = milestone_of(arguments.branch)
+    if milestone:
+        return report_milestone(paths, milestone)
+
     outside = check(paths)
     for path in outside:
         print(f"{path}: outside the contributor track")
     print(f"contributor paths: {len(paths)} path(s) checked, {len(outside)} outside the track")
     if outside:
         print(f"The contributor track may change only these folders: {', '.join(ALLOWED_PREFIXES)}")
+        print(f"A milestone is taken on a branch named milestone/<id>; see {MILESTONE_TRACK}")
         print(f"Everything else belongs to a milestone in doc/ROADMAP.md; see {TRACK}")
         return 1
     return 0

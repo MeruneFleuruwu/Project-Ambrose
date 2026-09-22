@@ -87,7 +87,9 @@ jobs:
         run: python apps/ci/ci_findings.py
       - name: Contributor track paths
         if: ${{ !cancelled() && github.event_name == 'pull_request' && (github.event.pull_request.head.repo.full_name != github.repository || contains(github.event.pull_request.labels.*.name, 'contrib')) }}
-        run: python apps/ci/ci_contrib_paths.py --range ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}
+        env:
+          PR_BRANCH: ${{ github.head_ref }}
+        run: python apps/ci/ci_contrib_paths.py --range ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} --branch "$PR_BRANCH"
       - name: Commit trailers
         if: ${{ !cancelled() }}
         env:

@@ -32,6 +32,21 @@ This is the maintainer's side of doc/CONTRIBUTOR-TRACK.md. It says how a pull re
 8. **Fix what review found, on main, then push.** One commit per fix, naming the pull request and the fault, with the contributor as co-author when it is their file.
 9. **Update the prompt and this file** when a batch teaches something. `contrib/AI-START-HERE.md` is what a contributor's assistant reads; if a fault repeats, it belongs there as a rule with the case that produced it.
 
+## Reviewing a milestone pull request
+
+doc/MILESTONE-TRACK.md is the contributor's side of this. A milestone pull request is the roadmap itself, so it is read harder than a track item, in this order, and anything that fails an early step is answered before the code is read at all.
+
+1. **It is a milestone the project opened.** The id is in "Open now", or in "In flight" against this contributor. One that is reserved is closed with the reason and the table, however good the code is, because something else is being built in those files right now.
+2. **The branch is named `milestone/<id>-<short-name>`.** Without it the path check runs in contributor mode and refuses every source file, and the contributor sees a wall of red they cannot fix. Tell them to rename and force-push rather than guessing what they meant.
+3. **Paths.** `python apps/ci/ci_contrib_paths.py --range origin/main...prN --branch <their branch>`, which refuses the maintainer's own files and every phase file but the milestone's own.
+4. **Scope.** `git diff --stat origin/main...prN` reads as one milestone. A rename, a reformat or an improvement on the way past makes the rest unreviewable and is sent back on its own.
+5. **Nothing from the client, and nothing generated.** The forbidden file scan, then `git diff --name-only` read by eye for an extracted file, a dump or a database file, because several of these milestones generate exactly those next to the source.
+6. **Build and run it.** Label it `ci:all` so both compilers see it, and build it locally too. Warnings are errors, and MSVC and GCC disagree about what is a warning, so a contributor who could only build on one platform is normal and is not a fault.
+7. **Every ticked box, one at a time.** For each `- [x]`, find the evidence in its brackets in the tree, then run it by name, `ctest --preset <preset> -R <test>`, and read what it asserts. A check ticked by a test that does not exist, or by one that asserts nothing, ends the review: say so plainly, keep the rest, and do not go looking for what else might be wrong until that is answered. For the milestone's central claim, break the code deliberately and watch the test fail, because a test that only ever passed proves nothing.
+8. **Every unticked box is accounted for** in the description, as a gated check the contributor could not run. An unticked box nobody mentions is the milestone half-built, which merges with the row left in "In flight" and what is left written next to it.
+9. **The phase's review notes** that name the milestone are resolved, in the code or in the description.
+10. **Merge, then finish it on main.** Squash with subject `<id>: <what landed>`, the contributor's `Co-Authored-By`, and `Contributed on the milestone track.` in the body. Then on main, in one commit: move the row to "Landed" or "In flight", update doc/ROADMAP.md's "Where we are" to say what is now built, and regenerate the card with `python apps/progress/progress.py`, which is why those files are kept off a milestone branch. `python apps/progress/ready.py` then says what the merge opened up.
+
 ## Traps met so far
 
 - Two loops that both `git checkout` in the same worktree corrupt each other. Build tools in a background loop or read files with `git show prN:path`, never both at once.

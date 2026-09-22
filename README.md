@@ -15,7 +15,7 @@
 [![Progress](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FJustchicoo%2FProject-Ambrose%2Fmain%2Fdoc%2Fprogress%2Fbadge.json)](doc/progress/)
 [![Contributor track](https://img.shields.io/badge/open%20items-59-5FD3C4?labelColor=131B31)](doc/CONTRIBUTOR-TRACK.md)
 
-**[Roadmap](doc/ROADMAP.md)** &nbsp;·&nbsp; **[Architecture](doc/ARCHITECTURE.md)** &nbsp;·&nbsp; **[Panel](doc/PANEL.md)** &nbsp;·&nbsp; **[Contribute](doc/CONTRIBUTOR-TRACK.md)** &nbsp;·&nbsp; **[Start with your AI](contrib/AI-START-HERE.md)** &nbsp;·&nbsp; **[Discord](https://discord.gg/Dx6ACDUj6N)**
+**[Roadmap](doc/ROADMAP.md)** &nbsp;·&nbsp; **[Architecture](doc/ARCHITECTURE.md)** &nbsp;·&nbsp; **[Panel](doc/PANEL.md)** &nbsp;·&nbsp; **[Contribute](doc/CONTRIBUTOR-TRACK.md)** &nbsp;·&nbsp; **[Milestones](doc/MILESTONE-TRACK.md)** &nbsp;·&nbsp; **[Start with your AI](contrib/AI-START-HERE.md)** &nbsp;·&nbsp; **[Discord](https://discord.gg/Dx6ACDUj6N)**
 
 </div>
 
@@ -96,12 +96,15 @@ Hosted CI builds the Windows leg on Sundays and Wednesdays, the sanitizer legs o
 
 ## Contributing
 
-The phases are built in order by the maintainer's own agents, so nobody else works from them. Everything from outside lands on a **separate track** that cannot collide with a milestone in flight, and every pull request is verified by running it, not by reading it.
+There are two doors, and every pull request through either is verified by running it, not by reading it.
+
+The **contributor track** has its own folders and cannot collide with a milestone in flight: findings, tools, schemas, fixtures, guides and proposals. The **milestone track** is the roadmap itself, a named set of milestones open to outside help, with the source tree and the acceptance checks that come with them. Everything not named there is reserved, because the maintainer's own agents are building it.
 
 | | |
 |---|---|
 | **59 open items** | [doc/CONTRIBUTOR-TRACK.md](doc/CONTRIBUTOR-TRACK.md) - findings about the game, and tools, schemas, fixtures, guides and proposals, each with what it needs and how it is proven |
 | **Start in one paste** | [contrib/AI-START-HERE.md](contrib/AI-START-HERE.md) - a prompt for any AI assistant, with everything it needs to work here without guessing |
+| **Build a milestone** | [doc/MILESTONE-TRACK.md](doc/MILESTONE-TRACK.md) - the roadmap milestones open to outside help, and [contrib/AI-MILESTONES-HERE.md](contrib/AI-MILESTONES-HERE.md), the prompt that goes with them |
 | **The shape of a finding** | [contrib/findings/README.md](contrib/findings/README.md) - one claim about how the game behaves, written so it can be proven or refuted |
 | **House rules** | [CONTRIBUTING.md](CONTRIBUTING.md) - AI-written changes are expected, not merely allowed |
 
