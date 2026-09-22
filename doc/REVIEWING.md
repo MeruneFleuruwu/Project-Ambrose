@@ -40,6 +40,7 @@ This is the maintainer's side of doc/CONTRIBUTOR-TRACK.md. It says how a pull re
 - Redelivering a merge does not re-run CI on the new base; close and reopen does.
 - A contributor cannot label from a fork, so the path check keys off the fork instead; nothing needs the `contrib` label to run.
 - After a squash merge the branch holds nothing; the next pull request from it is empty.
+- A sound pull request that conflicts with main cannot be merged on GitHub, and a fix cannot go to the fork. Run `git merge --squash prN` onto main, resolve the conflict, and commit with `--author` set to the contributor's numeric noreply address and the maintainer as committer. Then push, and close the pull request naming the commit. #103 landed this way as 1e425be.
 - `mergeable` reads `UNKNOWN` for a minute after a burst of merges; wait and retry rather than reaching for `--admin`.
 
 ## What the batch of sixty-three taught
