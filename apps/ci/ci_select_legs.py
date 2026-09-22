@@ -1,5 +1,5 @@
 # Project Ambrose by Imjustchico
-# Picks the core-build legs for a push, pull request, schedule slot, or manual run, building a scheduled leg only when code changed since the commit it last built, and says whether the Windows cache needs a keepalive restore.
+# Picks the core-build legs for a push, pull request, schedule slot, or manual run, building the Linux GCC leg for a milestone branch without waiting for a label, building a scheduled leg only when code changed since the commit it last built, and says whether the Windows cache needs a keepalive restore.
 import argparse
 import datetime
 import json
@@ -42,9 +42,10 @@ SETS.update({leg: [leg] for leg in LEGS})
 OPTIONS = ("none", "linux-gcc", "linux-clang", "linux-gcc-asan", "linux-clang-tsan", "linux-clang-fuzz", "windows-msvc-x64", "weekly", "linux", "all")
 DEFAULT_OPTION = "linux-gcc"
 LABEL_PREFIX = "ci:"
+MILESTONE_PREFIX = "milestone/"
 
 SMOKE_PATHS = (".github/", "apps/ci/ci_build.py", "apps/ci/ci_vcpkg_cache.py", "vcpkg.json")
-PUSH_PATHS = (".github/**", "apps/ci/**", "apps/designtokens/**", "apps/progress/**", "design/**", "vcpkg.json")
+PUSH_PATHS = (".github/**", "apps/ci/**", "apps/designtokens/**", "apps/progress/**", "design/**", "doc/ROADMAP.md", "doc/roadmap/**", "vcpkg.json")
 CODE_PATHSPEC = (".", ":(exclude)doc", ":(exclude,glob)**/*.md")
 ZERO_SHA = re.compile(r"^0*$")
 
@@ -222,6 +223,9 @@ def plan(event, inputs, now, git, actions=None):
     elif event == "pull_request":
         legs = legs_for_labels(inputs.get("labels"), warnings)
         reasons.extend(f"{leg}: selected (pull request label)" for leg in ordered(legs))
+        if (inputs.get("branch") or "").startswith(MILESTONE_PREFIX):
+            legs.append("linux-gcc")
+            reasons.append("linux-gcc: selected (a milestone branch builds without waiting for a label)")
         paths = git.changed_paths(inputs.get("before"), inputs.get("after"), merge_base=True)
         if paths is None or touches_smoke_paths(paths):
             legs.append("linux-gcc")
@@ -303,6 +307,7 @@ def main(argv=None, environment=None, git=None):
     parser.add_argument("--schedule", default="", help="the triggering cron, for a scheduled dry run")
     parser.add_argument("--legs", default="", help="the manual run option, for a dispatch dry run")
     parser.add_argument("--labels", default="", help="pull request labels as a JSON list, for a dry run")
+    parser.add_argument("--branch", default="", help="the pull request branch, so a milestone branch builds without a label")
     parser.add_argument("--before", default="", help="the range start, for a push or pull request dry run")
     parser.add_argument("--after", default="", help="the range end, for a push or pull request dry run")
     parser.add_argument("--now", default="", help="the UTC time of the run, for a dry run")
@@ -314,10 +319,10 @@ def main(argv=None, environment=None, git=None):
         event = environment.get("EVENT_NAME", "")
         before = environment.get("PR_BASE") if event == "pull_request" else environment.get("PUSH_BEFORE")
         after = environment.get("PR_HEAD") if event == "pull_request" else environment.get("PUSH_AFTER")
-        inputs = {"schedule": environment.get("SCHEDULE", ""), "legs": environment.get("DISPATCH_LEGS", ""), "labels": environment.get("PR_LABELS", ""), "before": before, "after": after}
+        inputs = {"schedule": environment.get("SCHEDULE", ""), "legs": environment.get("DISPATCH_LEGS", ""), "labels": environment.get("PR_LABELS", ""), "branch": environment.get("PR_BRANCH", ""), "before": before, "after": after}
     elif args.event:
         event = args.event
-        inputs = {"schedule": args.schedule, "legs": args.legs, "labels": args.labels, "before": args.before, "after": args.after}
+        inputs = {"schedule": args.schedule, "legs": args.legs, "labels": args.labels, "branch": args.branch, "before": args.before, "after": args.after}
     else:
         parser.error("pass --from-github-env or --event")
     now = parse_now(args.now) if args.now else datetime.datetime.now(UTC)

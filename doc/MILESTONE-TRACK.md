@@ -64,7 +64,7 @@ It refuses another phase's file, so a change that needs one is a change of scope
 
 ## How it is reviewed
 
-doc/REVIEWING.md is the rulebook, and its first line applies hardest here: verified by running, never by reading. Expect the maintainer to build the branch, run its tests, run the ones it claims by name, and try the failure the code says it handles. A milestone pull request also gets the CI build legs, which a maintainer turns on with a `ci:` label.
+doc/REVIEWING.md is the rulebook, and its first line applies hardest here: verified by running, never by reading. Expect the maintainer to build the branch, run its tests, run the ones it claims by name, and try the failure the code says it handles. A branch named for a milestone builds the Linux GCC leg in CI by itself, without waiting for a label, and the maintainer adds a `ci:` label for the Windows leg or the sanitizers when the change deserves them.
 
 Then one of four things happens, each with one message saying which and why: it merges and the milestone is marked landed; it merges with the milestone left open because gated checks remain; it merges and the maintainer fixes what review found on `main`, with you kept as co-author; or it is closed with the reason and what would make it mergeable.
 

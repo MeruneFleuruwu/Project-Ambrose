@@ -22,7 +22,9 @@ import ci_commit_trailer
 import ci_contrib_paths
 import ci_findings
 import ci_forbidden_files
+import ci_roadmap_state
 import ci_select_legs
+import ci_triage
 import ci_usage
 import ci_vcpkg_cache
 import ready as ready_report
@@ -167,6 +169,16 @@ class SelectLegsTests(unittest.TestCase):
         self.assertEqual(ci_select_legs.plan("pull_request", {"labels": '["CI:Linux-Clang", "Ci: weekly"]'}, now, FakeGit(["src/main.cpp"]))["legs"], ["windows-msvc-x64", "linux-clang", "linux-gcc-asan", "linux-clang-tsan"])
         self.assertEqual(ci_select_legs.plan("pull_request", {"labels": "null"}, now, FakeGit(["src/main.cpp"]))["legs"], [])
         self.assertEqual(ci_select_legs.plan("pull_request", {"labels": "[]"}, now, FakeGit(["apps/ci/ci_build.py"]))["legs"], ["linux-gcc"])
+
+    def test_a_milestone_branch_builds_without_waiting_for_a_label(self):
+        now = at("2026-10-01T00:00:00Z")
+        milestone = ci_select_legs.plan("pull_request", {"labels": "[]", "branch": "milestone/4.04-world-wire-math"}, now, FakeGit(["src/main.cpp"]))
+        self.assertEqual(milestone["legs"], ["linux-gcc"])
+        self.assertEqual(milestone["warnings"], [])
+        self.assertEqual(ci_select_legs.plan("pull_request", {"labels": "[]", "branch": "contrib/C-60-watcher"}, now, FakeGit(["src/main.cpp"]))["legs"], [])
+        self.assertEqual(ci_select_legs.plan("pull_request", {"labels": "[]"}, now, FakeGit(["src/main.cpp"]))["legs"], [])
+        both = ci_select_legs.plan("pull_request", {"labels": '["ci:windows-msvc-x64"]', "branch": "milestone/16.01-file-binary"}, now, FakeGit(["src/main.cpp"]))
+        self.assertEqual(both["legs"], ["windows-msvc-x64", "linux-gcc"])
 
     def test_slot_dates_follow_the_cron_weekday(self):
         self.assertEqual(ci_select_legs.slot_date(ci_select_legs.SUNDAY_CRON, at("2026-10-05T01:00:00Z")), datetime.date(2026, 10, 4))
@@ -584,6 +596,117 @@ class ContributorPathTests(unittest.TestCase):
         self.assertEqual(ci_contrib_paths.check([windows.replace("\\", "/")]), [])
         self.assertEqual(ci_contrib_paths.check([windows]), [windows])
 
+
+
+class RoadmapSummaryTests(unittest.TestCase):
+    def git(self, *args):
+        environment = dict(os.environ, GIT_AUTHOR_NAME="Ambrose Test", GIT_AUTHOR_EMAIL="test@example.com", GIT_COMMITTER_NAME="Ambrose Test", GIT_COMMITTER_EMAIL="test@example.com", GIT_CONFIG_NOSYSTEM="1")
+        result = subprocess.run(["git", "-c", "commit.gpgsign=false", "-c", "core.autocrlf=false", *args], cwd=self.folder, env=environment, capture_output=True, text=True, check=True)
+        return result.stdout.strip()
+
+    def write(self, path, text):
+        full = os.path.join(self.folder, path)
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+        with open(full, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(text)
+        self.git("add", "--", path)
+
+    def commit(self, message):
+        self.git("commit", "-q", "-m", message)
+        return self.git("rev-parse", "HEAD")
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.folder = self.directory.name
+        self.git("init", "-q")
+        self.git("checkout", "-q", "-b", "main")
+        self.write("doc/roadmap/phase-04-a-wizard.md", "## 4.04 World wire math\n\n- [ ] Unit: packing lands within 4 units\n- [ ] Unit: yaw survives a round trip\n")
+        self.write("doc/ROADMAP.md", "## Where we are\n\nPhase 3 is built.\n")
+        self.base = self.commit("the phase file and the summary")
+
+    def tearDown(self):
+        self.directory.cleanup()
+
+    def run_check(self, branch=""):
+        return ci_roadmap_state.main(["--root", self.folder, "--range", f"{self.base}...HEAD", "--branch", branch])
+
+    def test_ticking_a_check_without_saying_so_in_the_summary_is_refused(self):
+        self.write("doc/roadmap/phase-04-a-wizard.md", "## 4.04 World wire math\n\n- [x] Unit: packing lands within 4 units (MovementPackingTest.Packing)\n- [ ] Unit: yaw survives a round trip\n")
+        self.commit("tick one check")
+        self.assertEqual(self.run_check(), 1)
+
+    def test_ticking_a_check_and_updating_the_summary_passes(self):
+        self.write("doc/roadmap/phase-04-a-wizard.md", "## 4.04 World wire math\n\n- [x] Unit: packing lands within 4 units (MovementPackingTest.Packing)\n- [ ] Unit: yaw survives a round trip\n")
+        self.write("doc/ROADMAP.md", "## Where we are\n\nPhase 3 is built, and 4.04 packs positions.\n")
+        self.commit("tick one check and say so")
+        self.assertEqual(self.run_check(), 0)
+
+    def test_a_milestone_branch_is_exempt_because_it_may_not_touch_the_roadmap(self):
+        self.write("doc/roadmap/phase-04-a-wizard.md", "## 4.04 World wire math\n\n- [x] Unit: packing lands within 4 units (MovementPackingTest.Packing)\n- [ ] Unit: yaw survives a round trip\n")
+        self.commit("tick one check on a contributor's branch")
+        self.assertEqual(self.run_check("milestone/4.04-world-wire-math"), 0)
+        self.assertEqual(self.run_check("contrib/C-60-watcher"), 1)
+
+    def test_a_change_that_ticks_nothing_is_not_asked_for_a_summary(self):
+        self.write("src/main.cpp", "int main() {}\n")
+        self.commit("code only")
+        self.assertEqual(self.run_check(), 0)
+
+    def test_unticking_a_check_is_not_mistaken_for_ticking_one(self):
+        self.write("doc/roadmap/phase-04-a-wizard.md", "## 4.04 World wire math\n\n- [ ] Unit: packing lands within 4 units\n")
+        self.commit("drop a check")
+        self.assertEqual(self.run_check(), 0)
+
+    def test_a_range_that_cannot_be_diffed_checks_nothing(self):
+        self.assertEqual(ci_roadmap_state.main(["--root", self.folder, "--range", "f" * 40 + "...HEAD"]), 0)
+
+    def test_the_decision_is_made_on_what_changed(self):
+        self.assertEqual(ci_roadmap_state.problems(["- [x] a"], ["doc/roadmap/phase-04-x.md"], ""),
+                         ["1 acceptance check(s) were ticked, but doc/ROADMAP.md was not updated in the same change"])
+        self.assertEqual(ci_roadmap_state.problems(["- [x] a"], ["doc/roadmap/phase-04-x.md", "doc/ROADMAP.md"], ""), [])
+        self.assertEqual(ci_roadmap_state.problems([], ["doc/ROADMAP.md"], ""), [])
+        self.assertEqual(ci_roadmap_state.problems(["- [x] a"], [], "milestone/4.04-x"), [])
+
+
+class TriageTests(unittest.TestCase):
+    def test_a_milestone_branch_is_labelled_by_its_name(self):
+        self.assertEqual(ci_triage.labels_for("milestone/4.04-world-wire-math", ["src/server/game/Movement/MovementPacking.cpp"]), ["milestone-track"])
+        self.assertEqual(ci_triage.labels_for("milestone/16.01", []), ["milestone-track"])
+
+    def test_a_change_inside_the_contributor_track_is_labelled_by_its_paths(self):
+        self.assertEqual(ci_triage.labels_for("my-branch", ["contrib/tools/watcher/README.md", "doc/guides/arch.md"]), ["contrib"])
+        self.assertEqual(ci_triage.labels_for("my-branch", ["data/fuzz/seeds/one.bin"]), ["contrib"])
+
+    def test_anything_mixed_or_unknown_is_left_for_a_person(self):
+        self.assertEqual(ci_triage.labels_for("my-branch", ["contrib/notes/a.md", "src/main.cpp"]), [])
+        self.assertEqual(ci_triage.labels_for("my-branch", ["src/main.cpp"]), [])
+        self.assertEqual(ci_triage.labels_for("my-branch", []), [])
+        self.assertEqual(ci_triage.labels_for("", ["README.md"]), [])
+
+    def test_only_a_newcomer_on_a_known_track_is_greeted(self):
+        self.assertIn("doc/MILESTONE-TRACK.md", ci_triage.welcome_for(["milestone-track"], "FIRST_TIME_CONTRIBUTOR"))
+        self.assertIn("doc/CONTRIBUTOR-TRACK.md", ci_triage.welcome_for(["contrib"], "NONE"))
+        self.assertIsNone(ci_triage.welcome_for(["milestone-track"], "CONTRIBUTOR"))
+        self.assertIsNone(ci_triage.welcome_for(["milestone-track"], "MEMBER"))
+        self.assertIsNone(ci_triage.welcome_for([], "FIRST_TIME_CONTRIBUTOR"))
+
+    def test_the_greeting_says_what_decides_the_outcome(self):
+        milestone = ci_triage.welcome_for(["milestone-track"], "NONE")
+        self.assertIn("unticked", milestone)
+        self.assertIn("discord.gg", milestone)
+        self.assertIn("discord.gg", ci_triage.welcome_for(["contrib"], "NONE"))
+
+    def test_it_does_nothing_without_a_pull_request_or_a_token(self):
+        with mock.patch.dict(os.environ, {"GITHUB_TOKEN": ""}, clear=False):
+            self.assertEqual(ci_triage.main(["--repository", "a/b", "--number", "0"]), 0)
+            self.assertEqual(ci_triage.main(["--repository", "", "--number", "4"]), 0)
+            self.assertEqual(ci_triage.main(["--repository", "a/b", "--number", "4", "--branch", "milestone/4.04-x"]), 0)
+
+    def test_the_contributor_prefixes_are_ones_the_path_check_allows(self):
+        for prefix in ci_triage.CONTRIB_PREFIXES:
+            if prefix == "contrib/":
+                continue
+            self.assertEqual(ci_contrib_paths.check([prefix + "a-file"]), [], prefix)
 
 
 class MilestoneTrackTests(unittest.TestCase):

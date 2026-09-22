@@ -47,6 +47,17 @@ doc/MILESTONE-TRACK.md is the contributor's side of this. A milestone pull reque
 9. **The phase's review notes** that name the milestone are resolved, in the code or in the description.
 10. **Merge, then finish it on main.** Squash with subject `<id>: <what landed>`, the contributor's `Co-Authored-By`, and `Contributed on the milestone track.` in the body. Then on main, in one commit: move the row to "Landed" or "In flight", update doc/ROADMAP.md's "Where we are" to say what is now built, and regenerate the card with `python apps/progress/progress.py`, which is why those files are kept off a milestone branch. `python apps/progress/ready.py` then says what the merge opened up.
 
+## What is automated, so it is not done by hand
+
+None of this replaces a review. It removes the steps that were only ever bookkeeping.
+
+- **A pull request sorts itself.** `.github/workflows/triage.yml` labels it `milestone-track` from its branch name, or `contrib` when every path it changes is inside the track, and greets a first-time contributor once with the document their track is described in. It runs this repository's own code against the pull request's metadata, never the contributor's, which is why it may use `pull_request_target` safely. A mixed or unrecognised pull request is left unlabelled on purpose, because that is a decision.
+- **A milestone branch builds itself.** `ci_select_legs.py` adds the Linux GCC leg for any branch named `milestone/<id>`, so a milestone pull request compiles without waiting for a label. Fork runs still need approval for a first-time contributor. Add `ci:windows-msvc-x64` or `ci:all` by hand when the change deserves more.
+- **The summary cannot be forgotten.** `ci_roadmap_state.py` fails a push or pull request that ticks acceptance checks without updating doc/ROADMAP.md's "Where we are" in the same change. A milestone branch is exempt, because the roadmap is a file it may not touch, which leaves that update where it belongs, in the commit that finishes the merge. core-build now also runs on a push to main that touches the roadmap, so the progress card cannot go stale there either.
+- **Discord keeps two messages, never a thread of them.** `progress.yml` edits the progress card when the generated numbers change, and `openings.yml` edits the list of open milestones when doc/MILESTONE-TRACK.md changes. Each remembers its message id on its own state branch, `progress-state` and `openings-state`, and falls back to the id committed on main. Neither posts anything when the repository has no webhook secret.
+- **Dependabot proposes one grouped update a month** for the workflow actions and for the front-end workspace, and never a major version, which is a decision rather than an update.
+- **The relay reports more than pull requests.** The webhook that pushes events to the session now also carries issues, comments, reviews and a pull request whose checks failed, so a contributor stuck on a red check is answered without waiting for the next sweep.
+
 ## Traps met so far
 
 - Two loops that both `git checkout` in the same worktree corrupt each other. Build tools in a background loop or read files with `git show prN:path`, never both at once.

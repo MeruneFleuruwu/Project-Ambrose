@@ -5,7 +5,7 @@ name: core-build
 on:
   push:
     branches: [main]
-    paths: [".github/**", "apps/ci/**", "apps/designtokens/**", "apps/progress/**", "design/**", "vcpkg.json"]
+    paths: [".github/**", "apps/ci/**", "apps/designtokens/**", "apps/progress/**", "design/**", "doc/ROADMAP.md", "doc/roadmap/**", "vcpkg.json"]
   pull_request:
     types: [opened, synchronize, reopened, labeled]
   schedule:
@@ -90,6 +90,12 @@ jobs:
         env:
           PR_BRANCH: ${{ github.head_ref }}
         run: python apps/ci/ci_contrib_paths.py --range ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} --branch "$PR_BRANCH"
+      - name: Roadmap summary
+        if: ${{ !cancelled() && (github.event_name == 'pull_request' || github.event_name == 'push') }}
+        env:
+          PR_BRANCH: ${{ github.head_ref }}
+          CHECK_RANGE: ${{ github.event_name == 'pull_request' && format('{0}...{1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha) || format('{0}..{1}', github.event.before, github.sha) }}
+        run: python apps/ci/ci_roadmap_state.py --range "$CHECK_RANGE" --branch "$PR_BRANCH"
       - name: Commit trailers
         if: ${{ !cancelled() }}
         env:
@@ -107,6 +113,7 @@ jobs:
           SCHEDULE: ${{ github.event.schedule }}
           DISPATCH_LEGS: ${{ inputs.legs }}
           PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          PR_BRANCH: ${{ github.head_ref }}
           PR_BASE: ${{ github.event.pull_request.base.sha }}
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
           PUSH_BEFORE: ${{ github.event.before }}

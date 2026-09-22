@@ -8,6 +8,9 @@ contact_links:
   - name: Pick up contributor work
     url: https://github.com/Justchicoo/Project-Ambrose/blob/main/doc/CONTRIBUTOR-TRACK.md
     about: The open items, with what each one needs and how it is proven.
+  - name: Build a roadmap milestone
+    url: https://github.com/Justchicoo/Project-Ambrose/blob/main/doc/MILESTONE-TRACK.md
+    about: The milestones open to outside help, what finishing one means, and how one is claimed.
   - name: Report a security problem privately
     url: https://github.com/Justchicoo/Project-Ambrose/security/advisories/new
     about: Never in a public issue.

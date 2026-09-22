@@ -88,7 +88,7 @@ ctest --preset windows-debug
 
 On Linux the presets are `linux-gcc` and `linux-gcc-debug`, and `doc/guides/linux.md` is a walked guide. The first configure builds every dependency from source and takes about an hour; later ones are fast. A login server also needs a MySQL or MariaDB it can reach, the default being `127.0.0.1;3306;ambrose;ambrose;ambrose_login`, and `dbimport` creates the databases.
 
-The build is warnings-as-errors on both compilers, and MSVC and GCC disagree about what is a warning. If I can only build on one platform, say so in the pull request; the maintainer runs the other leg in CI, which a maintainer turns on for the branch with a `ci:` label.
+The build is warnings-as-errors on both compilers, and MSVC and GCC disagree about what is a warning. If I can only build on one platform, say so in the pull request. A branch named `milestone/<id>-<short-name>` builds the Linux GCC leg in CI by itself, so an open pull request tells us both whether it compiles there, and the maintainer adds a label for the Windows leg when it is worth one. The first run from a new contributor waits for a maintainer to approve it.
 
 ## Before the pull request
 
