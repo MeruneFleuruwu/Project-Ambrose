@@ -27,6 +27,7 @@ export { default as AppShell } from "./components/AppShell.svelte";
 export { default as SideNav } from "./components/SideNav.svelte";
 
 export { default as StateDot } from "./components/StateDot.svelte";
+export { default as LiveDot } from "./components/LiveDot.svelte";
 export { default as Badge } from "./components/Badge.svelte";
 export { default as ProgressBar } from "./components/ProgressBar.svelte";
 export { default as StepList } from "./components/StepList.svelte";

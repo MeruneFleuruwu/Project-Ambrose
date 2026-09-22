@@ -1,0 +1,106 @@
+/*
+ * Project Ambrose by Imjustchico
+ * Made-up figures the pages show until 17.06 reads them from the admin API: three apps, a realm, players, accounts, log lines and panel users, shaped like the answers the real routes give.
+ */
+
+export type AppState = "healthy" | "waiting" | "wrong" | "unknown";
+
+export type SampleApp = {
+    name: string;
+    role: string;
+    realm: string;
+    address: string;
+    port: number;
+    state: AppState;
+    word: string;
+    uptime: string;
+    revision: string;
+    sessions: number | null;
+    players: number | null;
+    limit: number | null;
+    tickAverage: number | null;
+    tickMax: number | null;
+    age: string;
+    stale: boolean;
+    badges: { tone: "healthy" | "waiting" | "wrong" | "neutral"; text: string }[];
+    problems: { code: string; message: string; fix: string; fixLabel: string }[];
+    ticks: number[];
+};
+
+export const apps: SampleApp[] = [
+    {
+        name: "loginserver", role: "login", realm: "", address: "127.0.0.1", port: 12000,
+        state: "healthy", word: "Online", uptime: "2 d 4 h", revision: "573f769",
+        sessions: 14, players: null, limit: null, tickAverage: null, tickMax: null,
+        age: "1 s ago", stale: false, badges: [], problems: [], ticks: [],
+    },
+    {
+        name: "gameserver", role: "game", realm: "Ambrose", address: "127.0.0.1", port: 12001,
+        state: "waiting", word: "Needs attention", uptime: "6 h 12 min", revision: "573f769",
+        sessions: 9, players: 9, limit: 500, tickAverage: 3.4, tickMax: 11.8,
+        age: "2 s ago", stale: false,
+        badges: [{ tone: "waiting", text: "Pending SQL updates" }, { tone: "wrong", text: "1 problem" }],
+        problems: [{ code: "type_dump_stale", message: "The type dump was built from an older client revision.", fix: "client", fixLabel: "Open client data" }],
+        ticks: [3.1, 3.3, 3.0, 3.8, 4.2, 3.4, 3.2, 11.8, 3.5, 3.3, 3.1, 3.4],
+    },
+    {
+        name: "patchserver", role: "patch", realm: "", address: "127.0.0.1", port: 12500,
+        state: "unknown", word: "Offline", uptime: "", revision: "573f769",
+        sessions: null, players: null, limit: null, tickAverage: null, tickMax: null,
+        age: "4 min ago", stale: true, badges: [{ tone: "neutral", text: "Stopped" }], problems: [], ticks: [],
+    },
+];
+
+export const players = [
+    { name: "Ember Stormweaver", level: "34", school: "Fire", zone: "Wizard City: Ravenwood", session: "1 h 12 min", realm: "Ambrose" },
+    { name: "Talon Frostblade", level: "12", school: "Ice", zone: "Wizard City: Unicorn Way", session: "22 min", realm: "Ambrose" },
+    { name: "Nova Lifespring", level: "50", school: "Life", zone: "Krokotopia: Pyramid of the Sun", session: "3 h 4 min", realm: "Ambrose" },
+    { name: "Quinn Deathwhisper", level: "7", school: "Death", zone: "Wizard City: Golem Court", session: "9 min", realm: "Ambrose" },
+];
+
+export const accounts = [
+    { username: "ember", created: "2026-09-01", lastSeen: "now", level: "Player", state: "Active" },
+    { username: "talon", created: "2026-09-10", lastSeen: "now", level: "Player", state: "Active" },
+    { username: "moderator1", created: "2026-08-20", lastSeen: "yesterday", level: "Moderator", state: "Active" },
+    { username: "spammer42", created: "2026-09-19", lastSeen: "3 days ago", level: "Player", state: "Banned until 2026-10-19" },
+];
+
+export const realms = [
+    { name: "Ambrose", address: "127.0.0.1:12001", flags: "Recommended", population: "9 / 500", heartbeat: "2 s ago", zones: "14" },
+    { name: "Ambrose Test", address: "127.0.0.1:12011", flags: "Test, offline", population: "0 / 50", heartbeat: "4 min ago", zones: "0" },
+];
+
+export const panelUsers = [
+    { name: "Imjustchico", role: "Owner", twoFactor: "On", lastSignIn: "now" },
+    { name: "helper", role: "Operator", twoFactor: "On", lastSignIn: "2 h ago" },
+];
+
+export const backups = [
+    { name: "nightly-2026-09-22", taken: "2026-09-22 03:00", size: "182 MB", verified: "Verified", kept: "7 days" },
+    { name: "nightly-2026-09-21", taken: "2026-09-21 03:00", size: "181 MB", verified: "Verified", kept: "7 days" },
+    { name: "before-update-573f769", taken: "2026-09-21 18:40", size: "181 MB", verified: "Verified", kept: "Pinned" },
+];
+
+export const activity = [
+    { when: "09:12", who: "Imjustchico", what: "Restarted gameserver", where: "gameserver" },
+    { when: "08:55", who: "helper", what: "Banned spammer42 for 30 days: spam in chat", where: "Accounts" },
+    { when: "08:40", who: "Imjustchico", what: "Changed Realm.PlayerLimit from 400 to 500", where: "Settings" },
+];
+
+const levels = ["info", "info", "info", "debug", "warn", "info", "error", "info"] as const;
+const lines = [
+    ["server", "gameserver started in 1.8 s"],
+    ["network", "Accepted 127.0.0.1:53122"],
+    ["login", "Account ember signed in"],
+    ["zone", "Loaded WizardCity/WC_Ravenwood with 38 objects"],
+    ["database", "Pending SQL update 2026_09_21_00_world.sql"],
+    ["commands.console", "Console: account set password (arguments hidden)"],
+    ["client", "The type dump was built from r801440, the install is r806919"],
+    ["login", "Account talon signed in"],
+] as const;
+
+export const logRecords = Array.from({ length: 40 }, (_, index) => {
+    const line = lines[index % lines.length];
+    const seconds = String(index % 60).padStart(2, "0");
+    return { sequence: 1000 + index, time: `2026-09-22 09:12:${seconds}`, level: levels[index % levels.length], category: line[0], message: line[1] };
+});
