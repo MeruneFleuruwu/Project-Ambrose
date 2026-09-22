@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Runs the admin API on Crow: it resolves the token, tells every route whose socket is still open when the listener stops and detaches the handle first so nothing reaches a connection Crow has let go, refuses a bind the remote-access rule forbids, says out loud what a bind it allows still costs, proves no other socket holds the address before Crow takes it, answers every request from the shared table in a middleware that runs before Crow's own routing, with the host, origin, cookie and CSRF headers a browser session is checked by, answers from the same table again after it the requests Crow replies to before a connection has an address of its own, such as OPTIONS, hands only a real WebSocket upgrade to the route registered for it under the same host check and authentication, serves the built panel and its sign-in, which trades the token once for a session cookie named after the port because cookies ignore ports, logs every error with its request id, gives each open socket a handle a route may keep and write to from any thread until the socket closes, queues a close behind the frames sent before it, and on a reload rotates the token live and ends every session with the old one, applies the panel folder, allowed hosts and session lifetimes without rebinding, rebinds a changed address, or brings the old listener back when the new one cannot bind.
+ * Runs the admin API on Crow: it resolves the token, tells every route whose socket is still open when the listener stops and detaches the handle first so nothing reaches a connection Crow has let go, refuses a bind the remote-access rule forbids, says out loud what a bind it allows still costs, proves no other socket holds the address before Crow takes it, answers every request from the shared table in a middleware that runs before Crow's own routing, with the host, origin, cookie and CSRF headers a browser session is checked by, answers from the same table again after it the requests Crow replies to before a connection has an address of its own, such as OPTIONS, hands only a real WebSocket upgrade to the route registered for it under the same host check and authentication, serves the built panel and its sign-in, which trades the token once for a session cookie named after the port because cookies ignore ports, logs every error with its request id, gives each open socket a handle a route may keep and write to from any thread until the socket closes, owning every socket's binding in the listener so one Crow drops without a close is still freed, queues a close behind the frames sent before it, and on a reload rotates the token live and ends every session with the old one, applies the panel folder, allowed hosts and session lifetimes without rebinding, rebinds a changed address, or brings the old listener back when the new one cannot bind.
  */
 
 #include "AdminServer.h"
@@ -19,6 +19,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <future>
@@ -124,27 +125,42 @@ namespace
     class OpenSockets
     {
     public:
-        void Add(AdminSocketRoute const* route, std::shared_ptr<CrowAdminSocket> socket)
+        SocketBinding* Accept(AdminSocketRoute const* route)
         {
             std::lock_guard const lock(_mutex);
-            _open.emplace_back(route, std::move(socket));
+            return _bindings.emplace_back(std::make_unique<SocketBinding>(SocketBinding{ route, nullptr })).get();
         }
 
-        void Remove(CrowAdminSocket const* socket)
+        std::shared_ptr<CrowAdminSocket> Open(SocketBinding* binding, crow::websocket::connection& connection)
         {
             std::lock_guard const lock(_mutex);
-            std::erase_if(_open, [socket](std::pair<AdminSocketRoute const*, std::shared_ptr<CrowAdminSocket>> const& entry) { return entry.second.get() == socket; });
+            if (std::ranges::none_of(_bindings, [binding](std::unique_ptr<SocketBinding> const& held) { return held.get() == binding; }))
+                return nullptr;
+            binding->Socket = std::make_shared<CrowAdminSocket>(connection);
+            binding->Socket->Bind(binding->Socket);
+            return binding->Socket;
         }
 
-        std::vector<std::pair<AdminSocketRoute const*, std::shared_ptr<CrowAdminSocket>>> TakeAll()
+        std::unique_ptr<SocketBinding> Release(SocketBinding const* binding)
         {
             std::lock_guard const lock(_mutex);
-            return std::exchange(_open, {});
+            auto const found = std::ranges::find_if(_bindings, [binding](std::unique_ptr<SocketBinding> const& held) { return held.get() == binding; });
+            if (found == _bindings.end())
+                return nullptr;
+            std::unique_ptr<SocketBinding> released = std::move(*found);
+            _bindings.erase(found);
+            return released;
+        }
+
+        std::vector<std::unique_ptr<SocketBinding>> TakeAll()
+        {
+            std::lock_guard const lock(_mutex);
+            return std::exchange(_bindings, {});
         }
 
     private:
         std::mutex _mutex;
-        std::vector<std::pair<AdminSocketRoute const*, std::shared_ptr<CrowAdminSocket>>> _open;
+        std::vector<std::unique_ptr<SocketBinding>> _bindings;
     };
 
     AdminRequest ToAdminRequest(crow::request const& request)
@@ -610,7 +626,7 @@ bool AdminServer::Open(AdminSettings const& settings, std::string const& token, 
     {
         listener->App.route_dynamic(pattern).template websocket<AdminApp>(&listener->App)
             .max_payload(settings.MaxRequestBytes)
-            .onaccept([this](crow::request const& request, std::optional<crow::response>& refusal, void** userdata)
+            .onaccept([this, open = listener->Open](crow::request const& request, std::optional<crow::response>& refusal, void** userdata)
             {
                 AdminRequest incoming = ToAdminRequest(request);
                 incoming.Upgrade = true;
@@ -637,18 +653,16 @@ bool AdminServer::Open(AdminSettings const& settings, std::string const& token, 
                     refuse(AdminResponse::Problem(404, "not_found", "The admin API has no WebSocket on " + incoming.Path));
                     return;
                 }
-                *userdata = new SocketBinding{ route, nullptr };
+                *userdata = open->Accept(route);
             })
             .onopen([open = listener->Open](crow::websocket::connection& connection)
             {
                 SocketBinding* const binding = BindingOf(connection);
                 if (!binding)
                     return;
-                binding->Socket = std::make_shared<CrowAdminSocket>(connection);
-                binding->Socket->Bind(binding->Socket);
-                open->Add(binding->Route, binding->Socket);
-                if (binding->Route && binding->Route->Opened)
-                    binding->Route->Opened(*binding->Socket);
+                std::shared_ptr<CrowAdminSocket> const socket = open->Open(binding, connection);
+                if (socket && binding->Route && binding->Route->Opened)
+                    binding->Route->Opened(*socket);
             })
             .onmessage([](crow::websocket::connection& connection, std::string const& message, bool binary)
             {
@@ -659,13 +673,12 @@ bool AdminServer::Open(AdminSettings const& settings, std::string const& token, 
             })
             .onclose([open = listener->Open](crow::websocket::connection& connection, std::string const& reason, uint16_t code)
             {
-                std::unique_ptr<SocketBinding> const binding(BindingOf(connection));
+                std::unique_ptr<SocketBinding> const binding = open->Release(BindingOf(connection));
                 connection.userdata(nullptr);
                 if (!binding)
                     return;
                 std::shared_ptr<CrowAdminSocket> const socket = binding->Socket ? binding->Socket : std::make_shared<CrowAdminSocket>(connection);
-                open->Remove(socket.get());
-                if (binding->Route && binding->Route->Closed)
+                if (binding->Socket && binding->Route && binding->Route->Closed)
                     binding->Route->Closed(*socket, reason, static_cast<uint16>(code));
                 socket->Detach();
             });
@@ -720,11 +733,13 @@ void AdminServer::Close()
         _listener->App.stop();
         if (_listener->Worker.valid())
             _listener->Worker.wait();
-        for (auto const& [route, socket] : _listener->Open->TakeAll())
+        for (std::unique_ptr<SocketBinding> const& binding : _listener->Open->TakeAll())
         {
-            socket->Detach();
-            if (route && route->Closed)
-                route->Closed(*socket, "the admin API listener stopped", 1001);
+            if (!binding->Socket)
+                continue;
+            binding->Socket->Detach();
+            if (binding->Route && binding->Route->Closed)
+                binding->Route->Closed(*binding->Socket, "the admin API listener stopped", 1001);
         }
         _listener.reset();
     }
