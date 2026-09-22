@@ -164,7 +164,7 @@
                     <div class={opened === record.sequence ? "bg-muted/60" : ""}>
                         <button
                             type="button"
-                            class={`grid w-full grid-cols-[12ch_6ch_minmax(0,1fr)] gap-x-[1ch] px-4 text-left hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:outline-none md:grid-cols-[12ch_6ch_20ch_minmax(0,1fr)] ${quiet ? "text-muted-foreground" : "text-foreground"}`}
+                            class={`grid w-full grid-cols-[12ch_6ch_minmax(0,1fr)] gap-x-2 px-4 text-left hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:outline-none md:grid-cols-[12ch_6ch_20ch_minmax(0,1fr)] ${quiet ? "text-muted-foreground" : "text-foreground"}`}
                             aria-expanded={opened === record.sequence}
                             onclick={() => toggle(record.sequence)}
                         >
@@ -178,10 +178,7 @@
                             >
                         </button>
                         {#if opened === record.sequence}
-                            <div
-                                id={`record-${record.sequence}`}
-                                class="mx-4 mb-2 rounded-md border bg-card p-3 font-sans md:ml-[calc(19ch+1rem)]"
-                            >
+                            <div id={`record-${record.sequence}`} class="mx-4 mb-2 rounded-md border bg-card p-3 font-sans md:ml-40">
                                 <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-xs">
                                     <dt class="text-muted-foreground">Sequence</dt>
                                     <dd class="font-mono">{record.sequence}</dd>
@@ -244,7 +241,7 @@
                 {#each order as level (level)}
                     <ToggleGroup.Item value={level} class="gap-1.5 px-2.5">
                         <span class={`size-1.5 rounded-full ${dots[level]}`}></span>{level}
-                        <span class="font-mono text-[11px] tabular-nums opacity-70">{counts[level]}</span>
+                        <span class="font-mono text-xs tabular-nums opacity-70">{counts[level]}</span>
                     </ToggleGroup.Item>
                 {/each}
             </ToggleGroup.Root>
@@ -254,7 +251,7 @@
                         <Button variant="outline" size="sm" {...props}>
                             <ListFilterIcon />Categories
                             {#if hidden.length > 0}
-                                <span class="font-mono text-[11px] tabular-nums opacity-70"
+                                <span class="font-mono text-xs tabular-nums opacity-70"
                                     >{categories.length - hidden.length}/{categories.length}</span
                                 >
                             {/if}

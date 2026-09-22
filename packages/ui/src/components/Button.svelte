@@ -40,8 +40,8 @@
     }: Props = $props();
 
     const looks: Record<string, string> = {
-        action: "bg-fill-action text-on-fill font-semibold shadow-[0_1px_0_0_rgb(255_255_255/0.18)_inset,0_1px_2px_0_rgb(0_0_0/0.35)] ring-1 ring-inset ring-black/10 hover:brightness-110 active:bg-fill-action-pressed active:brightness-100",
-        quiet: "bg-surface-card text-fg-body font-medium ring-1 ring-inset ring-edge-strong/70 shadow-[0_1px_2px_0_rgb(0_0_0/0.25)] hover:bg-surface-sunken hover:ring-action/50",
+        action: "ambrose-inset bg-fill-action text-on-fill font-semibold ring-1 ring-inset ring-fill-action-pressed hover:brightness-110 active:bg-fill-action-pressed active:brightness-100",
+        quiet: "bg-surface-card text-fg-body font-medium ring-1 ring-inset ring-edge-strong/70 hover:bg-surface-sunken hover:ring-action/50",
         danger: "bg-state-wrong/10 text-state-wrong font-medium ring-1 ring-inset ring-state-wrong/30 hover:bg-state-wrong/20",
         ghost: "text-fg-muted font-medium hover:bg-fg-muted/10 hover:text-fg-body",
     };

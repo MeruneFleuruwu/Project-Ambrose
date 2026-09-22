@@ -9,7 +9,7 @@ import sys
 
 SOURCE_ROOTS = ("packages/ui/src", "apps/dashboard/src", "apps/launcherui/src")
 COMPONENT_ROOT = "packages/ui/src"
-GENERATED = ("packages/ui/src/tokens/tokens.css", "packages/ui/src/tokens/tokens.ts", "packages/ui/src/icons/icons.ts")
+GENERATED = ("packages/ui/src/tokens/tokens.css", "packages/ui/src/tokens/variables.css", "packages/ui/src/tokens/tokens.ts", "packages/ui/src/icons/icons.ts")
 SKIP_FOLDERS = ("packages/ui/src/fonts", "packages/ui/src/canary")
 BUNDLES = ("apps/dashboard/dist", "apps/launcherui/dist")
 ALLOW_FILE = "apps/ci/ci_frontend_allow.json"

@@ -295,7 +295,8 @@
     }
 
     .view[aria-pressed="true"] {
-        background: color-mix(in srgb, var(--ambrose-color-fg-body) 10%, transparent);
+        border-color: var(--ambrose-color-edge-strong);
+        background: var(--ambrose-color-surface-sunken);
         color: var(--ambrose-color-fg-body);
     }
 

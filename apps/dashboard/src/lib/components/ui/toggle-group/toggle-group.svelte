@@ -63,9 +63,9 @@
     data-variant={variant}
     data-size={size}
     data-spacing={spacing}
-    style={`--gap: ${spacing}`}
+    style={`gap: calc(var(--spacing) * ${spacing})`}
     class={cn(
-        "rounded-lg data-[size=sm]:rounded-[min(var(--radius-md),10px)] group/toggle-group flex w-fit flex-row items-center gap-[--spacing(var(--gap))] data-vertical:flex-col data-vertical:items-stretch",
+        "rounded-lg data-[size=sm]:rounded-md group/toggle-group flex w-fit flex-row items-center data-vertical:flex-col data-vertical:items-stretch",
         className,
     )}
     {...restProps}

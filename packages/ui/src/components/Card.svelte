@@ -22,10 +22,7 @@
 <section
     {id}
     aria-labelledby={title ? titleId : undefined}
-    class={classes(
-        "flex flex-col rounded-card border border-edge-quiet bg-surface-card shadow-[0_1px_0_0_rgb(255_255_255/0.04)_inset,0_8px_24px_-12px_rgb(0_0_0/0.45)]",
-        extra,
-    )}
+    class={classes("flex flex-col rounded-card border border-edge-quiet bg-surface-card", extra)}
 >
     {#if title || actions}
         <header class="flex min-h-44 items-center justify-between gap-16 border-b border-edge-quiet px-16 py-10">
