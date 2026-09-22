@@ -111,7 +111,7 @@ bool Ambrose::IsInteractiveTerminal()
 #endif
 }
 
-std::filesystem::path Ambrose::GetExecutableDirectory()
+std::filesystem::path Ambrose::GetExecutablePath()
 {
 #ifdef _WIN32
     std::wstring buffer(260, L'\0');
@@ -119,7 +119,7 @@ std::filesystem::path Ambrose::GetExecutableDirectory()
     {
         DWORD const length = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
         if (length == 0)
-            return std::filesystem::current_path();
+            return {};
         if (length < buffer.size())
         {
             buffer.resize(length);
@@ -127,12 +127,18 @@ std::filesystem::path Ambrose::GetExecutableDirectory()
         }
         buffer.resize(buffer.size() * 2);
     }
-    return std::filesystem::path(buffer).parent_path();
+    return std::filesystem::path(buffer);
 #else
     std::error_code error;
-    std::filesystem::path const executable = std::filesystem::read_symlink("/proc/self/exe", error);
+    std::filesystem::path executable = std::filesystem::read_symlink("/proc/self/exe", error);
     if (error)
-        return std::filesystem::current_path();
-    return executable.parent_path();
+        return {};
+    return executable;
 #endif
+}
+
+std::filesystem::path Ambrose::GetExecutableDirectory()
+{
+    std::filesystem::path const executable = GetExecutablePath();
+    return executable.empty() ? std::filesystem::current_path() : executable.parent_path();
 }

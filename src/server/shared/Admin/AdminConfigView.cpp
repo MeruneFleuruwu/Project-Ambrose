@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Builds the settings answer from the config's own layers: every loaded key in order with its effective and shipped values, where each was read, the restart reason the app declared for it or none, and the secrets masked the same way the log stream masks them.
+ * Builds the settings answer from the config's own layers: every loaded key in order with its effective and shipped values, where each was read, the restart reason the app declared for it, which may be declared for every key under a prefix ending in a star, or none, and the secrets masked the same way the log stream masks them.
  */
 
 #include "AdminConfigView.h"
@@ -52,7 +52,13 @@ std::string AdminConfigView::SettingsJson(ConfigMgr const& config, std::span<Res
             entry["default_file"] = nullptr;
         }
         entry["secret"] = secret;
-        auto const restart = std::ranges::find(restartRequired, std::string_view(key), &RestartRequiredOption::Key);
+        auto const restart = std::ranges::find_if(restartRequired, [&key](RestartRequiredOption const& option)
+        {
+            if (!option.Key.ends_with('*'))
+                return option.Key == key;
+            std::string_view const prefix = option.Key.substr(0, option.Key.size() - 1);
+            return std::string_view(key).starts_with(prefix);
+        });
         entry["restart_reason"] = restart == restartRequired.end() ? nlohmann::json(nullptr) : nlohmann::json(std::string(restart->Reason));
         settings.push_back(std::move(entry));
     }

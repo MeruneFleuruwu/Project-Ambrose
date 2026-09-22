@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * The admin API's route table and front door: every request gets a request id that its answer and any error body carry, a host that is no IP address, localhost or a name the operator allows is refused so a page elsewhere cannot rebind a name onto this listener, paths outside /api go to the panel's files without a token, public routes such as signing in run without one, and every other path needs the bearer token or a browser session whose unsafe requests and socket upgrades name this listener's own origin and carry the session's CSRF token, with every answer stamped with the panel's security headers and every error handed to a log.
+ * The admin API's route table and front door: every request gets a request id that its answer and any error body carry, keeping one a caller such as the supervisor sent when it has the same form, so one id names the request in both logs, a host that is no IP address, localhost or a name the operator allows is refused so a page elsewhere cannot rebind a name onto this listener, paths outside /api go to the panel's files without a token, public routes such as signing in run without one, a route may answer every path under a prefix when no exact route claims it, the longest prefix first, and every other path needs the bearer token or a browser session whose unsafe requests and socket upgrades name this listener's own origin and carry the session's CSRF token, with every answer stamped with the panel's security headers and every error handed to a log.
  */
 
 #ifndef AMBROSE_ADMINROUTER_H
@@ -72,6 +72,7 @@ public:
 
     void Add(std::string method, std::string path, Handler handler);
     void AddPublic(std::string method, std::string path, Handler handler);
+    void AddPrefix(std::string method, std::string prefix, Handler handler);
     void SetFiles(Handler files);
     void SetAllowedHosts(std::vector<std::string> names);
     void SetBrowserAccess(AdminBrowserAccess access);
@@ -90,6 +91,7 @@ public:
     static AdminResponse Refused(AdminAuthResult result);
     static AdminResponse HostRefused(std::string_view host);
     static std::string NewRequestId();
+    static bool IsRequestId(std::string_view text) noexcept;
     static std::string HostName(std::string_view host);
 
 private:
@@ -99,11 +101,12 @@ private:
         std::string Path;
         Handler Run;
         bool Public = false;
+        bool Prefix = false;
     };
 
     AdminResponse Answer(AdminRequest& request) const;
     AdminResponse Serve(AdminRequest const& request) const;
-    void Put(std::string method, std::string path, Handler handler, bool isPublic);
+    void Put(std::string method, std::string path, Handler handler, bool isPublic, bool prefix = false);
 
     AdminAuth& _auth;
     std::atomic<std::size_t> _maxBodyBytes{ 0 };

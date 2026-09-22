@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Tests the settings answer and the shutdown route: every loaded key with its effective value, shipped default, layer, file and line, secrets masked in both values, restart reasons only on the keys an app declares, and POST /api/shutdown refusing bad bodies field by field, scheduling and cancelling a countdown, and stopping the app.
+ * Tests the settings answer and the shutdown route: every loaded key with its effective value, shipped default, layer, file and line, secrets masked in both values, restart reasons only on the keys an app declares, one by name and one for every key under a prefix, and POST /api/shutdown refusing bad bodies field by field, scheduling and cancelling a countdown, and stopping the app.
  */
 
 #include "AdminConfigView.h"
@@ -150,7 +150,7 @@ TEST(AdminConfigViewTest, EachKeyShowsItsValueDefaultLayerAndSourceWithSecretsMa
     ConfigMgr config([](std::string const& name) { return name == "AMBROSE_WORLD_UPDATE_INTERVAL" ? std::optional<std::string>("100") : std::nullopt; });
     ASSERT_TRUE(config.LoadInitial(file, {}, { { "Admin.Token", "fedcba9876543210fedcba9876543210" } }).Succeeded());
 
-    std::array<RestartRequiredOption, 1> const restart{ { { "World.UpdateInterval", "the tick starts with the app" } } };
+    std::array<RestartRequiredOption, 2> const restart{ { { "World.UpdateInterval", "the tick starts with the app" }, { "Extra.*", "everything extra is read once" } } };
     std::string const text = AdminConfigView::SettingsJson(config, restart);
     EXPECT_EQ(text.find("distpass"), std::string::npos);
     EXPECT_EQ(text.find("localpass"), std::string::npos);
@@ -190,6 +190,7 @@ TEST(AdminConfigViewTest, EachKeyShowsItsValueDefaultLayerAndSourceWithSecretsMa
     EXPECT_EQ(token["default"], "***");
 
     nlohmann::json const& extra = settings.at("Extra.Key");
+    EXPECT_EQ(extra["restart_reason"], "everything extra is read once");
     EXPECT_TRUE(extra["default"].is_null());
     EXPECT_TRUE(extra["default_file"].is_null());
 }

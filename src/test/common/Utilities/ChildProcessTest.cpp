@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Tests ChildProcess by running the child_process_helper program: exit codes and the lines written to standard output and error, arguments with spaces, quotes, backslashes, empty strings and UTF-8 arriving exactly, a program path holding spaces and UTF-8 and, on Windows, named without .exe, lines split at MaxLineBytes without cutting a character, CRLF, a last line with no newline, invalid UTF-8 replaced, many lines in order, closed input and the working directory, an input that ends with the parent staying open while the child runs, so a child watching it keeps running, and ending, once Run returns, a copy of the helper in a process group of its own that exits when that input ends, a child watching an input already at its end exiting at once with the code it chose, programs and arguments that cannot start, a timeout, a stop request, a child ignoring SIGTERM and a grandchild holding the output open each ending the child and its grandchild, and on POSIX the exit code still read when SIGCHLD is ignored or set to reap children itself; StartDetached runs a program with no pipes and no exit code of its own, which a file that program writes shows, and reports a program that cannot start; also checks QuoteWindowsArgument against CommandLineToArgvW.
+ * Tests ChildProcess by running the child_process_helper program: exit codes and the lines written to standard output and error, arguments with spaces, quotes, backslashes, empty strings and UTF-8 arriving exactly, a program path holding spaces and UTF-8 and, on Windows, named without .exe, lines split at MaxLineBytes without cutting a character, CRLF, a last line with no newline, invalid UTF-8 replaced, many lines in order, closed input and the working directory, an input that ends with the parent staying open while the child runs, so a child watching it keeps running, and ending, once Run returns, a copy of the helper in a process group of its own that exits when that input ends, a child watching an input already at its end exiting at once with the code it chose, programs and arguments that cannot start, a timeout, a stop request, a child ignoring SIGTERM and a grandchild holding the output open each ending the child and its grandchild, and on POSIX the exit code still read when SIGCHLD is ignored or set to reap children itself; StartDetached runs a program with no pipes and no exit code of its own, which a file that program writes shows, and reports a program that cannot start; also checks QuoteWindowsArgument against CommandLineToArgvW. ChildProcessHandle tests launch the helper with its output and errors in files it keeps appending to after the launcher lets go, stop a copy that waits like a server with a shutdown line on its input and with an interrupt, which is Ctrl+Break through the helper itself on Windows and SIGTERM on POSIX, end a child and its grandchild as one tree, adopt a running child from its identity after the launching handle is gone and refuse the same process id with another start time or executable, find no identity for a process that has ended, and report a program that cannot start.
  */
 
 #include "ChildProcess.h"
@@ -153,6 +153,60 @@ namespace
         std::optional<long long> const grandchild = Ambrose::StringTo<long long>(output.front());
         ASSERT_TRUE(grandchild) << output.front();
         EXPECT_TRUE(ProcessEnded(*grandchild)) << "grandchild " << *grandchild << " is still running";
+    }
+
+    std::string ReadWhole(std::filesystem::path const& file)
+    {
+        std::ifstream stream(file, std::ios::binary);
+        return std::string(std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>());
+    }
+
+    std::vector<std::string> Lines(std::filesystem::path const& file)
+    {
+        std::string const text = ReadWhole(file);
+        std::vector<std::string> lines;
+        for (std::string_view const line : Ambrose::Tokenize(text, '\n', false))
+            lines.emplace_back(line);
+        return lines;
+    }
+
+    bool WaitForText(std::filesystem::path const& file, std::string_view expected)
+    {
+        std::chrono::steady_clock::time_point const until = std::chrono::steady_clock::now() + 30s;
+        while (std::chrono::steady_clock::now() < until)
+        {
+            if (ReadWhole(file).find(expected) != std::string::npos)
+                return true;
+            std::this_thread::sleep_for(20ms);
+        }
+        return false;
+    }
+
+    ChildLaunchOptions LaunchOptions(LogTestDirectory const& directory, std::vector<std::string> arguments)
+    {
+        ChildLaunchOptions options;
+        options.Program = HelperPath();
+        options.Arguments = std::move(arguments);
+        options.OutputFile = directory.Path() / "out.log";
+        options.ErrorFile = directory.Path() / "err.log";
+        options.SendBreak = [](int64 group, std::string& error)
+        {
+            ChildProcessResult const result = ChildProcess::Run(HelperOptions({ "console-break", std::to_string(group) }));
+            if (result.Succeeded())
+                return true;
+            error = result.Error.empty() ? "the helper could not send Ctrl+Break" : result.Error;
+            return false;
+        };
+        return options;
+    }
+
+    bool SameExecutable(std::filesystem::path const& left, std::filesystem::path const& right)
+    {
+        ChildProcessIdentity first;
+        first.Executable = left;
+        ChildProcessIdentity second;
+        second.Executable = right;
+        return first.Matches(second);
     }
 
     void ExpectNotStarted(ChildProcessOptions const& options, std::string_view expected)
@@ -538,4 +592,132 @@ TEST(ChildProcessTest, StartDetachedReportsAProgramThatCannotStart)
     ChildProcessResult const nothing = ChildProcess::StartDetached(options);
     EXPECT_FALSE(nothing.Started);
     EXPECT_EQ(nothing.Error, "no program was named to run");
+}
+
+TEST(ChildProcessHandleTest, LaunchWritesOutputAndErrorsToFilesAndReportsTheExitCode)
+{
+    LogTestDirectory directory;
+    std::string error;
+    ChildProcessHandle child = ChildProcessHandle::Launch(LaunchOptions(directory, { "echo", "out", "err", "bad", "exit", "3" }), error);
+    ASSERT_TRUE(child) << error;
+    EXPECT_GT(child.GetIdentity().Id, 0);
+    EXPECT_TRUE(SameExecutable(child.GetIdentity().Executable.filename(), HelperPath().filename())) << child.GetIdentity().Executable;
+    EXPECT_FALSE(child.IsAdopted());
+    EXPECT_FALSE(child.HasInput());
+    ASSERT_TRUE(child.WaitForExit(30s));
+    std::optional<ChildExit> const exit = child.GetExit();
+    ASSERT_TRUE(exit.has_value());
+    EXPECT_EQ(exit->Code, std::optional<int64>(3));
+    EXPECT_EQ(ReadWhole(directory.Path() / "out.log"), "out\n");
+    EXPECT_EQ(ReadWhole(directory.Path() / "err.log"), "bad\n");
+    EXPECT_FALSE(ChildProcessHandle::Describe(child.GetIdentity().Id).has_value());
+}
+
+TEST(ChildProcessHandleTest, OutputKeepsLandingAfterTheLaunchingHandleIsGone)
+{
+    LogTestDirectory directory;
+    std::string error;
+    {
+        ChildProcessHandle child = ChildProcessHandle::Launch(LaunchOptions(directory, { "sleep", "300", "echo", "later" }), error);
+        ASSERT_TRUE(child) << error;
+    }
+    EXPECT_TRUE(WaitForText(directory.Path() / "out.log", "later\n"));
+}
+
+TEST(ChildProcessHandleTest, AShutdownLineOnItsInputStopsAChildThatWaitsLikeAServer)
+{
+    LogTestDirectory directory;
+    ChildLaunchOptions options = LaunchOptions(directory, { "wait-for-stop" });
+    options.KeepInput = true;
+    std::string error;
+    ChildProcessHandle child = ChildProcessHandle::Launch(options, error);
+    ASSERT_TRUE(child) << error;
+    ScopeExit const cleanup([&child] { std::string ignored; child.EndTree(ignored); });
+    EXPECT_TRUE(child.HasInput());
+    ASSERT_TRUE(WaitForText(directory.Path() / "out.log", "waiting\n"));
+    ASSERT_TRUE(child.WriteInput("shutdown\n", error)) << error;
+    ASSERT_TRUE(child.WaitForExit(30s));
+    EXPECT_EQ(child.GetExit()->Code, std::optional<int64>(0));
+    EXPECT_NE(ReadWhole(directory.Path() / "out.log").find("stopped by shutdown"), std::string::npos);
+    EXPECT_FALSE(child.WriteInput("shutdown\n", error));
+}
+
+TEST(ChildProcessHandleTest, AnInterruptStopsTheChildsGroupTheWayASignalStopsAServer)
+{
+    LogTestDirectory directory;
+    std::string error;
+    ChildProcessHandle child = ChildProcessHandle::Launch(LaunchOptions(directory, { "wait-for-stop" }), error);
+    ASSERT_TRUE(child) << error;
+    ScopeExit const cleanup([&child] { std::string ignored; child.EndTree(ignored); });
+    ASSERT_TRUE(WaitForText(directory.Path() / "out.log", "waiting\n"));
+    ASSERT_TRUE(child.Interrupt(error)) << error;
+    ASSERT_TRUE(child.WaitForExit(30s));
+    EXPECT_EQ(child.GetExit()->Code, std::optional<int64>(0));
+    EXPECT_NE(ReadWhole(directory.Path() / "out.log").find("stopped by signal"), std::string::npos);
+    EXPECT_FALSE(child.Interrupt(error));
+}
+
+TEST(ChildProcessHandleTest, EndTreeEndsTheChildAndItsGrandchild)
+{
+    LogTestDirectory directory;
+    std::string error;
+    ChildProcessHandle child = ChildProcessHandle::Launch(LaunchOptions(directory, { "spawn-sleeper", "sleep", "60000" }), error);
+    ASSERT_TRUE(child) << error;
+    ASSERT_TRUE(WaitForText(directory.Path() / "out.log", "\n"));
+    ASSERT_TRUE(child.EndTree(error)) << error;
+    ASSERT_TRUE(child.WaitForExit(30s));
+    std::vector<std::string> const lines = Lines(directory.Path() / "out.log");
+    ExpectGrandchildEnded(lines);
+}
+
+TEST(ChildProcessHandleTest, AdoptTakesARunningChildBackOnlyWhileItsIdentityMatches)
+{
+    LogTestDirectory directory;
+    std::string error;
+    ChildProcessIdentity identity;
+    {
+        ChildProcessHandle child = ChildProcessHandle::Launch(LaunchOptions(directory, { "spawn-sleeper", "sleep", "60000" }), error);
+        ASSERT_TRUE(child) << error;
+        identity = child.GetIdentity();
+        ASSERT_TRUE(WaitForText(directory.Path() / "out.log", "\n"));
+    }
+    std::optional<ChildProcessIdentity> const described = ChildProcessHandle::Describe(identity.Id);
+    ASSERT_TRUE(described.has_value());
+    EXPECT_TRUE(described->Matches(identity));
+
+    ChildProcessIdentity laterStart = identity;
+    laterStart.StartTime += 1;
+    EXPECT_FALSE(ChildProcessHandle::Adopt(laterStart, {}, error));
+    EXPECT_NE(error.find(std::to_string(identity.Id)), std::string::npos) << error;
+    ChildProcessIdentity otherProgram = identity;
+    otherProgram.Executable = otherProgram.Executable.parent_path() / "another-program";
+    EXPECT_FALSE(ChildProcessHandle::Adopt(otherProgram, {}, error));
+
+    ChildProcessHandle adopted = ChildProcessHandle::Adopt(identity, {}, error);
+    ASSERT_TRUE(adopted) << error;
+    ScopeExit const cleanup([&adopted] { std::string ignored; adopted.EndTree(ignored); });
+    EXPECT_TRUE(adopted.IsAdopted());
+    EXPECT_FALSE(adopted.HasInput());
+    EXPECT_FALSE(adopted.WaitForExit(0ms));
+    ASSERT_TRUE(adopted.EndTree(error)) << error;
+    ASSERT_TRUE(adopted.WaitForExit(30s));
+#ifdef _WIN32
+    EXPECT_EQ(adopted.GetExit()->Code, std::optional<int64>(1));
+#endif
+    std::vector<std::string> const lines = Lines(directory.Path() / "out.log");
+    ExpectGrandchildEnded(lines);
+}
+
+TEST(ChildProcessHandleTest, LaunchReportsAProgramThatCannotStart)
+{
+    LogTestDirectory directory;
+    ChildLaunchOptions options = LaunchOptions(directory, {});
+    options.Program = directory.Path() / "missing-program";
+    std::string error;
+    EXPECT_FALSE(ChildProcessHandle::Launch(options, error));
+    EXPECT_FALSE(error.empty());
+    EXPECT_TRUE(Utf::IsValidUtf8(error));
+    options.Program.clear();
+    EXPECT_FALSE(ChildProcessHandle::Launch(options, error));
+    EXPECT_FALSE(ChildProcessHandle::Describe(0).has_value());
 }

@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Implements running a child process: on Windows CreateProcessW with a command line quoted by CommandLineToArgvW rules, CREATE_NO_WINDOW unless the program draws its own window, only the input, which is the NUL device or the read end of an anonymous pipe whose write end stays uninheritable here, and two overlapped named pipes inherited, and a kill-on-close job object, running <path>.exe for a program path without an extension when only that file exists, refusing batch files because cmd.exe reparses their arguments, and wording system errors in UTF-8; on POSIX posix_spawn into a new process group with /dev/null or the read end of a close-on-exec pipe as input and output pipes read with poll, ending the group with SIGTERM then SIGKILL, after clearing a SIGCHLD disposition that would reap the child before its exit code is read; a program named without a folder is searched for on the PATH, and output is split into UTF-8 lines, with invalid bytes replaced, on the calling thread. StartDetached shares that command building and starts a program nobody waits for: on Windows a detached process of its own group, breaking away from a job when the job allows it, and on POSIX posix_spawn into a session of its own with every standard handle on the null device. ExitWhenInputEnds reads standard input on a detached thread and ends the process with no cleanup once it reaches its end or fails.
+ * Implements running a child process: on Windows CreateProcessW with a command line quoted by CommandLineToArgvW rules, CREATE_NO_WINDOW unless the program draws its own window, only the input, which is the NUL device or the read end of an anonymous pipe whose write end stays uninheritable here, and two overlapped named pipes inherited, and a kill-on-close job object, running <path>.exe for a program path without an extension when only that file exists, refusing batch files because cmd.exe reparses their arguments, and wording system errors in UTF-8; on POSIX posix_spawn into a new process group with /dev/null or the read end of a close-on-exec pipe as input and output pipes read with poll, ending the group with SIGTERM then SIGKILL, after clearing a SIGCHLD disposition that would reap the child before its exit code is read; a program named without a folder is searched for on the PATH, and output is split into UTF-8 lines, with invalid bytes replaced, on the calling thread. StartDetached shares that command building and starts a program nobody waits for: on Windows a detached process of its own group, breaking away from a job when the job allows it, and on POSIX posix_spawn into a session of its own with every standard handle on the null device. ExitWhenInputEnds reads standard input on a detached thread and ends the process with no cleanup once it reaches its end or fails. A ChildProcessHandle launch opens the output and error files for appending and hands them over as the standard handles, keeps the write end of the input pipe non-blocking, and on Windows creates the process suspended with no window in a process group of its own, breaking away from an outer job when that job allows it, then puts it in a job named after its process id and start time that ends nothing when this process closes it, and leaves a handle to that job inside the child, because a name lives only while a handle does, so a later process can open that job by name to end the tree for as long as the child runs, and reads its identity from the process times and image name; on POSIX it spawns into a session of its own, reads the identity from /proc with the boot id beside it and a deleted executable's suffix dropped, watches the exit with a pidfd where the kernel has one, and blocks SIGPIPE on the writing thread so a closed input never ends this process. SendConsoleBreak, for a helper process only, leaves its own console, attaches to the target's and sends Ctrl+Break to its group.
  */
 
 #include "ChildProcess.h"
@@ -14,7 +14,10 @@
 #include <array>
 #include <atomic>
 #include <cerrno>
+#include <charconv>
 #include <cstdlib>
+#include <fstream>
+#include <limits>
 #include <mutex>
 #include <system_error>
 #include <thread>
@@ -36,6 +39,10 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+
+#ifdef __linux__
+#include <sys/syscall.h>
+#endif
 
 extern char** environ;
 
@@ -1390,4 +1397,860 @@ void ChildProcess::ExitWhenInputEnds(int exitCode)
 #endif
         std::_Exit(exitCode);
     }).detach();
+}
+
+bool ChildProcessIdentity::Matches(ChildProcessIdentity const& other) const
+{
+    if (Id != other.Id || StartTime != other.StartTime || BootId != other.BootId)
+        return false;
+#ifdef _WIN32
+    return CompareStringOrdinal(Executable.c_str(), -1, other.Executable.c_str(), -1, TRUE) == CSTR_EQUAL;
+#else
+    return Executable == other.Executable;
+#endif
+}
+
+#ifdef _WIN32
+struct ChildProcessHandle::State
+{
+    ChildProcessIdentity Identity;
+    Handle Process;
+    Handle Job;
+    Handle Input;
+    ChildBreakSender SendBreak;
+    bool Adopted = false;
+    std::mutex Mutex;
+    std::optional<ChildExit> Exit;
+};
+
+namespace
+{
+    std::wstring JobName(ChildProcessIdentity const& identity)
+    {
+        return L"Local\\ProjectAmbrose.Job." + std::to_wstring(identity.Id) + L"." + std::to_wstring(identity.StartTime);
+    }
+
+    bool IsRunning(HANDLE process)
+    {
+        return WaitForSingleObject(process, 0) == WAIT_TIMEOUT;
+    }
+
+    std::optional<ChildProcessIdentity> ReadIdentity(HANDLE process, DWORD id)
+    {
+        FILETIME created{};
+        FILETIME exited{};
+        FILETIME kernel{};
+        FILETIME user{};
+        if (!GetProcessTimes(process, &created, &exited, &kernel, &user))
+            return std::nullopt;
+        std::wstring image(MaxCommandLineCharacters, L'\0');
+        DWORD size = static_cast<DWORD>(image.size());
+        if (!QueryFullProcessImageNameW(process, 0, image.data(), &size))
+            return std::nullopt;
+        image.resize(size);
+        ChildProcessIdentity identity;
+        identity.Id = static_cast<int64>(id);
+        identity.StartTime = (static_cast<uint64>(created.dwHighDateTime) << 32) | created.dwLowDateTime;
+        identity.Executable = std::filesystem::path(image);
+        return identity;
+    }
+
+    Handle OpenAppendFile(std::filesystem::path const& file, std::string_view what, std::string const& programText, std::string& error)
+    {
+        if (file.empty())
+        {
+            Handle discard(CreateFileW(L"NUL", GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+            if (!discard)
+                error = fmt::format("{} could not be started because the NUL device could not be opened for its {}: {}", programText, what, SystemMessage(GetLastError()));
+            return discard;
+        }
+        Handle handle(CreateFileW(file.c_str(), FILE_APPEND_DATA | SYNCHRONIZE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+        if (!handle)
+            error = fmt::format("{} could not be started because its {} file {} could not be opened: {}", programText, what, PathText(file), SystemMessage(GetLastError()));
+        return handle;
+    }
+
+    std::unique_ptr<ChildProcessHandle::State> LaunchState(ChildLaunchOptions const& options, ChildProcessOptions const& run, std::string const& programText, std::string& error)
+    {
+        ChildProcessResult result;
+        WindowsCommand command;
+        if (!PrepareCommand(run, programText, command, result))
+        {
+            error = result.Error;
+            return nullptr;
+        }
+        Handle output = OpenAppendFile(options.OutputFile, "output", programText, error);
+        if (!output)
+            return nullptr;
+        Handle errors = OpenAppendFile(options.ErrorFile, "error output", programText, error);
+        if (!errors)
+            return nullptr;
+        Handle input;
+        Handle inputHeld;
+        if (options.KeepInput)
+        {
+            HANDLE readEnd = nullptr;
+            HANDLE writeEnd = nullptr;
+            if (!CreatePipe(&readEnd, &writeEnd, nullptr, 0))
+            {
+                error = fmt::format("{} could not be started because a pipe for its input could not be created: {}", programText, SystemMessage(GetLastError()));
+                return nullptr;
+            }
+            input = Handle(readEnd);
+            inputHeld = Handle(writeEnd);
+            DWORD mode = PIPE_READMODE_BYTE | PIPE_NOWAIT;
+            if (!SetNamedPipeHandleState(inputHeld.Get(), &mode, nullptr, nullptr))
+            {
+                error = fmt::format("{} could not be started because its input pipe could not be made non-blocking: {}", programText, SystemMessage(GetLastError()));
+                return nullptr;
+            }
+        }
+        else
+        {
+            input = Handle(CreateFileW(L"NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+            if (!input)
+            {
+                error = fmt::format("{} could not be started because the NUL device could not be opened for its input: {}", programText, SystemMessage(GetLastError()));
+                return nullptr;
+            }
+        }
+        std::array<HANDLE, 3> inherited{ input.Get(), output.Get(), errors.Get() };
+        for (HANDLE const handle : inherited)
+        {
+            if (!SetHandleInformation(handle, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT))
+            {
+                error = fmt::format("{} could not be started because a handle could not be made inheritable: {}", programText, SystemMessage(GetLastError()));
+                return nullptr;
+            }
+        }
+        AttributeList attributes(inherited);
+        if (attributes.Get() == nullptr)
+        {
+            error = fmt::format("{} could not be started because its handle list could not be built: {}", programText, SystemMessage(attributes.Error()));
+            return nullptr;
+        }
+
+        STARTUPINFOEXW startup{};
+        startup.StartupInfo.cb = sizeof(startup);
+        startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
+        startup.StartupInfo.wShowWindow = SW_HIDE;
+        startup.StartupInfo.hStdInput = input.Get();
+        startup.StartupInfo.hStdOutput = output.Get();
+        startup.StartupInfo.hStdError = errors.Get();
+        startup.lpAttributeList = attributes.Get();
+        DWORD const creation = CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP | CREATE_SUSPENDED | EXTENDED_STARTUPINFO_PRESENT;
+        LPCWSTR const application = command.Search ? nullptr : command.Program.c_str();
+        LPCWSTR const directory = command.WorkingDirectory.empty() ? nullptr : command.WorkingDirectory.c_str();
+        PROCESS_INFORMATION information{};
+        std::wstring commandBuffer = command.CommandBuffer;
+        BOOL created = CreateProcessW(application, commandBuffer.data(), nullptr, nullptr, TRUE, creation | CREATE_BREAKAWAY_FROM_JOB, nullptr, directory, &startup.StartupInfo, &information);
+        DWORD createError = GetLastError();
+        if (!created && createError == ERROR_ACCESS_DENIED)
+        {
+            commandBuffer = command.CommandBuffer;
+            created = CreateProcessW(application, commandBuffer.data(), nullptr, nullptr, TRUE, creation, nullptr, directory, &startup.StartupInfo, &information);
+            createError = GetLastError();
+        }
+        input.Reset();
+        output.Reset();
+        errors.Reset();
+        if (!created)
+        {
+            error = fmt::format("{} could not be started: {}", programText, SystemMessage(createError));
+            return nullptr;
+        }
+        Handle process(information.hProcess);
+        Handle thread(information.hThread);
+        std::optional<ChildProcessIdentity> const identity = ReadIdentity(process.Get(), information.dwProcessId);
+        if (!identity)
+        {
+            DWORD const identityError = GetLastError();
+            TerminateProcess(process.Get(), 1);
+            error = fmt::format("{} could not be started because its identity could not be read: {}", programText, SystemMessage(identityError));
+            return nullptr;
+        }
+        Handle job(CreateJobObjectW(nullptr, JobName(*identity).c_str()));
+        if (job)
+        {
+            JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
+            limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION;
+            if (!SetInformationJobObject(job.Get(), JobObjectExtendedLimitInformation, &limits, sizeof(limits)) || !AssignProcessToJobObject(job.Get(), process.Get()))
+                job.Reset();
+        }
+        if (job)
+        {
+            HANDLE kept = nullptr;
+            DuplicateHandle(GetCurrentProcess(), job.Get(), process.Get(), &kept, JOB_OBJECT_QUERY, FALSE, 0);
+        }
+        if (ResumeThread(thread.Get()) == static_cast<DWORD>(-1))
+        {
+            DWORD const resumeError = GetLastError();
+            TerminateProcess(process.Get(), 1);
+            error = fmt::format("{} could not be started because its first thread could not be resumed: {}", programText, SystemMessage(resumeError));
+            return nullptr;
+        }
+        auto state = std::make_unique<ChildProcessHandle::State>();
+        state->Identity = *identity;
+        state->Process = std::move(process);
+        state->Job = std::move(job);
+        state->Input = std::move(inputHeld);
+        state->SendBreak = options.SendBreak;
+        return state;
+    }
+
+    std::optional<ChildProcessIdentity> DescribeProcess(int64 id)
+    {
+        if (id <= 0 || id > static_cast<int64>(std::numeric_limits<DWORD>::max()))
+            return std::nullopt;
+        Handle process(OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, static_cast<DWORD>(id)));
+        if (!process || !IsRunning(process.Get()))
+            return std::nullopt;
+        return ReadIdentity(process.Get(), static_cast<DWORD>(id));
+    }
+
+    std::unique_ptr<ChildProcessHandle::State> AdoptState(ChildProcessIdentity const& expected, ChildBreakSender sendBreak, std::string& error)
+    {
+        if (expected.Id <= 0 || expected.Id > static_cast<int64>(std::numeric_limits<DWORD>::max()))
+        {
+            error = fmt::format("{} is not a process id", expected.Id);
+            return nullptr;
+        }
+        Handle process(OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_TERMINATE, FALSE, static_cast<DWORD>(expected.Id)));
+        if (!process)
+        {
+            error = fmt::format("process {} is not running or cannot be opened: {}", expected.Id, SystemMessage(GetLastError()));
+            return nullptr;
+        }
+        if (!IsRunning(process.Get()))
+        {
+            error = fmt::format("process {} has ended", expected.Id);
+            return nullptr;
+        }
+        std::optional<ChildProcessIdentity> const actual = ReadIdentity(process.Get(), static_cast<DWORD>(expected.Id));
+        if (!actual)
+        {
+            error = fmt::format("the identity of process {} could not be read: {}", expected.Id, SystemMessage(GetLastError()));
+            return nullptr;
+        }
+        if (!actual->Matches(expected))
+        {
+            error = fmt::format("process {} is {} started at another time, not the program that was recorded", expected.Id, PathText(actual->Executable));
+            return nullptr;
+        }
+        Handle job(OpenJobObjectW(JOB_OBJECT_TERMINATE | JOB_OBJECT_QUERY, FALSE, JobName(expected).c_str()));
+        if (job)
+        {
+            BOOL inJob = FALSE;
+            if (!IsProcessInJob(process.Get(), job.Get(), &inJob) || !inJob)
+                job.Reset();
+        }
+        auto state = std::make_unique<ChildProcessHandle::State>();
+        state->Identity = *actual;
+        state->Process = std::move(process);
+        state->Job = std::move(job);
+        state->SendBreak = std::move(sendBreak);
+        state->Adopted = true;
+        return state;
+    }
+}
+
+bool ChildProcessHandle::WaitForExit(std::chrono::milliseconds timeout)
+{
+    State& state = *_state;
+    {
+        std::lock_guard<std::mutex> const lock(state.Mutex);
+        if (state.Exit)
+            return true;
+    }
+    DWORD const wait = static_cast<DWORD>(std::clamp<int64>(timeout.count(), 0, static_cast<int64>(INFINITE) - 1));
+    if (WaitForSingleObject(state.Process.Get(), wait) != WAIT_OBJECT_0)
+        return false;
+    std::lock_guard<std::mutex> const lock(state.Mutex);
+    if (!state.Exit)
+    {
+        ChildExit exit;
+        DWORD code = 0;
+        if (GetExitCodeProcess(state.Process.Get(), &code))
+            exit.Code = static_cast<int64>(code);
+        state.Exit = exit;
+    }
+    return true;
+}
+
+bool ChildProcessHandle::WriteInput(std::string_view text, std::string& error)
+{
+    State& state = *_state;
+    std::lock_guard<std::mutex> const lock(state.Mutex);
+    if (!state.Input)
+    {
+        error = "this process was not started with an input pipe";
+        return false;
+    }
+    if (state.Exit)
+    {
+        error = "the process has ended";
+        return false;
+    }
+    DWORD written = 0;
+    if (!WriteFile(state.Input.Get(), text.data(), static_cast<DWORD>(text.size()), &written, nullptr))
+    {
+        error = fmt::format("its input could not be written: {}", SystemMessage(GetLastError()));
+        return false;
+    }
+    if (written != text.size())
+    {
+        error = "its input is full, so the process is not reading it";
+        return false;
+    }
+    return true;
+}
+
+bool ChildProcessHandle::Interrupt(std::string& error)
+{
+    State& state = *_state;
+    ChildBreakSender sendBreak;
+    {
+        std::lock_guard<std::mutex> const lock(state.Mutex);
+        if (state.Exit || !IsRunning(state.Process.Get()))
+        {
+            error = "the process has ended";
+            return false;
+        }
+        sendBreak = state.SendBreak;
+    }
+    if (!sendBreak)
+    {
+        error = "no helper was given to send Ctrl+Break to its console";
+        return false;
+    }
+    return sendBreak(state.Identity.Id, error);
+}
+
+bool ChildProcessHandle::EndTree(std::string& error)
+{
+    State& state = *_state;
+    std::lock_guard<std::mutex> const lock(state.Mutex);
+    if (state.Job)
+    {
+        if (TerminateJobObject(state.Job.Get(), 1))
+            return true;
+        error = fmt::format("its job could not be ended: {}", SystemMessage(GetLastError()));
+        return false;
+    }
+    if (!IsRunning(state.Process.Get()))
+        return true;
+    if (TerminateProcess(state.Process.Get(), 1))
+        return true;
+    error = fmt::format("it could not be ended: {}", SystemMessage(GetLastError()));
+    return false;
+}
+
+bool ChildProcess::SendConsoleBreak(int64 group, std::string& error)
+{
+    if (group <= 0 || group > static_cast<int64>(std::numeric_limits<DWORD>::max()))
+    {
+        error = fmt::format("{} is not a process group", group);
+        return false;
+    }
+    FreeConsole();
+    if (!AttachConsole(static_cast<DWORD>(group)))
+    {
+        error = fmt::format("the console of process {} could not be attached: {}", group, SystemMessage(GetLastError()));
+        return false;
+    }
+    SetConsoleCtrlHandler(nullptr, TRUE);
+    bool const sent = GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, static_cast<DWORD>(group)) != 0;
+    if (!sent)
+        error = fmt::format("Ctrl+Break could not be sent to process group {}: {}", group, SystemMessage(GetLastError()));
+    FreeConsole();
+    return sent;
+}
+#else
+struct ChildProcessHandle::State
+{
+    ChildProcessIdentity Identity;
+    Descriptor Input;
+    Descriptor Watch;
+    ChildBreakSender SendBreak;
+    bool Adopted = false;
+    std::mutex Mutex;
+    std::optional<ChildExit> Exit;
+};
+
+namespace
+{
+    constexpr std::chrono::milliseconds ExitPollInterval{ 20 };
+    constexpr std::string_view DeletedSuffix = " (deleted)";
+
+    std::string ReadFirstLine(std::string const& file)
+    {
+        std::ifstream stream(file);
+        std::string line;
+        std::getline(stream, line);
+        return line;
+    }
+
+    std::string ReadBootId()
+    {
+#ifdef __linux__
+        return std::string(Ambrose::Trim(ReadFirstLine("/proc/sys/kernel/random/boot_id")));
+#else
+        return std::string();
+#endif
+    }
+
+    std::optional<ChildProcessIdentity> DescribeProcess(int64 id)
+    {
+#ifdef __linux__
+        if (id <= 0 || id > static_cast<int64>(std::numeric_limits<pid_t>::max()))
+            return std::nullopt;
+        std::string const folder = "/proc/" + std::to_string(id);
+        std::string const stat = ReadFirstLine(folder + "/stat");
+        std::size_t const close = stat.rfind(')');
+        if (close == std::string::npos)
+            return std::nullopt;
+        std::string_view rest = std::string_view(stat).substr(close + 1);
+        std::vector<std::string_view> fields;
+        while (!rest.empty())
+        {
+            std::size_t const start = rest.find_first_not_of(' ');
+            if (start == std::string_view::npos)
+                break;
+            rest.remove_prefix(start);
+            std::size_t const end = rest.find(' ');
+            fields.push_back(rest.substr(0, end));
+            rest.remove_prefix(end == std::string_view::npos ? rest.size() : end);
+        }
+        constexpr std::size_t StateField = 0;
+        constexpr std::size_t StartTimeField = 19;
+        if (fields.size() <= StartTimeField || fields[StateField] == "Z" || fields[StateField] == "X")
+            return std::nullopt;
+        uint64 startTime = 0;
+        std::string_view const text = fields[StartTimeField];
+        auto const [end, parsed] = std::from_chars(text.data(), text.data() + text.size(), startTime);
+        if (parsed != std::errc() || end != text.data() + text.size())
+            return std::nullopt;
+        std::error_code linkError;
+        std::string executable = std::filesystem::read_symlink(folder + "/exe", linkError).native();
+        if (linkError)
+            return std::nullopt;
+        if (executable.size() > DeletedSuffix.size() && std::string_view(executable).substr(executable.size() - DeletedSuffix.size()) == DeletedSuffix)
+            executable.resize(executable.size() - DeletedSuffix.size());
+        ChildProcessIdentity identity;
+        identity.Id = id;
+        identity.StartTime = startTime;
+        identity.BootId = ReadBootId();
+        identity.Executable = std::filesystem::path(executable);
+        return identity;
+#else
+        (void)id;
+        return std::nullopt;
+#endif
+    }
+
+    Descriptor WatchProcess([[maybe_unused]] pid_t id)
+    {
+#if defined(__linux__) && defined(SYS_pidfd_open)
+        long const descriptor = syscall(SYS_pidfd_open, id, 0);
+        return descriptor < 0 ? Descriptor() : Descriptor(static_cast<int>(descriptor));
+#else
+        return Descriptor();
+#endif
+    }
+
+    int OpenAppendFile(std::filesystem::path const& file, Descriptor& descriptor)
+    {
+        int const opened = open(file.c_str(), O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0600);
+        if (opened < 0)
+            return errno;
+        descriptor = Descriptor(opened);
+        if (descriptor.Get() > STDERR_FILENO)
+            return 0;
+        int const moved = fcntl(descriptor.Get(), F_DUPFD_CLOEXEC, STDERR_FILENO + 1);
+        if (moved < 0)
+            return errno;
+        descriptor = Descriptor(moved);
+        return 0;
+    }
+
+    std::unique_ptr<ChildProcessHandle::State> LaunchState(ChildLaunchOptions const& options, ChildProcessOptions const&, std::string const& programText, std::string& error)
+    {
+        ChildProcessResult result;
+        std::filesystem::path program = options.Program;
+        bool const search = program.native().find('/') == std::string::npos;
+        if (!search && !MakeAbsolute(program, "program", result))
+        {
+            error = result.Error;
+            return nullptr;
+        }
+        std::filesystem::path workingDirectory = options.WorkingDirectory;
+        if (!workingDirectory.empty() && !MakeAbsolute(workingDirectory, "working directory", result))
+        {
+            error = result.Error;
+            return nullptr;
+        }
+#ifndef AMBROSE_SPAWN_CHDIR
+        if (!workingDirectory.empty())
+        {
+            error = fmt::format("{} could not be started because this system cannot start a program in another working directory", programText);
+            return nullptr;
+        }
+#endif
+        if (int const code = KeepChildrenWaitable(); code != 0)
+        {
+            error = fmt::format("{} could not be started because SIGCHLD would reap it before its exit code is read, and that could not be changed: {}", programText, ErrnoMessage(code));
+            return nullptr;
+        }
+        Descriptor output;
+        Descriptor errors;
+        if (!options.OutputFile.empty())
+        {
+            if (int const code = OpenAppendFile(options.OutputFile, output); code != 0)
+            {
+                error = fmt::format("{} could not be started because its output file {} could not be opened: {}", programText, PathText(options.OutputFile), ErrnoMessage(code));
+                return nullptr;
+            }
+        }
+        if (!options.ErrorFile.empty())
+        {
+            if (int const code = OpenAppendFile(options.ErrorFile, errors); code != 0)
+            {
+                error = fmt::format("{} could not be started because its error output file {} could not be opened: {}", programText, PathText(options.ErrorFile), ErrnoMessage(code));
+                return nullptr;
+            }
+        }
+        Descriptor inputRead;
+        Descriptor inputHeld;
+        if (options.KeepInput)
+        {
+            if (int const code = MakePipe(inputRead, inputHeld, false); code != 0)
+            {
+                error = fmt::format("{} could not be started because a pipe for its input could not be created: {}", programText, ErrnoMessage(code));
+                return nullptr;
+            }
+            int const flags = fcntl(inputHeld.Get(), F_GETFL);
+            if (flags < 0 || fcntl(inputHeld.Get(), F_SETFL, flags | O_NONBLOCK) != 0)
+            {
+                error = fmt::format("{} could not be started because its input pipe could not be made non-blocking: {}", programText, ErrnoMessage(errno));
+                return nullptr;
+            }
+        }
+
+        SpawnSetup setup;
+        if (!setup.Ready())
+        {
+            error = fmt::format("{} could not be started because its spawn settings could not be prepared", programText);
+            return nullptr;
+        }
+        int setupCode = 0;
+        auto const step = [&setupCode](int code)
+        {
+            if (setupCode == 0)
+                setupCode = code;
+        };
+        if (options.KeepInput)
+            step(posix_spawn_file_actions_adddup2(setup.Actions(), inputRead.Get(), STDIN_FILENO));
+        else
+            step(posix_spawn_file_actions_addopen(setup.Actions(), STDIN_FILENO, "/dev/null", O_RDONLY, 0));
+        if (output)
+            step(posix_spawn_file_actions_adddup2(setup.Actions(), output.Get(), STDOUT_FILENO));
+        else
+            step(posix_spawn_file_actions_addopen(setup.Actions(), STDOUT_FILENO, "/dev/null", O_WRONLY, 0));
+        if (errors)
+            step(posix_spawn_file_actions_adddup2(setup.Actions(), errors.Get(), STDERR_FILENO));
+        else
+            step(posix_spawn_file_actions_addopen(setup.Actions(), STDERR_FILENO, "/dev/null", O_WRONLY, 0));
+#ifdef AMBROSE_SPAWN_CHDIR
+        if (!workingDirectory.empty())
+            step(posix_spawn_file_actions_addchdir_np(setup.Actions(), workingDirectory.c_str()));
+#endif
+#ifdef AMBROSE_SPAWN_CLOSEFROM
+        step(posix_spawn_file_actions_addclosefrom_np(setup.Actions(), STDERR_FILENO + 1));
+#endif
+        int flags = POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF;
+#ifdef POSIX_SPAWN_SETSID
+        flags |= POSIX_SPAWN_SETSID;
+#else
+        flags |= POSIX_SPAWN_SETPGROUP;
+        step(posix_spawnattr_setpgroup(setup.Attributes(), 0));
+#endif
+#ifdef __APPLE__
+        flags |= POSIX_SPAWN_CLOEXEC_DEFAULT;
+#endif
+        step(posix_spawnattr_setflags(setup.Attributes(), static_cast<short>(flags)));
+        sigset_t mask{};
+        sigemptyset(&mask);
+        step(posix_spawnattr_setsigmask(setup.Attributes(), &mask));
+        sigset_t defaults{};
+        sigemptyset(&defaults);
+        for (int const number : DefaultSignals)
+            sigaddset(&defaults, number);
+        step(posix_spawnattr_setsigdefault(setup.Attributes(), &defaults));
+        if (setupCode != 0)
+        {
+            error = fmt::format("{} could not be started because its spawn settings could not be prepared: {}", programText, ErrnoMessage(setupCode));
+            return nullptr;
+        }
+
+        ChildProcessOptions arguments;
+        arguments.Arguments = options.Arguments;
+        std::vector<std::string> strings;
+        std::vector<char*> argv = BuildArgv(program, arguments, strings);
+        pid_t id = 0;
+        int const spawned = search
+            ? posix_spawnp(&id, program.c_str(), setup.Actions(), setup.Attributes(), argv.data(), environ)
+            : posix_spawn(&id, program.c_str(), setup.Actions(), setup.Attributes(), argv.data(), environ);
+        inputRead.Reset();
+        output.Reset();
+        errors.Reset();
+        if (spawned != 0)
+        {
+            error = fmt::format("{} could not be started: {}", programText, ErrnoMessage(spawned));
+            return nullptr;
+        }
+        auto state = std::make_unique<ChildProcessHandle::State>();
+        std::optional<ChildProcessIdentity> identity = DescribeProcess(id);
+        if (!identity)
+        {
+            identity = ChildProcessIdentity{};
+            identity->Id = id;
+            identity->BootId = ReadBootId();
+            identity->Executable = program;
+        }
+        state->Identity = std::move(*identity);
+        state->Input = std::move(inputHeld);
+        state->Watch = WatchProcess(id);
+        state->SendBreak = options.SendBreak;
+        return state;
+    }
+
+    std::unique_ptr<ChildProcessHandle::State> AdoptState(ChildProcessIdentity const& expected, ChildBreakSender sendBreak, std::string& error)
+    {
+        std::optional<ChildProcessIdentity> const actual = DescribeProcess(expected.Id);
+        if (!actual)
+        {
+            error = fmt::format("process {} is not running or cannot be read", expected.Id);
+            return nullptr;
+        }
+        if (!actual->Matches(expected))
+        {
+            error = fmt::format("process {} is {} started at another time, not the program that was recorded", expected.Id, PathText(actual->Executable));
+            return nullptr;
+        }
+        if (getpgid(static_cast<pid_t>(expected.Id)) != static_cast<pid_t>(expected.Id))
+        {
+            error = fmt::format("process {} no longer leads its own process group", expected.Id);
+            return nullptr;
+        }
+        auto state = std::make_unique<ChildProcessHandle::State>();
+        state->Identity = *actual;
+        state->Watch = WatchProcess(static_cast<pid_t>(expected.Id));
+        state->SendBreak = std::move(sendBreak);
+        state->Adopted = true;
+        return state;
+    }
+
+    bool StillRunning(ChildProcessIdentity const& identity)
+    {
+        std::optional<ChildProcessIdentity> const current = DescribeProcess(identity.Id);
+        return current && current->Matches(identity);
+    }
+
+    bool SignalGroup(ChildProcessHandle::State& state, int number, std::string& error)
+    {
+        if (state.Exit || (state.Adopted && !StillRunning(state.Identity)))
+        {
+            error = "the process has ended";
+            return false;
+        }
+        pid_t const id = static_cast<pid_t>(state.Identity.Id);
+        bool const group = kill(-id, number) == 0;
+        bool const leader = kill(id, number) == 0;
+        if (group || leader)
+            return true;
+        error = fmt::format("signal {} could not be sent: {}", number, ErrnoMessage(errno));
+        return false;
+    }
+}
+
+bool ChildProcessHandle::WaitForExit(std::chrono::milliseconds timeout)
+{
+    State& state = *_state;
+    Clock::time_point const deadline = Clock::now() + timeout;
+    while (true)
+    {
+        {
+            std::lock_guard<std::mutex> const lock(state.Mutex);
+            if (state.Exit)
+                return true;
+            if (state.Adopted)
+            {
+                if (!StillRunning(state.Identity))
+                {
+                    state.Exit = ChildExit{};
+                    return true;
+                }
+            }
+            else
+            {
+                int status = 0;
+                pid_t const reaped = waitpid(static_cast<pid_t>(state.Identity.Id), &status, WNOHANG);
+                if (reaped == static_cast<pid_t>(state.Identity.Id))
+                {
+                    ChildExit exit;
+                    if (WIFEXITED(status))
+                        exit.Code = WEXITSTATUS(status);
+                    else if (WIFSIGNALED(status))
+                        exit.Signal = WTERMSIG(status);
+                    state.Exit = exit;
+                    return true;
+                }
+                if (reaped < 0 && errno != EINTR)
+                {
+                    state.Exit = ChildExit{};
+                    return true;
+                }
+            }
+        }
+        Clock::time_point const now = Clock::now();
+        if (now >= deadline)
+            return false;
+        std::chrono::milliseconds wait = WaitUntil(now, deadline);
+        if (state.Watch)
+        {
+            pollfd descriptor{ state.Watch.Get(), POLLIN, 0 };
+            poll(&descriptor, 1, static_cast<int>(std::min<int64>(wait.count(), std::numeric_limits<int>::max())));
+        }
+        else
+        {
+            std::this_thread::sleep_for(std::min(wait, ExitPollInterval));
+        }
+    }
+}
+
+bool ChildProcessHandle::WriteInput(std::string_view text, std::string& error)
+{
+    State& state = *_state;
+    std::lock_guard<std::mutex> const lock(state.Mutex);
+    if (!state.Input)
+    {
+        error = "this process was not started with an input pipe";
+        return false;
+    }
+    if (state.Exit)
+    {
+        error = "the process has ended";
+        return false;
+    }
+    sigset_t pipeSignal{};
+    sigemptyset(&pipeSignal);
+    sigaddset(&pipeSignal, SIGPIPE);
+    sigset_t previous{};
+    pthread_sigmask(SIG_BLOCK, &pipeSignal, &previous);
+    int writeError = 0;
+    while (!text.empty())
+    {
+        ssize_t const written = write(state.Input.Get(), text.data(), text.size());
+        if (written > 0)
+        {
+            text.remove_prefix(static_cast<std::size_t>(written));
+            continue;
+        }
+        if (written < 0 && errno == EINTR)
+            continue;
+        writeError = written < 0 ? errno : EAGAIN;
+        break;
+    }
+    if (writeError == EPIPE)
+    {
+        timespec const immediately{ 0, 0 };
+        sigtimedwait(&pipeSignal, nullptr, &immediately);
+    }
+    pthread_sigmask(SIG_SETMASK, &previous, nullptr);
+    if (writeError == 0)
+        return true;
+    if (writeError == EAGAIN || writeError == EWOULDBLOCK)
+        error = "its input is full, so the process is not reading it";
+    else if (writeError == EPIPE)
+        error = "it has closed its input";
+    else
+        error = fmt::format("its input could not be written: {}", ErrnoMessage(writeError));
+    return false;
+}
+
+bool ChildProcessHandle::Interrupt(std::string& error)
+{
+    State& state = *_state;
+    std::lock_guard<std::mutex> const lock(state.Mutex);
+    return SignalGroup(state, SIGTERM, error);
+}
+
+bool ChildProcessHandle::EndTree(std::string& error)
+{
+    State& state = *_state;
+    std::lock_guard<std::mutex> const lock(state.Mutex);
+    if (state.Exit)
+        return true;
+    return SignalGroup(state, SIGKILL, error);
+}
+
+bool ChildProcess::SendConsoleBreak(int64, std::string& error)
+{
+    error = "Ctrl+Break is a Windows console event; POSIX systems stop a process group with SIGTERM";
+    return false;
+}
+#endif
+
+ChildProcessHandle::ChildProcessHandle() noexcept = default;
+ChildProcessHandle::~ChildProcessHandle() = default;
+ChildProcessHandle::ChildProcessHandle(ChildProcessHandle&& other) noexcept = default;
+ChildProcessHandle& ChildProcessHandle::operator=(ChildProcessHandle&& other) noexcept = default;
+
+ChildProcessHandle::ChildProcessHandle(std::unique_ptr<State> state) noexcept : _state(std::move(state))
+{
+}
+
+ChildProcessHandle ChildProcessHandle::Launch(ChildLaunchOptions const& options, std::string& error)
+{
+    ChildProcessOptions run;
+    run.Program = options.Program;
+    run.Arguments = options.Arguments;
+    run.WorkingDirectory = options.WorkingDirectory;
+    std::string const programText = PathText(options.Program);
+    error = CheckOptions(run, programText);
+    if (!error.empty())
+        return ChildProcessHandle();
+    return ChildProcessHandle(LaunchState(options, run, programText, error));
+}
+
+ChildProcessHandle ChildProcessHandle::Adopt(ChildProcessIdentity const& identity, ChildBreakSender sendBreak, std::string& error)
+{
+    return ChildProcessHandle(AdoptState(identity, std::move(sendBreak), error));
+}
+
+std::optional<ChildProcessIdentity> ChildProcessHandle::Describe(int64 id)
+{
+    return DescribeProcess(id);
+}
+
+ChildProcessIdentity const& ChildProcessHandle::GetIdentity() const
+{
+    return _state->Identity;
+}
+
+bool ChildProcessHandle::IsAdopted() const
+{
+    return _state->Adopted;
+}
+
+bool ChildProcessHandle::HasInput() const
+{
+    std::lock_guard<std::mutex> const lock(_state->Mutex);
+    return static_cast<bool>(_state->Input);
+}
+
+std::optional<ChildExit> ChildProcessHandle::GetExit() const
+{
+    std::lock_guard<std::mutex> const lock(_state->Mutex);
+    return _state->Exit;
 }

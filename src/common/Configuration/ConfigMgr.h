@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Layered typed configuration: defaults, local config, conf.d drop-ins, AMBROSE_ environment variables, and overrides, with the shipped defaults kept readable under every layer, and the shape a subsystem declares an option it reads only at startup in, with the reason.
+ * Layered typed configuration: defaults, local config, conf.d drop-ins, AMBROSE_ environment variables, and overrides, with the shipped defaults kept readable under every layer, and the shape a subsystem declares an option it reads only at startup in, with the reason, where a key ending in a star stands for every key under that prefix.
  */
 
 #ifndef AMBROSE_CONFIGMGR_H

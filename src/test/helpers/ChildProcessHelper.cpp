@@ -1,12 +1,15 @@
 /*
  * Project Ambrose by Imjustchico
- * Program the ChildProcess tests run, carrying out the commands in its arguments in order: echo and err print a line to standard output or error, exit ends with a code, sleep waits milliseconds, args prints every later argument on its own line, long prints a line of that many bytes, unfinished prints that many bytes with no newline, pad prints that many bytes and then some text as a line, lines prints that many numbered lines, hex writes bytes given in hex as a line, touch writes an empty file at that path, so a run with no pipes can still be seen, partial writes text with no newline, crlf ends a line with CRLF, stdin prints whether input is already at its end, input prints without waiting whether input is open, at its end or holding data, cwd prints the working directory, ignore-term ignores SIGTERM, exit-when-input-ends calls ChildProcess::ExitWhenInputEnds with a code, spawn-sleeper starts a copy of itself that sleeps for a minute and prints that copy's process id, and spawn-input-watcher starts a copy of itself in a process group of its own, sharing its input and discarding its output, that ends once that input ends or else sleeps for a minute, and prints that copy's process id.
+ * Program the ChildProcess and supervisor tests run, carrying out the commands in its arguments in order, and when its first argument is --config, reading more from that file one argument per line the way the supervisor starts an app: echo and err print a line to standard output or error, exit ends with a code, sleep waits milliseconds, args prints every later argument on its own line, long prints a line of that many bytes, unfinished prints that many bytes with no newline, pad prints that many bytes and then some text as a line, lines prints that many numbered lines, hex writes bytes given in hex as a line, touch writes an empty file at that path, so a run with no pipes can still be seen, partial writes text with no newline, crlf ends a line with CRLF, stdin prints whether input is already at its end, input prints without waiting whether input is open, at its end or holding data, cwd prints the working directory, ignore-term ignores SIGTERM, exit-when-input-ends calls ChildProcess::ExitWhenInputEnds with a code, spawn-sleeper starts a copy of itself that sleeps for a minute and prints that copy's process id, spawn-input-watcher starts a copy of itself in a process group of its own, sharing its input and discarding its output, that ends once that input ends or else sleeps for a minute, and prints that copy's process id, wait-for-stop prints waiting and runs until a shutdown line arrives on its input or SIGINT, SIGTERM or SIGBREAK does, then says which and exits 0, the way a server stops, and console-break sends Ctrl+Break to a process group through ChildProcess::SendConsoleBreak, exiting 1 with the reason when it cannot.
  */
 
 #include "ChildProcess.h"
 
+#include <array>
+#include <atomic>
 #include <charconv>
 #include <chrono>
+#include <csignal>
 #include <cstddef>
 #include <cstdio>
 #include <filesystem>
@@ -42,6 +45,13 @@ extern char** environ;
 
 namespace
 {
+    volatile std::sig_atomic_t stopSignal = 0;
+
+    void OnStopSignal(int number)
+    {
+        stopSignal = number;
+    }
+
 #ifdef _WIN32
     std::string ToUtf8(std::wstring_view text)
     {
@@ -212,7 +222,21 @@ int main(int argc, char** argv)
     _setmode(_fileno(stdout), _O_BINARY);
     _setmode(_fileno(stderr), _O_BINARY);
 #endif
-    std::vector<std::string> const arguments = Arguments(argc, argv);
+    std::vector<std::string> arguments = Arguments(argc, argv);
+    if (arguments.size() >= 3 && arguments[1] == "--config")
+    {
+        std::ifstream script(std::filesystem::path(std::u8string(arguments[2].begin(), arguments[2].end())), std::ios::binary);
+        std::vector<std::string> expanded{ arguments[0] };
+        std::string line;
+        while (std::getline(script, line))
+        {
+            if (!line.empty() && line.back() == '\r')
+                line.pop_back();
+            expanded.push_back(line);
+        }
+        expanded.insert(expanded.end(), arguments.begin() + 3, arguments.end());
+        arguments = std::move(expanded);
+    }
     for (std::size_t index = 1; index < arguments.size(); ++index)
     {
         std::string const command = arguments[index];
@@ -251,6 +275,35 @@ int main(int argc, char** argv)
         {
             Write(stdout, InputState() + "\n");
             continue;
+        }
+        if (command == "wait-for-stop")
+        {
+            std::signal(SIGINT, OnStopSignal);
+            std::signal(SIGTERM, OnStopSignal);
+#ifdef SIGBREAK
+            std::signal(SIGBREAK, OnStopSignal);
+#endif
+            static std::atomic<bool> shutdownLine{ false };
+            std::thread([]
+            {
+                std::array<char, 256> line{};
+                while (std::fgets(line.data(), static_cast<int>(line.size()), stdin) != nullptr)
+                {
+                    std::string_view text(line.data());
+                    while (!text.empty() && (text.back() == '\n' || text.back() == '\r'))
+                        text.remove_suffix(1);
+                    if (text == "shutdown")
+                    {
+                        shutdownLine = true;
+                        return;
+                    }
+                }
+            }).detach();
+            Write(stdout, "waiting\n");
+            while (stopSignal == 0 && !shutdownLine.load())
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            Write(stdout, stopSignal != 0 ? "stopped by signal\n" : "stopped by shutdown\n");
+            return 0;
         }
         if (command == "spawn-sleeper" || command == "spawn-input-watcher")
         {
@@ -339,6 +392,15 @@ int main(int argc, char** argv)
         else if (command == "exit-when-input-ends")
         {
             ChildProcess::ExitWhenInputEnds(static_cast<int>(*number));
+        }
+        else if (command == "console-break")
+        {
+            std::string error;
+            if (!ChildProcess::SendConsoleBreak(static_cast<int64>(*number), error))
+            {
+                Write(stderr, error + "\n");
+                return 1;
+            }
         }
         else if (command == "long")
         {

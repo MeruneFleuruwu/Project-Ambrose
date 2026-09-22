@@ -72,6 +72,7 @@ public:
     Seconds GetUptime() const noexcept;
 
     bool IsReady() const noexcept { return GetLifecycleState() == AppLifecycle::Running; }
+    bool IsCheckOnly() const noexcept { return _checkOnly.load(); }
     ConsoleCommandTable& Commands() noexcept { return _commands; }
     ServerAppInfo const& GetInfo() const noexcept { return _info; }
     AppLifecycle GetLifecycleState() const noexcept { return _lifecycle.load(); }
@@ -138,6 +139,7 @@ private:
     std::condition_variable _commandWake;
     std::deque<std::string> _commandQueue;
     bool _commandStop = false;
+    std::atomic<bool> _checkOnly{ false };
     std::chrono::steady_clock::time_point _lastUpdate;
     std::atomic<std::chrono::steady_clock::time_point> _startedAt{ std::chrono::steady_clock::time_point() };
     std::atomic<AppLifecycle> _lifecycle{ AppLifecycle::Stopped };

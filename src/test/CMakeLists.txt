@@ -1,5 +1,5 @@
 # Project Ambrose by Imjustchico
-# Builds unit_tests from every test source outside the compile, client, fuzz, helpers and tools folders, with the launcher's own tests joining it when the launcher library is built so one executable holds them, and outside the login server's folder unless its library is built, together with the child_process_helper program its ChildProcess tests run, which links the common library and whose DLL list the tests get to copy it elsewhere, hands the tests the path of the generated design token stylesheet so the terminal header can be checked against it, links the Windows security API the admin token permission checks read, registers each test with CTest, adds the compile and client folders, the typeextract tests when that tool is built and the fuzz folder when fuzzers are built, and smoke-tests each server executable and the bindecode, dbimport, extractor, launcher, localetool and typeextract tools.
+# Builds unit_tests from every test source outside the compile, client, fuzz, helpers and tools folders, with the launcher's own tests joining it when the launcher library is built so one executable holds them, and outside the login server's and the supervisor's folders unless their libraries are built, together with the child_process_helper program its ChildProcess tests run, which links the common library and whose DLL list the tests get to copy it elsewhere, hands the tests the path of the generated design token stylesheet so the terminal header can be checked against it, links the Windows security API the admin token permission checks read, registers each test with CTest, adds the compile and client folders, the typeextract tests when that tool is built and the fuzz folder when fuzzers are built, and smoke-tests each server executable, the supervisor and the bindecode, dbimport, extractor, launcher, localetool and typeextract tools.
 find_package(GTest CONFIG REQUIRED)
 include(GoogleTest)
 
@@ -11,6 +11,9 @@ foreach(source IN LISTS all_test_sources)
         continue()
     endif()
     if(relative MATCHES "^server/apps/loginserver/" AND NOT TARGET login)
+        continue()
+    endif()
+    if(relative MATCHES "^server/apps/supervisor/" AND NOT TARGET supervision)
         continue()
     endif()
     list(APPEND test_sources "${source}")
@@ -47,6 +50,10 @@ if(TARGET login)
     target_link_libraries(unit_tests PRIVATE login)
 endif()
 
+if(TARGET supervision)
+    target_link_libraries(unit_tests PRIVATE supervision)
+endif()
+
 if(TARGET launcher-core)
     file(GLOB launcher_test_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tools/launcher/*.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/tools/launcher/*.h")
     target_sources(unit_tests PRIVATE ${launcher_test_sources})
@@ -66,7 +73,7 @@ if(AMBROSE_BUILD_FUZZERS)
     add_subdirectory(fuzz)
 endif()
 
-foreach(app IN ITEMS gameserver loginserver patchserver)
+foreach(app IN ITEMS gameserver loginserver patchserver supervisor)
     if(TARGET ${app})
         add_test(NAME AppSmoke.${app}
             COMMAND "${CMAKE_COMMAND}" -DAPP=$<TARGET_FILE:${app}> -DUNIT_TESTS=$<TARGET_FILE:unit_tests> -DNAME=${app} -DWORKDIR=${CMAKE_CURRENT_BINARY_DIR}/app-smoke/${app} -P "${CMAKE_CURRENT_SOURCE_DIR}/apps/AppSmokeTest.cmake")

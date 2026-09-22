@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Answers every admin API request in one order: a request id, the host check, the panel's files for paths outside /api, public routes, then the bearer token or a browser session with its origin and CSRF checks, the body limit and the route, and finally the security headers, the request id in the answer and in any error body, and the error log.
+ * Answers every admin API request in one order: a request id, the host check, the panel's files for paths outside /api, public routes, then the bearer token or a browser session with its origin and CSRF checks, the body limit and the route, an exact one before the longest prefix that covers the path, and finally the security headers, the request id in the answer and in any error body, and the error log.
  */
 
 #include "AdminRouter.h"
@@ -90,23 +90,30 @@ AdminRouter::AdminRouter(AdminAuth& auth) : _auth(auth)
 {
 }
 
-void AdminRouter::Put(std::string method, std::string path, Handler handler, bool isPublic)
+void AdminRouter::Put(std::string method, std::string path, Handler handler, bool isPublic, bool prefix)
 {
     std::unique_lock const lock(_mutex);
     std::string const upper = Ambrose::ToUpper(method);
-    auto const existing = std::find_if(_routes.begin(), _routes.end(), [&](Route const& route) { return route.Method == upper && route.Path == path; });
+    auto const existing = std::find_if(_routes.begin(), _routes.end(), [&](Route const& route) { return route.Method == upper && route.Path == path && route.Prefix == prefix; });
     if (existing != _routes.end())
     {
         existing->Run = std::move(handler);
         existing->Public = isPublic;
         return;
     }
-    _routes.push_back({ upper, std::move(path), std::move(handler), isPublic });
+    _routes.push_back({ upper, std::move(path), std::move(handler), isPublic, prefix });
 }
 
 void AdminRouter::Add(std::string method, std::string path, Handler handler)
 {
     Put(std::move(method), std::move(path), std::move(handler), false);
+}
+
+void AdminRouter::AddPrefix(std::string method, std::string prefix, Handler handler)
+{
+    if (prefix.empty() || prefix.back() != '/')
+        prefix.push_back('/');
+    Put(std::move(method), std::move(prefix), std::move(handler), false, true);
 }
 
 void AdminRouter::AddPublic(std::string method, std::string path, Handler handler)
@@ -156,7 +163,7 @@ bool AdminRouter::Has(std::string const& method, std::string const& path) const
 {
     std::shared_lock const lock(_mutex);
     std::string const upper = Ambrose::ToUpper(method);
-    return std::any_of(_routes.begin(), _routes.end(), [&](Route const& route) { return route.Method == upper && route.Path == path; });
+    return std::any_of(_routes.begin(), _routes.end(), [&](Route const& route) { return route.Method == upper && route.Path == path && !route.Prefix; });
 }
 
 std::vector<std::string> AdminRouter::Describe() const
@@ -165,7 +172,7 @@ std::vector<std::string> AdminRouter::Describe() const
     std::vector<std::string> lines;
     lines.reserve(_routes.size());
     for (Route const& route : _routes)
-        lines.push_back(route.Method + " " + route.Path);
+        lines.push_back(route.Method + " " + route.Path + (route.Prefix ? "*" : ""));
     std::sort(lines.begin(), lines.end());
     return lines;
 }
@@ -262,6 +269,11 @@ std::string AdminRouter::NewRequestId()
     return Base64::Encode(bytes, Base64::Alphabet::UrlSafe, Base64::Padding::Omitted);
 }
 
+bool AdminRouter::IsRequestId(std::string_view text) noexcept
+{
+    return text.size() == 16 && std::all_of(text.begin(), text.end(), [](char c) { return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_'; });
+}
+
 AdminResponse AdminRouter::Dispatch(AdminRequest const& incoming) const
 {
     AdminRequest request = incoming;
@@ -296,7 +308,7 @@ AdminResponse AdminRouter::Answer(AdminRequest& request) const
         std::string const method = Ambrose::ToUpper(request.Method);
         for (Route const& route : _routes)
         {
-            if (route.Public && route.Path == request.Path && route.Method == method)
+            if (route.Public && !route.Prefix && route.Path == request.Path && route.Method == method)
             {
                 open = route.Run;
                 break;
@@ -366,7 +378,7 @@ AdminResponse AdminRouter::Serve(AdminRequest const& request) const
         std::string const method = Ambrose::ToUpper(request.Method);
         for (Route const& route : _routes)
         {
-            if (route.Path != request.Path)
+            if (route.Prefix || route.Path != request.Path)
                 continue;
             if (route.Method == method)
             {
@@ -374,6 +386,27 @@ AdminResponse AdminRouter::Serve(AdminRequest const& request) const
                 break;
             }
             allowed.push_back(route.Method);
+        }
+        if (!handler && allowed.empty())
+        {
+            std::size_t longest = 0;
+            for (Route const& route : _routes)
+            {
+                if (!route.Prefix || request.Path.size() <= route.Path.size() || request.Path.compare(0, route.Path.size(), route.Path) != 0 || route.Path.size() < longest)
+                    continue;
+                if (route.Path.size() > longest)
+                {
+                    longest = route.Path.size();
+                    handler = nullptr;
+                    allowed.clear();
+                }
+                if (route.Method == method)
+                    handler = route.Run;
+                else
+                    allowed.push_back(route.Method);
+            }
+            if (handler)
+                allowed.clear();
         }
     }
 

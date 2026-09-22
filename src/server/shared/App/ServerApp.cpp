@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Runs an app from arguments to exit: rejects bad options and missing config with exit code 1, opens the admin API with the app's own routes and the live log stream already in it before the app starts, keeping a generated token in the data folder or, where the machine names none, beside the config file, and refuses to run when its binding is unsafe, stops gracefully on signals, requests, the shutdown command or POST /api/shutdown, now or after a delay either can cancel, with the reason logged when the delay runs out, answers GET /api/settings with the options the app declares restart-required, moves the one lifecycle state the console and the admin API both read, lets a start in progress run queued signal handlers without blocking so a stop during OnStart exits cleanly without reporting ready, ticks updates on its io loop, and runs queued console lines on a command thread that shutdown waits for, answering on the same writer the log lines use.
+ * Runs an app from arguments to exit: rejects bad options and missing config with exit code 1, opens the admin API with the app's own routes and the live log stream already in it before the app starts, keeping a generated token in the data folder or, where the machine names none, beside the config file, and refuses to run when its binding is unsafe, stops gracefully on signals, requests, the shutdown command or POST /api/shutdown, now or after a delay either can cancel, with the reason logged when the delay runs out, answers GET /api/settings with the options the app declares restart-required, moves the one lifecycle state the console and the admin API both read, tells an app whether it runs only to check its start, lets a start in progress run queued signal handlers without blocking so a stop during OnStart exits cleanly without reporting ready, ticks updates on its io loop, and runs queued console lines on a command thread that shutdown waits for, answering on the same writer the log lines use.
  */
 
 #include "ServerApp.h"
@@ -348,6 +348,7 @@ int ServerApp::Run(std::vector<std::string> const& arguments)
     _lifecycle = AppLifecycle::Stopped;
     _stopScheduled = false;
     AppOptions const options = AppOptions::Parse(arguments, _info.DefaultConfigFile);
+    _checkOnly = options.CheckOnly;
     if (!options.Error.empty())
     {
         _err << _info.Name << ": " << options.Error << "\n" << AppOptions::Usage(_info.Name, _info.DefaultConfigFile);

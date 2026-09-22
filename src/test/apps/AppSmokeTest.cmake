@@ -1,5 +1,5 @@
 # Project Ambrose by Imjustchico
-# Runs a built server executable to check --version, a missing config, and --check with a copy of its shipped .conf.dist in the work folder, so no saved choice in the build folder's conf.d applies, where neither that run nor a run in Setup.Mode ask with ClientDir and TypeDumpPath empty and unlocked, an empty input file and a machine holding a synthetic install may print any text of a setup question to either output, the game and login servers must log that install as found with the advice for a run without a terminal, and no choice is saved; with AMBROSE_TEST_DB the game server and the login server, with its login and characters databases, create, update, open and close uniquely named databases that are dropped afterwards, the login server runs account commands piped into its console input, and a bad login database string exits 1.
+# Runs a built server executable to check --version, a missing config, and --check with a copy of its shipped .conf.dist in the work folder, so no saved choice in the build folder's conf.d applies, where neither that run nor a run in Setup.Mode ask with ClientDir and TypeDumpPath empty and unlocked, an empty input file and a machine holding a synthetic install may print any text of a setup question to either output, the game and login servers must log that install as found with the advice for a run without a terminal, and no choice is saved; with AMBROSE_TEST_DB the game server and the login server, with its login and characters databases, create, update, open and close uniquely named databases that are dropped afterwards, the login server runs account commands piped into its console input, a bad login database string exits 1, and the supervisor's --check names every app it would run and starts none of them, with its admin API on a port of its own choosing and its token in the work folder.
 if(NOT APP OR NOT NAME OR NOT WORKDIR)
     message(FATAL_ERROR "APP, NAME and WORKDIR must be set")
 endif()
@@ -32,6 +32,9 @@ string(REPLACE "gameserver" "WorldServerPort" portOption "${portOption}")
 string(REPLACE "loginserver" "LoginServerPort" portOption "${portOption}")
 string(REPLACE "patchserver" "PatchServerPort" portOption "${portOption}")
 set(quietOptions --set BindIP=127.0.0.1 --set ${portOption}=0 --set ClientDir= --set Appender.Server=1,3,0 --set Appender.Errors=1,3,0 --set Appender.Stream=1,3,0 --set Appender.Console=1,3,0)
+if(NAME STREQUAL "supervisor")
+    list(APPEND quietOptions --set Admin.Port=0 "--set=Admin.TokenFile=${WORKDIR}/admin.token")
+endif()
 set(questionText "needs your own Wizard101 install, and|needs the type dump made from your install, and|[Pp]ress Enter|\\[Y/n\\]|skipping setup questions|Type a path")
 set(workConfig "${WORKDIR}/${NAME}.conf.dist")
 file(COPY_FILE "${appDir}/${NAME}.conf.dist" "${workConfig}")
@@ -42,6 +45,9 @@ execute_process(COMMAND "${APP}" --check --config "${workConfig}" ${quietOptions
 if(NOT distResult EQUAL 0 OR NOT distOutput MATCHES "${NAME} ready" OR NOT distOutput MATCHES "${NAME} stopped" OR "${distOutput}${distError}" MATCHES "${questionText}")
     message(FATAL_ERROR "${NAME} with its shipped ${NAME}.conf.dist did not report ready without asking (${distResult}): ${distOutput}${distError}")
 endif()
+if(NAME STREQUAL "supervisor" AND (NOT distOutput MATCHES "Watching 3 app\\(s\\)" OR distOutput MATCHES "Started (loginserver|gameserver|patchserver)"))
+    message(FATAL_ERROR "supervisor --check did not check its three apps without starting any: ${distOutput}${distError}")
+endif()
 
 set(machine "${WORKDIR}/machine")
 set(synthetic "${machine}/drive_c/ProgramData/KingsIsle Entertainment/Wizard101")
@@ -49,6 +55,9 @@ file(WRITE "${synthetic}/Data/GameData/Root.wad" "not an archive")
 file(WRITE "${synthetic}/Bin/revision.dat" "r999999999.Synthetic_1_0\n")
 set(machineEnv "ProgramData=${machine}/drive_c/ProgramData" "WINEPREFIX=${machine}" "LOCALAPPDATA=${WORKDIR}/data" "XDG_DATA_HOME=${WORKDIR}/data" --unset=AMBROSE_CLIENT_DIR --unset=AMBROSE_TYPE_DUMP_PATH --unset=AMBROSE_SETUP_MODE)
 set(askOptions --set BindIP=127.0.0.1 --set ${portOption}=0 --set Setup.Mode=ask --set Setup.PromptTimeout=5 --set Appender.Server=1,3,0 --set Appender.Errors=1,3,0 --set Appender.Stream=1,3,0 --set Appender.Console=1,3,0)
+if(NAME STREQUAL "supervisor")
+    list(APPEND askOptions --set Admin.Port=0 "--set=Admin.TokenFile=${WORKDIR}/admin.token")
+endif()
 execute_process(COMMAND "${CMAKE_COMMAND}" -E env ${machineEnv}
         "${APP}" --check --config "${workConfig}" ${askOptions} --set LoginDatabaseInfo= --set CharacterDatabaseInfo= --set WorldDatabaseInfo=
     WORKING_DIRECTORY "${WORKDIR}" INPUT_FILE "${WORKDIR}/no-input.txt" RESULT_VARIABLE askResult OUTPUT_VARIABLE askOutput ERROR_VARIABLE askError TIMEOUT 60)
