@@ -24,6 +24,7 @@ This is the maintainer's side of doc/CONTRIBUTOR-TRACK.md. It says how a pull re
    - Guide or note: every backticked path exists in the tree and every `Section.Option` is found under `src`, `apps` or `doc/config`. Walk it if the environment allows: the Linux guide was run on Ubuntu 24.04 rather than trusted.
    - Proposal: find whether the thing proposed already exists before judging the design. `src/test/apps/AppSmokeTest.cmake` alone already proves the servers reach readiness with disposable databases.
    - Finding: the claim is about the game, the evidence is observations, the method matches, and the revision is real. An experiment with before-and-after hashes of the install is the standard.
+   - Schema or fixture for a route that exists: compare its property names and JSON types with the encoder that writes the route, `src/server/shared/Admin/AdminStatus.cpp` for status, apps and capabilities, and validate a response shaped like the real one against it. The first two schemas, C-56 and C-57, passed their own checkers and described fields the server never sends.
    - Locale or data: check whether two pull requests write the same file. Merge the larger, fold the rest onto main, close the other as folded.
 5. **Merge with a squash**, subject `<item id>: <what landed>`, body saying what it does, `Contributed on the contributor track.`, and the contributor's `Co-Authored-By`. Never build one branch on another to merge them together.
 6. **Close what is not a contribution** with the reason, the item that stays open, and what would make it one.
