@@ -52,3 +52,20 @@ the same gameserver as the status fixture. A gameserver does not register a
 listener yet, so its `address` is empty and its `port` is 0, and the schema
 allows both, as it allows an empty `realm`. The loginserver fixtures are
 synthetic values built from the encoder contract.
+
+## C-60: problem code catalog
+
+The standard problem codes the status response may carry are the ones the build
+registers and the dashboard's quick-fix links understand. Each entry carries the
+runtime code, the message and subject the app reports, the operator-facing
+severity the panel and docs should treat as the warning level, and the action an
+operator takes to fix it.
+
+```powershell
+python contrib\schemas\check_problem_codes.py
+```
+
+`problem-codes-v1.json` lists the shipped codes from `src/server/shared/Admin/
+AdminCapabilities.h` and the app-side status problems in `src/server/shared/App/
+ServerApp.cpp`: missing install, missing or stale type dump, unreachable
+database, pending schema updates and an unapproved client revision.
