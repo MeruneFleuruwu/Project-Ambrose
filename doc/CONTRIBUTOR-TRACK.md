@@ -123,7 +123,6 @@ Each item is worth doing, needs nothing from the phases, and lands inside the tr
 | F-53 | Which classes the type dump marks as having no reflected properties, grouped by base class, with counts | `contrib/findings/objects/` | The static, countable half of F-38 |
 | F-54 | The sizes and counts of every archive in the install: files per archive, compressed and uncompressed totals, as a table | `contrib/findings/data/` | The patch server plans transfers against this |
 | F-55 | What a name table row holds: the fields the extractor reads from each name table, checked against the dump | `contrib/findings/data/` | The world database's name columns are shaped by it |
-| C-71 | A checker for the roadmap files: every dependency names a milestone that exists, ids are unique, sizes match the counting rule, and a ticked box carries evidence | `contrib/tools/` | The maintainer runs one from a scratchpad; the project should own one |
 | C-72 | A dead-link checker for `doc/`, relative links and anchors, with its results as a note | `contrib/tools/` | Documents move; links do not follow them |
 | C-73 | An audit of `vcpkg.json` and `package.json` against `THIRD-PARTY-NOTICES.md`: every dependency listed, every licence right, nothing listed that is no longer used | `contrib/notes/` | The notices file is a promise the repository keeps by hand |
 | C-74 | A capture-free replay corpus for C-23: manifests of frame sequences in the shape the replayer reads, for a login, a wrong password and a keepalive exchange, built from the message definitions rather than a capture | `contrib/fixtures/` | The replayer exists; it has nothing to replay |
@@ -208,6 +207,7 @@ The first list is mostly taken, and what remains of it waits on servers that do 
 | C-68 | The launcher's three misdiagnosed problems: the configuration the client ignores, the fullscreen traps, and the page a refused client opens | `doc/guides/` | MeruneFleuruwu, in #114 |
 | C-69 | An audit of every shipped option against its page, and the nine drifts it found | `contrib/tools/config-audit/` | MeruneFleuruwu, in #115 |
 | C-70 | An audit of every log category the code writes against the guide and the shipped loggers, and the undocumented one it found | `contrib/tools/log-category-audit/` | MeruneFleuruwu, in #116 |
+| C-71 | A checker for the roadmap files: ids, dependencies, sizes and, on request, the evidence beside a ticked box | `contrib/tools/roadmap-check/` | MeruneFleuruwu, in #117 |
 
 An item stays listed until its pull request is merged. Ask before starting something not on the list: the answer is usually yes if it lands in the paths above.
 
