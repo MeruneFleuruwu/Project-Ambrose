@@ -13,7 +13,8 @@
       "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
       "cacheVariables": {
         "CMAKE_CONFIGURATION_TYPES": "Debug;RelWithDebInfo",
-        "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/deps/vcpkg/triplets"
+        "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/deps/vcpkg/triplets",
+        "VCPKG_OVERLAY_PORTS": "${sourceDir}/deps/vcpkg/ports"
       }
     },
     {
