@@ -1,91 +1,159 @@
-<!-- Project Ambrose by Imjustchico: The settings page: each app's settings in tabs by area, each saved with a live reload, the form 17.13 turns into the full editor. -->
+<!-- Project Ambrose by Imjustchico: The config page, live from each app: every option the app has loaded with the value in use, the value its .conf.dist ships, the layer, file and line it was read from, secrets shown only as the mask, and the reason beside each option that only takes effect at the app's next start, searchable and grouped by the first word of the key. -->
 <script lang="ts">
     import * as Card from "$lib/components/ui/card/index.js";
-    import * as Tabs from "$lib/components/ui/tabs/index.js";
-    import { Button } from "$lib/components/ui/button/index.js";
+    import * as Select from "$lib/components/ui/select/index.js";
+    import * as Table from "$lib/components/ui/table/index.js";
     import { Input } from "$lib/components/ui/input/index.js";
-    import { Label } from "$lib/components/ui/label/index.js";
-    import { Switch } from "$lib/components/ui/switch/index.js";
+    import { ApiError } from "$lib/api.svelte.js";
+    import { live } from "$lib/status.svelte.js";
+    import { servedBy, settingsOf, supervised, supervisorServes } from "$lib/supervision.svelte.js";
+    import type { SettingsAnswer } from "$lib/schemas.js";
+    import SearchIcon from "@lucide/svelte/icons/search";
     import PageHeader from "../components/PageHeader.svelte";
+    import StatusBadge from "../components/StatusBadge.svelte";
+
+    const layers: Record<string, string> = {
+        default: "Shipped default",
+        module_default: "Module default",
+        config: "This app's .conf",
+        module_config: "A conf.d file",
+        environment: "Environment variable",
+        override: "Command line",
+    };
+
+    const choices = $derived(supervisorServes() ? [servedBy(), ...supervised().map((app) => app.name)] : [servedBy()]);
+    let chosen = $state("");
+    let answer = $state<SettingsAnswer | null>(null);
+    let failure = $state("");
+    let search = $state("");
+
+    const app = $derived(choices.includes(chosen) ? chosen : (choices[0] ?? ""));
+
+    $effect(() => {
+        const name = app;
+        if (name === "") return;
+        const controller = new AbortController();
+        void (async () => {
+            try {
+                answer = await settingsOf(name, controller.signal);
+                failure = "";
+            } catch (problem) {
+                if (controller.signal.aborted) return;
+                answer = null;
+                failure = problem instanceof ApiError ? problem.message : "The settings could not be read";
+            }
+        })();
+        return () => controller.abort();
+    });
+
+    const shown = $derived.by(() => {
+        const text = search.trim().toLowerCase();
+        const settings = (answer?.settings ?? []).filter(
+            (setting) => text === "" || setting.key.toLowerCase().includes(text) || setting.value.toLowerCase().includes(text),
+        );
+        const groups: { name: string; list: typeof settings }[] = [];
+        for (const setting of settings) {
+            const dot = setting.key.indexOf(".");
+            const name = dot === -1 ? "General" : setting.key.slice(0, dot);
+            const held = groups.find((group) => group.name === name);
+            if (held) held.list.push(setting);
+            else groups.push({ name, list: [setting] });
+        }
+        return groups;
+    });
+
+    const counted = $derived(answer?.settings.length ?? 0);
+    const restarts = $derived((answer?.settings ?? []).filter((setting) => setting.restart_reason !== null).length);
 </script>
 
-<PageHeader title="Settings" description="Changes apply live with a reload; nothing needs a restart.">
+<PageHeader
+    title="Settings"
+    description={`Every option ${app === "" ? "this app" : app} has loaded, with where each value came from. Editing them from here arrives with milestone 17.13.`}
+>
     {#snippet actions()}
-        <Button variant="ghost">Discard</Button>
-        <Button>Save and reload</Button>
+        {#if choices.length > 1}
+            <Select.Root type="single" bind:value={chosen}>
+                <Select.Trigger class="w-44" aria-label="App whose settings are shown">{app}</Select.Trigger>
+                <Select.Content>
+                    {#each choices as name (name)}
+                        <Select.Item value={name}>{name}</Select.Item>
+                    {/each}
+                </Select.Content>
+            </Select.Root>
+        {/if}
+        <div class="relative">
+            <SearchIcon class="absolute top-2.5 left-2.5 size-4 text-muted-foreground" />
+            <Input class="w-56 pl-8" placeholder="Search options" bind:value={search} aria-label="Search options" />
+        </div>
     {/snippet}
 </PageHeader>
 
-<Tabs.Root value="realm" class="gap-4">
-    <Tabs.List>
-        <Tabs.Trigger value="realm">Realm</Tabs.Trigger>
-        <Tabs.Trigger value="admin">Admin API</Tabs.Trigger>
-        <Tabs.Trigger value="logging">Logging</Tabs.Trigger>
-    </Tabs.List>
-    <Tabs.Content value="realm">
-        <Card.Root class="shadow-xs">
-            <Card.Header>
-                <Card.Title>Realm</Card.Title>
-                <Card.Description>What players see in the realm list.</Card.Description>
-            </Card.Header>
-            <Card.Content class="grid gap-6 md:grid-cols-2">
-                <div class="grid content-start gap-2">
-                    <Label for="realm-name">Realm name</Label><Input id="realm-name" value="Ambrose" />
-                </div>
-                <div class="grid content-start gap-2">
-                    <Label for="realm-limit">Player limit</Label>
-                    <Input id="realm-limit" type="number" value="500" />
-                    <p class="text-xs text-muted-foreground">Applies from the next realm list refresh.</p>
-                </div>
-                <div class="flex items-center justify-between rounded-lg border p-4 md:col-span-2">
-                    <div class="space-y-0.5">
-                        <Label for="realm-recommended">Recommended</Label>
-                        <p class="text-xs text-muted-foreground">Show this realm first to new players.</p>
-                    </div>
-                    <Switch id="realm-recommended" checked />
-                </div>
-            </Card.Content>
+{#if failure}
+    <Card.Root class="shadow-xs">
+        <Card.Header>
+            <Card.Title>The settings could not be read</Card.Title>
+            <Card.Description>{failure}</Card.Description>
+        </Card.Header>
+    </Card.Root>
+{:else if !answer}
+    <p class="text-sm text-muted-foreground">Reading the settings of {app === "" ? "this app" : app}.</p>
+{:else}
+    <div class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+        <span>{counted} option{counted === 1 ? "" : "s"} from <span class="font-mono text-xs">{answer.file}</span></span>
+        {#if restarts > 0}
+            <StatusBadge tone="waiting">{restarts} need a restart</StatusBadge>
+        {/if}
+        {#if live.status && live.status.app !== app}
+            <span>Read through the supervisor.</span>
+        {/if}
+    </div>
+
+    {#each shown as group (group.name)}
+        <Card.Root class="py-0 shadow-xs">
+            <Table.Root>
+                <Table.Header>
+                    <Table.Row class="hover:bg-transparent">
+                        <Table.Head class="pl-6">{group.name}</Table.Head>
+                        <Table.Head>Value in use</Table.Head>
+                        <Table.Head class="hidden lg:table-cell">Shipped default</Table.Head>
+                        <Table.Head class="hidden md:table-cell">Read from</Table.Head>
+                    </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                    {#each group.list as setting (setting.key)}
+                        <Table.Row>
+                            <Table.Cell class="pl-6 align-top">
+                                <div class="font-mono text-xs font-medium">{setting.key}</div>
+                                <div class="mt-1 flex flex-wrap gap-1">
+                                    {#if setting.secret}<StatusBadge tone="mine">Secret</StatusBadge>{/if}
+                                    {#if setting.restart_reason}<StatusBadge tone="waiting">Restart required</StatusBadge>{/if}
+                                </div>
+                                {#if setting.restart_reason}
+                                    <div class="mt-1 max-w-80 text-xs text-muted-foreground">{setting.restart_reason}</div>
+                                {/if}
+                            </Table.Cell>
+                            <Table.Cell class="align-top font-mono text-xs break-all">
+                                {setting.value === "" ? "—" : setting.value}
+                                {#if setting.default !== null && setting.default !== setting.value}
+                                    <div class="mt-1 font-sans text-xs text-waiting">Changed from the default</div>
+                                {/if}
+                            </Table.Cell>
+                            <Table.Cell class="hidden align-top font-mono text-xs break-all lg:table-cell"
+                                >{setting.default === null ? "Not shipped" : setting.default === "" ? "—" : setting.default}</Table.Cell
+                            >
+                            <Table.Cell class="hidden align-top text-xs md:table-cell">
+                                <div>{layers[setting.layer] ?? setting.layer}</div>
+                                <div class="text-muted-foreground">
+                                    {setting.file}{setting.line > 0 ? `:${setting.line}` : ""}
+                                </div>
+                            </Table.Cell>
+                        </Table.Row>
+                    {/each}
+                </Table.Body>
+            </Table.Root>
         </Card.Root>
-    </Tabs.Content>
-    <Tabs.Content value="admin">
-        <Card.Root class="shadow-xs">
-            <Card.Header>
-                <Card.Title>Admin API</Card.Title>
-                <Card.Description>The listener this panel talks to.</Card.Description>
-            </Card.Header>
-            <Card.Content class="grid gap-6 md:grid-cols-2">
-                <div class="grid content-start gap-2">
-                    <Label for="admin-bind">Listen address</Label><Input id="admin-bind" value="127.0.0.1" class="font-mono" />
-                </div>
-                <div class="grid content-start gap-2">
-                    <Label for="admin-token">Token</Label>
-                    <Input id="admin-token" type="password" value="hidden-token" class="font-mono" />
-                    <p class="text-xs text-muted-foreground">A secret: never shown or logged.</p>
-                </div>
-                <div class="flex items-center justify-between rounded-lg border p-4 md:col-span-2">
-                    <div class="space-y-0.5">
-                        <Label for="admin-enable">Serve the admin API</Label>
-                        <p class="text-xs text-muted-foreground">Turning this off closes the listener at once.</p>
-                    </div>
-                    <Switch id="admin-enable" checked />
-                </div>
-            </Card.Content>
-        </Card.Root>
-    </Tabs.Content>
-    <Tabs.Content value="logging">
-        <Card.Root class="shadow-xs">
-            <Card.Header>
-                <Card.Title>Logging</Card.Title>
-                <Card.Description>How much each server writes and keeps.</Card.Description>
-            </Card.Header>
-            <Card.Content class="grid gap-6 md:grid-cols-2">
-                <div class="grid content-start gap-2">
-                    <Label for="log-backlog">Live backlog</Label><Input id="log-backlog" type="number" value="1000" />
-                </div>
-                <div class="grid content-start gap-2">
-                    <Label for="log-days">Keep log files for (days)</Label><Input id="log-days" type="number" value="14" />
-                </div>
-            </Card.Content>
-        </Card.Root>
-    </Tabs.Content>
-</Tabs.Root>
+    {/each}
+    {#if shown.length === 0}
+        <p class="text-sm text-muted-foreground">No option matches “{search}”.</p>
+    {/if}
+{/if}

@@ -32,6 +32,8 @@ dist/
 storybook-static/
 playwright-report/
 test-results/
+.vitest-attachments/
+__screenshots__/
 coverage/
 *.tsbuildinfo
 .npm-cache/

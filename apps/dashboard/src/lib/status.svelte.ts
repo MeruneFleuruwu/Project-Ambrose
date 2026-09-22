@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * The live picture of the app that served the panel: its entry in the app list and its capabilities, read when watching starts, its status read every second into the latest sample and the time it arrived, fifteen-minute typed-array rings of tick times and sessions for the charts, and the connection in the words doc/DESIGN.md sets, retrying with a growing delay and a countdown when answers stop, and stopping when the session ends.
+ * The live picture of the app that served the panel: its entry in the app list and its capabilities, read when watching starts and, when the supervisor served the panel, the whole app list read again every second because it carries every app's state, its status read every second into the latest sample and the time it arrived, fifteen-minute typed-array rings of tick times and sessions for the charts, and the connection in the words doc/DESIGN.md sets, retrying with a growing delay and a countdown when answers stop, and stopping when the session ends.
  */
 
 import { ApiError, request } from "./api.svelte";
@@ -105,7 +105,8 @@ async function poll() {
     inFlight = controller;
     const deadline = setTimeout(() => controller.abort(), 3 * IntervalMs);
     try {
-        if (live.apps.length === 0) live.apps = await request("GET", "api/apps", AppList, undefined, controller.signal);
+        if (live.apps.length === 0 || live.apps.some((entry) => entry.supervision != null))
+            live.apps = await request("GET", "api/apps", AppList, undefined, controller.signal);
         if (live.capabilities === null)
             live.capabilities = await request("GET", "api/capabilities", Capabilities, undefined, controller.signal);
         const status = await request("GET", "api/status", Status, undefined, controller.signal);

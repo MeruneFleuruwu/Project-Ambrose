@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * The shapes the panel accepts from the admin API, checked at the boundary with Valibot: the session, the app list, the status and the capabilities, each loose so a field a newer server adds is kept rather than refused, since the status schema only ever gains fields.
+ * The shapes the panel accepts from the admin API, checked at the boundary with Valibot: the session, the app list with what the supervisor knows about each app, the status, the capabilities, the captured output, a power answer, the settings an app has loaded and its databases with their update files, each loose so a field a newer server adds is kept rather than refused, since these schemas only ever gain fields.
  */
 
 import * as v from "valibot";
@@ -14,6 +14,42 @@ export const SessionAnswer = v.looseObject({
     lifetime_seconds: v.number(),
 });
 
+export const AppExit = v.looseObject({
+    epoch_ms: v.number(),
+    code: v.nullable(v.number()),
+    signal: v.nullable(v.number()),
+    requested: v.boolean(),
+    during: v.string(),
+    uptime_ms: v.number(),
+});
+
+export const Supervision = v.looseObject({
+    name: v.string(),
+    program: v.string(),
+    config: v.string(),
+    state: v.string(),
+    watching: v.boolean(),
+    desired: v.string(),
+    pid: v.nullable(v.number()),
+    adopted: v.boolean(),
+    started_epoch_ms: v.nullable(v.number()),
+    ready_epoch_ms: v.nullable(v.number()),
+    admin: v.looseObject({
+        enabled: v.boolean(),
+        address: v.nullable(v.string()),
+        port: v.nullable(v.number()),
+        problem: v.nullable(v.string()),
+    }),
+    stop: v.nullable(v.looseObject({ method: v.string(), requested_epoch_ms: v.number() })),
+    restart_epoch_ms: v.nullable(v.number()),
+    crashes: v.number(),
+    failed_starts: v.number(),
+    restarts: v.number(),
+    last_exit: v.nullable(AppExit),
+    exits: v.array(AppExit),
+    message: v.nullable(v.string()),
+});
+
 export const AppEntry = v.looseObject({
     name: v.string(),
     role: v.string(),
@@ -21,6 +57,7 @@ export const AppEntry = v.looseObject({
     address: v.string(),
     port: v.number(),
     revision: v.string(),
+    supervision: v.optional(v.nullable(Supervision)),
 });
 
 export const AppList = v.array(AppEntry);
@@ -55,8 +92,121 @@ export const Capabilities = v.looseObject({
     problem_codes: v.array(v.looseObject({ code: v.string(), description: v.string() })),
 });
 
+export const OutputAnswer = v.looseObject({
+    schema: v.number(),
+    app: v.string(),
+    run: v.string(),
+    lines: v.array(v.looseObject({ seq: v.number(), stream: v.string(), text: v.string(), epoch_ms: v.nullable(v.number()) })),
+});
+
+export const PowerAnswer = v.looseObject({
+    app: v.string(),
+    action: v.string(),
+    seconds: v.number(),
+    accepted: v.boolean(),
+});
+
+export const SettingsAnswer = v.looseObject({
+    schema: v.number(),
+    file: v.string(),
+    settings: v.array(
+        v.looseObject({
+            key: v.string(),
+            value: v.string(),
+            layer: v.string(),
+            file: v.string(),
+            line: v.number(),
+            default: v.nullable(v.string()),
+            default_file: v.nullable(v.string()),
+            secret: v.boolean(),
+            restart_reason: v.nullable(v.string()),
+        }),
+    ),
+});
+
+export const DatabaseAnswer = v.looseObject({
+    schema: v.number(),
+    databases: v.array(
+        v.looseObject({
+            name: v.string(),
+            key: v.string(),
+            state: v.string(),
+            applying: v.boolean(),
+            updates_enabled: v.boolean(),
+            update_flag: v.number(),
+            address: v.nullable(v.string()),
+            pool: v.looseObject({
+                async_connections: v.number(),
+                sync_connections: v.number(),
+                async_active: v.number(),
+                sync_leased: v.number(),
+                sync_waiting: v.number(),
+                queued: v.number(),
+                reconnects: v.number(),
+            }),
+            stores: v.array(v.string()),
+        }),
+    ),
+});
+
+export const AppliedUpdate = v.looseObject({
+    name: v.string(),
+    state: v.string(),
+    hash: v.string(),
+    applied_epoch_ms: v.number(),
+    took_ms: v.number(),
+    present: v.boolean(),
+    changed: v.boolean(),
+});
+
+export const PendingUpdate = v.looseObject({
+    name: v.string(),
+    state: v.string(),
+    file: v.string(),
+    hash: v.string(),
+    kind: v.string(),
+    transactional: v.boolean(),
+    line: v.nullable(v.number()),
+    statement: v.nullable(v.string()),
+    problem: v.nullable(v.string()),
+    renamed_from: v.nullable(v.string()),
+    restart_required: v.boolean(),
+    waits_for: v.nullable(v.string()),
+});
+
+export const DatabaseUpdatesAnswer = v.looseObject({
+    schema: v.number(),
+    databases: v.array(
+        v.looseObject({
+            name: v.string(),
+            listed: v.boolean(),
+            error: v.nullable(v.string()),
+            applied: v.array(AppliedUpdate),
+            pending: v.array(PendingUpdate),
+        }),
+    ),
+});
+
+export const DatabaseApplyAnswer = v.looseObject({
+    database: v.string(),
+    succeeded: v.boolean(),
+    applied: v.array(v.string()),
+    stopped_at: v.nullable(v.string()),
+    failed_at: v.nullable(v.string()),
+    failure: v.nullable(v.string()),
+    stores: v.array(v.looseObject({ name: v.string(), loaded: v.boolean(), errors: v.array(v.string()), warnings: v.array(v.string()) })),
+});
+
 export type SessionAnswer = v.InferOutput<typeof SessionAnswer>;
 export type AppEntry = v.InferOutput<typeof AppEntry>;
 export type Problem = v.InferOutput<typeof Problem>;
 export type Status = v.InferOutput<typeof Status>;
 export type Capabilities = v.InferOutput<typeof Capabilities>;
+export type Supervision = v.InferOutput<typeof Supervision>;
+export type AppExit = v.InferOutput<typeof AppExit>;
+export type OutputAnswer = v.InferOutput<typeof OutputAnswer>;
+export type SettingsAnswer = v.InferOutput<typeof SettingsAnswer>;
+export type DatabaseAnswer = v.InferOutput<typeof DatabaseAnswer>;
+export type DatabaseUpdatesAnswer = v.InferOutput<typeof DatabaseUpdatesAnswer>;
+export type DatabaseApplyAnswer = v.InferOutput<typeof DatabaseApplyAnswer>;
+export type PendingUpdate = v.InferOutput<typeof PendingUpdate>;

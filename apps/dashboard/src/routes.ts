@@ -6,6 +6,7 @@
 import type { Component } from "svelte";
 import ActivityIcon from "@lucide/svelte/icons/activity";
 import ArchiveIcon from "@lucide/svelte/icons/archive";
+import DatabaseIcon from "@lucide/svelte/icons/database";
 import FileTextIcon from "@lucide/svelte/icons/file-text";
 import GaugeIcon from "@lucide/svelte/icons/gauge";
 import GlobeIcon from "@lucide/svelte/icons/globe";
@@ -54,7 +55,7 @@ export const routes: Route[] = [
         permission: "apps.read",
         nav: true,
         group: "Servers",
-        view: { kind: "arrives", milestone: "17.08", preview: { kind: "page", load: () => import("./pages/Servers.svelte") } },
+        view: { kind: "page", load: () => import("./pages/Servers.svelte") },
     },
     {
         path: "logs",
@@ -73,6 +74,15 @@ export const routes: Route[] = [
         nav: true,
         group: "Servers",
         view: { kind: "arrives", milestone: "17.07", preview: { kind: "page", load: () => import("./pages/Console.svelte") } },
+    },
+    {
+        path: "database",
+        title: "Database",
+        icon: DatabaseIcon,
+        permission: "database.read",
+        nav: true,
+        group: "Servers",
+        view: { kind: "page", load: () => import("./pages/Database.svelte") },
     },
     {
         path: "backups",
@@ -135,7 +145,7 @@ export const routes: Route[] = [
         permission: "settings.read",
         nav: true,
         group: "Panel",
-        view: { kind: "arrives", milestone: "17.13", preview: { kind: "page", load: () => import("./pages/Settings.svelte") } },
+        view: { kind: "page", load: () => import("./pages/Settings.svelte") },
     },
     {
         path: "activity",
