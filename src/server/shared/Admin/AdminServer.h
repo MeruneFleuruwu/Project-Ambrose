@@ -37,6 +37,7 @@ public:
     virtual void SendText(std::string text) = 0;
     virtual void Close(std::string reason) = 0;
     virtual std::string GetRemoteAddress() = 0;
+    virtual std::shared_ptr<AdminSocket> Keep() { return {}; }
 };
 
 struct AdminSocketRoute

@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * The lifecycle every server app shares: options, config, logging, banner, the one start time and lifecycle state its console and its admin API both report, the optional admin API listener an app fills with its own routes before it opens, shutdown signals that a start in progress can poll for, an optional update tick, console commands on their own thread with their replies on the log's own writer, and a clean exit code.
+ * The lifecycle every server app shares: options, config, logging, banner, the one start time and lifecycle state its console and its admin API both report, the optional admin API listener an app fills with its own routes before it opens and the live log stream that runs on it, shutdown signals that a start in progress can poll for, an optional update tick, console commands on their own thread with their replies on the log's own writer, and a clean exit code.
  */
 
 #ifndef AMBROSE_SERVERAPP_H
@@ -34,6 +34,7 @@ class ConfigMgr;
 class ConsoleInput;
 class ConsoleReader;
 class Log;
+class LogStreamService;
 
 namespace Ambrose::Asio
 {
@@ -128,6 +129,7 @@ private:
     std::unique_ptr<Ambrose::Asio::SignalHandler> _signals;
     ConsoleCommandTable _commands;
     std::unique_ptr<AdminServer> _admin;
+    std::unique_ptr<LogStreamService> _logStream;
     std::unique_ptr<ConsoleReader> _console;
     std::thread _commandThread;
     std::mutex _commandMutex;

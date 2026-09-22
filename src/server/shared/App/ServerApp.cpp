@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Runs an app from arguments to exit: rejects bad options and missing config with exit code 1, opens the admin API with the app's own routes already in it before the app starts, keeping a generated token in the data folder or, where the machine names none, beside the config file, and refuses to run when its binding is unsafe, stops gracefully on signals, requests or the shutdown command, now or after a delay, moves the one lifecycle state the console and the admin API both read, lets a start in progress run queued signal handlers without blocking so a stop during OnStart exits cleanly without reporting ready, ticks updates on its io loop, and runs queued console lines on a command thread that shutdown waits for, answering on the same writer the log lines use.
+ * Runs an app from arguments to exit: rejects bad options and missing config with exit code 1, opens the admin API with the app's own routes and the live log stream already in it before the app starts, keeping a generated token in the data folder or, where the machine names none, beside the config file, and refuses to run when its binding is unsafe, stops gracefully on signals, requests or the shutdown command, now or after a delay, moves the one lifecycle state the console and the admin API both read, lets a start in progress run queued signal handlers without blocking so a stop during OnStart exits cleanly without reporting ready, ticks updates on its io loop, and runs queued console lines on a command thread that shutdown waits for, answering on the same writer the log lines use.
  */
 
 #include "ServerApp.h"
@@ -17,6 +17,7 @@
 #include "ConsoleWriter.h"
 #include "GitRevision.h"
 #include "Log.h"
+#include "LogStream.h"
 #include "SignalHandler.h"
 #include "StringUtil.h"
 #include "TerminalConsoleInput.h"
@@ -257,6 +258,9 @@ bool ServerApp::StartAdminApi()
     sAdminCapabilities.RegisterStandardProblems();
     sAdminCapabilities.AddReloadTarget("admin");
     AdminStatus::Register(_admin->Routes(), [this] { return BuildStatus(); });
+    _logStream = std::make_unique<LogStreamService>(_log.GetStreamHub());
+    _logStream->Start();
+    _admin->AddSocket(_logStream->MakeSocketRoute("/api/logs"));
 
     OnAdminApiReady(*_admin);
 
@@ -266,6 +270,7 @@ bool ServerApp::StartAdminApi()
     AMBROSE_LOG(_log, LogLevel::Error, "server.admin", "{}", error);
     _err << _info.Name << ": " << error << "\n";
     _admin.reset();
+    _logStream.reset();
     return false;
 }
 
@@ -366,6 +371,7 @@ int ServerApp::Run(std::vector<std::string> const& arguments)
         if (_admin)
             _admin->Stop();
         _admin.reset();
+        _logStream.reset();
         _work.reset();
         FinishShutdown();
         return stopped ? EXIT_SUCCESS : EXIT_FAILURE;
@@ -397,6 +403,7 @@ int ServerApp::Run(std::vector<std::string> const& arguments)
     if (_admin)
         _admin->Stop();
     _admin.reset();
+    _logStream.reset();
     OnStop();
     LogLifecycle(LogLevel::Info, fmt::format("{} stopped", _info.Name));
     FinishShutdown();

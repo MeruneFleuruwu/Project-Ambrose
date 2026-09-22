@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Publishes live log records into a backlog and every matching subscriber, with gap-free subscription.
+ * Publishes live log records into a backlog and every matching subscriber, with gap-free subscription and a handle whose last copy closes the subscription it names.
  */
 
 #include "LogStreamHub.h"
@@ -20,7 +20,7 @@ std::shared_ptr<LogSubscription> LogStreamHub::Subscribe(LogStreamFilter filter,
     }
     if (shouldWake)
         subscription->Wake();
-    return subscription;
+    return std::shared_ptr<LogSubscription>(subscription.get(), [subscription](LogSubscription* handle) { handle->Close(); });
 }
 
 void LogStreamHub::SetBacklogCapacity(std::size_t capacity)
@@ -50,25 +50,18 @@ void LogStreamHub::Publish(LogMessage const& message)
             _backlog.push_back(record);
         }
         bool prune = false;
-        for (std::weak_ptr<LogSubscription> const& weak : _subscribers)
+        for (std::shared_ptr<LogSubscription> const& subscription : _subscribers)
         {
-            std::shared_ptr<LogSubscription> subscription = weak.lock();
-            if (!subscription || subscription->IsClosed())
+            if (subscription->IsClosed())
             {
                 prune = true;
                 continue;
             }
             if (subscription->GetFilter().Matches(*record) && subscription->Push(record))
-                toWake.push_back(std::move(subscription));
+                toWake.push_back(subscription);
         }
         if (prune)
-        {
-            std::erase_if(_subscribers, [](std::weak_ptr<LogSubscription> const& weak)
-            {
-                std::shared_ptr<LogSubscription> const subscription = weak.lock();
-                return !subscription || subscription->IsClosed();
-            });
-        }
+            std::erase_if(_subscribers, [](std::shared_ptr<LogSubscription> const& subscription) { return subscription->IsClosed(); });
     }
     for (std::shared_ptr<LogSubscription> const& subscription : toWake)
         subscription->Wake();
@@ -83,9 +76,5 @@ std::vector<std::shared_ptr<LogMessage const>> LogStreamHub::GetBacklog() const
 std::size_t LogStreamHub::GetSubscriberCount() const
 {
     std::lock_guard lock(_mutex);
-    return static_cast<std::size_t>(std::count_if(_subscribers.begin(), _subscribers.end(), [](std::weak_ptr<LogSubscription> const& weak)
-    {
-        std::shared_ptr<LogSubscription> const subscription = weak.lock();
-        return subscription && !subscription->IsClosed();
-    }));
+    return static_cast<std::size_t>(std::count_if(_subscribers.begin(), _subscribers.end(), [](std::shared_ptr<LogSubscription> const& subscription) { return !subscription->IsClosed(); }));
 }

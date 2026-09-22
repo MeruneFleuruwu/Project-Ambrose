@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Runs the admin API on Crow: it resolves the token, refuses a bind the remote-access rule forbids, says out loud what a bind it allows still costs, proves no other socket holds the address before Crow takes it, answers every request from the shared table in a middleware that runs before Crow's own routing, answers from the same table again after it the requests Crow replies to before a connection has an address of its own, such as OPTIONS, hands only a real WebSocket upgrade to the route registered for it under the same authentication, and on a reload rotates the token live, rebinds a changed address, or brings the old listener back when the new one cannot bind.
+ * Runs the admin API on Crow: it resolves the token, tells every route whose socket is still open when the listener stops and detaches the handle first so nothing reaches a connection Crow has let go, refuses a bind the remote-access rule forbids, says out loud what a bind it allows still costs, proves no other socket holds the address before Crow takes it, answers every request from the shared table in a middleware that runs before Crow's own routing, answers from the same table again after it the requests Crow replies to before a connection has an address of its own, such as OPTIONS, hands only a real WebSocket upgrade to the route registered for it under the same authentication, gives each open socket a handle a route may keep and write to from any thread until the socket closes, queues a close behind the frames sent before it, and on a reload rotates the token live, rebinds a changed address, or brings the old listener back when the new one cannot bind.
  */
 
 #include "AdminServer.h"
@@ -21,6 +21,7 @@
 #include <atomic>
 #include <chrono>
 #include <future>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <system_error>
@@ -70,17 +71,79 @@ namespace
         return bridge;
     }
 
+    void CloseAfterPendingFrames(crow::websocket::connection& connection, std::string reason);
+
     class CrowAdminSocket : public AdminSocket
     {
     public:
-        explicit CrowAdminSocket(crow::websocket::connection& connection) : _connection(connection) {}
+        explicit CrowAdminSocket(crow::websocket::connection& connection) : _connection(&connection) {}
 
-        void SendText(std::string text) override { _connection.send_text(std::move(text)); }
-        void Close(std::string reason) override { _connection.close(reason); }
-        std::string GetRemoteAddress() override { return _connection.get_remote_ip(); }
+        void SendText(std::string text) override
+        {
+            std::lock_guard const lock(_mutex);
+            if (_connection)
+                _connection->send_text(std::move(text));
+        }
+
+        void Close(std::string reason) override
+        {
+            std::lock_guard const lock(_mutex);
+            if (_connection)
+                CloseAfterPendingFrames(*_connection, std::move(reason));
+        }
+
+        std::string GetRemoteAddress() override
+        {
+            std::lock_guard const lock(_mutex);
+            return _connection ? _connection->get_remote_ip() : std::string();
+        }
+
+        std::shared_ptr<AdminSocket> Keep() override { return _self.lock(); }
+
+        void Bind(std::shared_ptr<CrowAdminSocket> const& self) { _self = self; }
+
+        void Detach()
+        {
+            std::lock_guard const lock(_mutex);
+            _connection = nullptr;
+        }
 
     private:
-        crow::websocket::connection& _connection;
+        std::mutex _mutex;
+        crow::websocket::connection* _connection;
+        std::weak_ptr<CrowAdminSocket> _self;
+    };
+
+    struct SocketBinding
+    {
+        AdminSocketRoute const* Route = nullptr;
+        std::shared_ptr<CrowAdminSocket> Socket;
+    };
+
+    class OpenSockets
+    {
+    public:
+        void Add(AdminSocketRoute const* route, std::shared_ptr<CrowAdminSocket> socket)
+        {
+            std::lock_guard const lock(_mutex);
+            _open.emplace_back(route, std::move(socket));
+        }
+
+        void Remove(CrowAdminSocket const* socket)
+        {
+            std::lock_guard const lock(_mutex);
+            std::erase_if(_open, [socket](std::pair<AdminSocketRoute const*, std::shared_ptr<CrowAdminSocket>> const& entry) { return entry.second.get() == socket; });
+        }
+
+        std::vector<std::pair<AdminSocketRoute const*, std::shared_ptr<CrowAdminSocket>>> TakeAll()
+        {
+            std::lock_guard const lock(_mutex);
+            return std::exchange(_open, {});
+        }
+
+    private:
+        std::mutex _mutex;
+        std::vector<std::pair<AdminSocketRoute const*, std::shared_ptr<CrowAdminSocket>>> _open;
     };
 
     AdminRequest ToAdminRequest(crow::request const& request)
@@ -149,6 +212,17 @@ namespace
 
     using AdminApp = crow::App<AdminGate>;
 
+    void CloseAfterPendingFrames(crow::websocket::connection& connection, std::string reason)
+    {
+        using PlainConnection = crow::websocket::Connection<crow::SocketAdaptor, AdminApp>;
+        if (PlainConnection* const plain = dynamic_cast<PlainConnection*>(&connection))
+        {
+            plain->post([plain, reason = std::move(reason)] { plain->close(reason, crow::websocket::CloseStatusCode::NormalClosure); });
+            return;
+        }
+        connection.close(reason);
+    }
+
     std::optional<uint16> ReserveEndpoint(std::string const& bindIp, uint16 port, std::string& error)
     {
         std::optional<asio::ip::address> const address = Ambrose::Asio::MakeAddress(bindIp);
@@ -191,9 +265,9 @@ namespace
         return bound.port();
     }
 
-    AdminSocketRoute const* RouteOf(crow::websocket::connection& connection)
+    SocketBinding* BindingOf(crow::websocket::connection& connection)
     {
-        return static_cast<AdminSocketRoute const*>(connection.userdata());
+        return static_cast<SocketBinding*>(connection.userdata());
     }
 }
 
@@ -201,6 +275,7 @@ struct AdminServer::Listener
 {
     AdminApp App;
     std::future<void> Worker;
+    std::shared_ptr<OpenSockets> Open = std::make_shared<OpenSockets>();
     std::string BindIp;
     uint16 Port = 0;
 };
@@ -436,31 +511,37 @@ bool AdminServer::Open(AdminSettings const& settings, std::string const& token, 
                     refusal = ToCrowResponse(AdminResponse::Problem(404, "not_found", "The admin API has no WebSocket on " + incoming.Path));
                     return;
                 }
-                *userdata = const_cast<AdminSocketRoute*>(route);
+                *userdata = new SocketBinding{ route, nullptr };
             })
-            .onopen([](crow::websocket::connection& connection)
+            .onopen([open = listener->Open](crow::websocket::connection& connection)
             {
-                AdminSocketRoute const* const route = RouteOf(connection);
-                if (!route || !route->Opened)
+                SocketBinding* const binding = BindingOf(connection);
+                if (!binding)
                     return;
-                CrowAdminSocket socket(connection);
-                route->Opened(socket);
+                binding->Socket = std::make_shared<CrowAdminSocket>(connection);
+                binding->Socket->Bind(binding->Socket);
+                open->Add(binding->Route, binding->Socket);
+                if (binding->Route && binding->Route->Opened)
+                    binding->Route->Opened(*binding->Socket);
             })
             .onmessage([](crow::websocket::connection& connection, std::string const& message, bool binary)
             {
-                AdminSocketRoute const* const route = RouteOf(connection);
-                if (!route || !route->Received)
+                SocketBinding* const binding = BindingOf(connection);
+                if (!binding || !binding->Socket || !binding->Route || !binding->Route->Received)
                     return;
-                CrowAdminSocket socket(connection);
-                route->Received(socket, message, binary);
+                binding->Route->Received(*binding->Socket, message, binary);
             })
-            .onclose([](crow::websocket::connection& connection, std::string const& reason, uint16_t code)
+            .onclose([open = listener->Open](crow::websocket::connection& connection, std::string const& reason, uint16_t code)
             {
-                AdminSocketRoute const* const route = RouteOf(connection);
-                if (!route || !route->Closed)
+                std::unique_ptr<SocketBinding> const binding(BindingOf(connection));
+                connection.userdata(nullptr);
+                if (!binding)
                     return;
-                CrowAdminSocket socket(connection);
-                route->Closed(socket, reason, static_cast<uint16>(code));
+                std::shared_ptr<CrowAdminSocket> const socket = binding->Socket ? binding->Socket : std::make_shared<CrowAdminSocket>(connection);
+                open->Remove(socket.get());
+                if (binding->Route && binding->Route->Closed)
+                    binding->Route->Closed(*socket, reason, static_cast<uint16>(code));
+                socket->Detach();
             });
     };
     takeSockets(RootRoutePattern);
@@ -512,6 +593,12 @@ void AdminServer::Close()
         _listener->App.stop();
         if (_listener->Worker.valid())
             _listener->Worker.wait();
+        for (auto const& [route, socket] : _listener->Open->TakeAll())
+        {
+            socket->Detach();
+            if (route && route->Closed)
+                route->Closed(*socket, "the admin API listener stopped", 1001);
+        }
         _listener.reset();
     }
     LogBridge().Attach(nullptr);

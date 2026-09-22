@@ -1,20 +1,17 @@
 /*
  * Project Ambrose by Imjustchico
- * Queues filtered live log records for one subscriber, dropping the oldest when full and waking on the first record.
+ * Queues filtered live log records for one subscriber in a ring that grows to its capacity and then overwrites the oldest, counting what it dropped and waking on the first record.
  */
 
 #include "LogSubscription.h"
 
+#include <algorithm>
 #include <utility>
 
-bool LogStreamFilter::Matches(LogMessage const& message) const noexcept
+bool LogStreamFilter::MatchesCategory(std::string_view category) const noexcept
 {
-    if (!IsLevelEnabled(MinLevel, message.Level))
-        return false;
-    if (Categories.empty())
-        return true;
-    for (std::string const& category : Categories)
-        if (Ambrose::Logging::IsCategoryWithin(message.Category, category))
+    for (std::string const& prefix : Categories)
+        if (Ambrose::Logging::IsCategoryWithin(category, prefix))
             return true;
     return false;
 }
@@ -36,18 +33,41 @@ std::size_t LogSubscription::GetCapacity() const noexcept
 
 bool LogSubscription::Push(std::shared_ptr<LogMessage const> const& record)
 {
-    std::lock_guard lock(_mutex);
-    if (_closed)
+    if (_closed.load(std::memory_order_relaxed))
         return false;
-    bool const wasEmpty = _queue.empty();
-    if (_queue.size() >= _capacity)
+    std::lock_guard lock(_mutex);
+    if (_closed.load(std::memory_order_relaxed))
+        return false;
+    bool const wasEmpty = _count == 0;
+    if (_count == _ring.size() && _ring.size() < _capacity)
+        Grow();
+    if (_count == _capacity)
     {
-        _queue.pop_front();
+        _ring[_head] = record;
+        if (++_head == _ring.size())
+            _head = 0;
         ++_droppedSincePop;
         ++_droppedTotal;
     }
-    _queue.push_back(record);
+    else
+    {
+        std::size_t slot = _head + _count;
+        if (slot >= _ring.size())
+            slot -= _ring.size();
+        _ring[slot] = record;
+        ++_count;
+    }
     return wasEmpty && static_cast<bool>(_wake);
+}
+
+void LogSubscription::Grow()
+{
+    std::size_t const size = std::min(_capacity, std::max<std::size_t>(64, _ring.size() * 2));
+    std::vector<std::shared_ptr<LogMessage const>> grown(size);
+    for (std::size_t index = 0; index < _count; ++index)
+        grown[index] = std::move(_ring[(_head + index) % _ring.size()]);
+    _ring.swap(grown);
+    _head = 0;
 }
 
 void LogSubscription::Wake() const
@@ -60,10 +80,12 @@ LogPopResult LogSubscription::Pop(std::vector<std::shared_ptr<LogMessage const>>
 {
     std::lock_guard lock(_mutex);
     LogPopResult result;
-    while (result.Count < max && !_queue.empty())
+    while (result.Count < max && _count > 0)
     {
-        out.push_back(std::move(_queue.front()));
-        _queue.pop_front();
+        out.push_back(std::move(_ring[_head]));
+        if (++_head == _ring.size())
+            _head = 0;
+        --_count;
         ++result.Count;
     }
     result.Dropped = std::exchange(_droppedSincePop, 0);
@@ -73,7 +95,7 @@ LogPopResult LogSubscription::Pop(std::vector<std::shared_ptr<LogMessage const>>
 std::size_t LogSubscription::GetQueuedCount() const
 {
     std::lock_guard lock(_mutex);
-    return _queue.size();
+    return _count;
 }
 
 uint64 LogSubscription::GetTotalDropped() const
@@ -85,12 +107,13 @@ uint64 LogSubscription::GetTotalDropped() const
 void LogSubscription::Close()
 {
     std::lock_guard lock(_mutex);
-    _closed = true;
-    _queue.clear();
+    _closed.store(true, std::memory_order_relaxed);
+    _ring.clear();
+    _head = 0;
+    _count = 0;
 }
 
-bool LogSubscription::IsClosed() const
+bool LogSubscription::IsClosed() const noexcept
 {
-    std::lock_guard lock(_mutex);
-    return _closed;
+    return _closed.load(std::memory_order_relaxed);
 }

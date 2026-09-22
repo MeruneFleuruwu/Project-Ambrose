@@ -1,12 +1,18 @@
 /*
  * Project Ambrose by Imjustchico
- * Backlog ring and subscriber registry for live structured log records.
+ * Backlog ring and subscriber registry for live structured log records; a subscription closes when the last copy of the handle Subscribe returned is dropped, and the registry holds it plainly so publishing takes no reference count per subscriber.
  */
 
 #ifndef AMBROSE_LOGSTREAMHUB_H
 #define AMBROSE_LOGSTREAMHUB_H
 
 #include "LogSubscription.h"
+
+#include <deque>
+#include <functional>
+#include <memory>
+#include <mutex>
+#include <vector>
 
 class LogStreamHub
 {
@@ -31,7 +37,7 @@ private:
     mutable std::mutex _mutex;
     std::deque<std::shared_ptr<LogMessage const>> _backlog;
     std::size_t _backlogCapacity = DefaultBacklog;
-    std::vector<std::weak_ptr<LogSubscription>> _subscribers;
+    std::vector<std::shared_ptr<LogSubscription>> _subscribers;
 };
 
 #endif
