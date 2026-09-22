@@ -123,7 +123,6 @@ Each item is worth doing, needs nothing from the phases, and lands inside the tr
 | F-53 | Which classes the type dump marks as having no reflected properties, grouped by base class, with counts | `contrib/findings/objects/` | The static, countable half of F-38 |
 | F-54 | The sizes and counts of every archive in the install: files per archive, compressed and uncompressed totals, as a table | `contrib/findings/data/` | The patch server plans transfers against this |
 | F-55 | What a name table row holds: the fields the extractor reads from each name table, checked against the dump | `contrib/findings/data/` | The world database's name columns are shaped by it |
-| C-73 | An audit of `vcpkg.json` and `package.json` against `THIRD-PARTY-NOTICES.md`: every dependency listed, every licence right, nothing listed that is no longer used | `contrib/notes/` | The notices file is a promise the repository keeps by hand |
 | C-74 | A capture-free replay corpus for C-23: manifests of frame sequences in the shape the replayer reads, for a login, a wrong password and a keepalive exchange, built from the message definitions rather than a capture | `contrib/fixtures/` | The replayer exists; it has nothing to replay |
 | C-75 | A second observer for any merged tool: run it against your own install or server, record what it printed, and file what disagreed with its README as a note | `contrib/notes/` | A tool that two people ran is worth more than one with a green self-test |
 
@@ -208,6 +207,7 @@ The first list is mostly taken, and what remains of it waits on servers that do 
 | C-70 | An audit of every log category the code writes against the guide and the shipped loggers, and the undocumented one it found | `contrib/tools/log-category-audit/` | MeruneFleuruwu, in #116 |
 | C-71 | A checker for the roadmap files: ids, dependencies, sizes and, on request, the evidence beside a ticked box | `contrib/tools/roadmap-check/` | MeruneFleuruwu, in #117 |
 | C-72 | A dead-link checker for the documents, relative targets and heading anchors, with its clean run recorded as a note | `contrib/tools/dead-link-check/` | MeruneFleuruwu, in #118 |
+| C-73 | An audit of every manifest against the notices file, and the nine dependencies it found with no row | `contrib/tools/dependency-notices-audit/` | MeruneFleuruwu, in #119 |
 
 An item stays listed until its pull request is merged. Ask before starting something not on the list: the answer is usually yes if it lands in the paths above.
 
