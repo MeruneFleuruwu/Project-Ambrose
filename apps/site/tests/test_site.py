@@ -85,6 +85,19 @@ class BoardTests(unittest.TestCase):
         snapshot = {"pulls": [{"number": 9, "headRefName": "contrib/C-60", "author": {"login": "a"}, "url": "u", "updatedAt": "2026-09-22T10:00:00Z"}], "issues": []}
         self.assertEqual(build.claims(snapshot, NOW), {})
 
+    def test_the_other_track_shows_work_that_is_not_a_milestone(self):
+        snapshot = {"pulls": [
+            {"number": 140, "title": "C-61: a corpus", "headRefName": "contrib/c61", "author": {"login": "someone"}, "url": "u", "updatedAt": "2026-09-22T12:00:00Z"},
+            {"number": 141, "title": "bump", "headRefName": "dependabot/npm/x", "author": {"login": "dependabot[bot]"}, "url": "u", "updatedAt": "2026-09-22T12:00:00Z"},
+            pull("4.04")], "issues": []}
+        rows = build.other_work(snapshot, NOW)
+        self.assertEqual([row["number"] for row in rows], [140, 141])
+        self.assertEqual(rows[0]["kind"], "the contributor track")
+        self.assertEqual(rows[1]["kind"], "a bot")
+        built = build.build_state(ROOT, snapshot, NOW)
+        self.assertEqual(len(built["other_open_work"]), 2)
+        self.assertEqual(find(built, "4.04")["status"], "building")
+
     def test_a_held_milestone_names_who_holds_it_and_what_they_are_on(self):
         built = state()
         held = [row for row in built["milestones"] if row["status"] == "held"]
@@ -97,6 +110,25 @@ class BoardTests(unittest.TestCase):
         for row in built["milestones"]:
             self.assertGreaterEqual(row["unlocks"], 0)
         self.assertTrue(any(row["unlocks"] > 0 for row in built["milestones"]))
+
+    def test_a_milestone_waiting_on_one_thing_says_what_that_is(self):
+        built = state()
+        queued = [row for row in built["milestones"] if row.get("next_after")]
+        self.assertTrue(queued)
+        for row in queued:
+            self.assertEqual(row["status"], "waiting")
+            self.assertEqual(row["missing"], [row["next_after"]])
+        lines = build.queue(built["milestones"])
+        self.assertTrue(lines)
+        self.assertTrue(all("finishing it frees" in line for line in lines))
+
+    def test_a_hold_nobody_has_moved_asks_to_be_checked(self):
+        later = NOW + datetime.timedelta(days=build.HOLD_REVIEW_DAYS + 1)
+        fresh = build.build_state(ROOT, {"pulls": [], "issues": []}, NOW)
+        aged = build.build_state(ROOT, {"pulls": [], "issues": []}, later)
+        self.assertFalse(any(entry["needs_review"] for entry in fresh["holds"]))
+        self.assertTrue(all(entry["needs_review"] for entry in aged["holds"]))
+        self.assertTrue(all(entry["days"] >= 0 for entry in fresh["holds"]))
 
     def test_the_state_file_tells_an_assistant_how_to_read_it(self):
         built = state()

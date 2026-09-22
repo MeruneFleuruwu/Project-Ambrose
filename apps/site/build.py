@@ -32,6 +32,7 @@ CLAIM_URL = REPOSITORY + "/issues/new?template=claim_milestone.yml"
 STATE_URL = "https://justchicoo.github.io/Project-Ambrose/state.json"
 
 STALE_DAYS = 14
+HOLD_REVIEW_DAYS = 21
 MILESTONE_BRANCH = re.compile(r"^milestone/(\d+)\.(\d+)")
 CLAIM_TITLE = re.compile(r"(\d+\.\d+)")
 OPEN_ROW = re.compile(r"^\| *([\d.,  ]+?) *\| *(.+?) *\| *(.+?) *\| *(.+?) *\| *(.+?) *\|$")
@@ -46,6 +47,7 @@ HOW_TO_USE = [
     "A hold can cover a whole phase. If phase 17 is held, every milestone in it is held, whatever its own row says.",
     "Claim by opening a draft pull request from a branch named milestone/<id>-<short-name>, which is also what lets CI accept a change under src/. The board picks that up by itself.",
     "A milestone is finished only when every acceptance check in its phase file is ticked with the evidence that proved it. A check you cannot run stays unticked and is named in the pull request.",
+    "A milestone carrying next_after is waiting on exactly that one milestone, so it is what to line up next rather than what to start. A hold carrying needs_review has not moved in weeks: ask in the Discord rather than assuming it is still held.",
     "The prompt for your own assistant is at " + PROMPT + ", and the rules it is held to are at " + TRACK_URL + ".",
 ]
 
@@ -175,6 +177,20 @@ def claims(snapshot, now):
     return found
 
 
+def other_work(snapshot, now):
+    rows = []
+    for pull in snapshot.get("pulls", []):
+        branch = pull.get("headRefName", "") or ""
+        if MILESTONE_BRANCH.match(branch):
+            continue
+        author = (pull.get("author") or {}).get("login", "somebody")
+        kind = "a bot" if author.endswith("[bot]") else ("the contributor track" if branch.startswith("contrib/") else "something else")
+        rows.append({"number": pull.get("number"), "title": pull.get("title", ""), "who": author, "kind": kind,
+                     "url": pull.get("url", ""), "branch": branch, "updated": (pull.get("updatedAt") or "")[:10],
+                     "draft": bool(pull.get("isDraft"))})
+    return rows
+
+
 def unlocked_by(everything):
     counts = {identifier: 0 for identifier in everything}
     for milestone in everything.values():
@@ -193,7 +209,8 @@ def status_of(milestone, opened_ids, kept, taken):
     held = hold_for(milestone["id"], kept)
     if held:
         what = held["what"] or "work in flight"
-        return "held", f'{held["who"]}: {what}'
+        since = f' since {held["since"]}' if held.get("since") else ""
+        return "held", f'{held["who"]}: {what}{since}'
     if milestone["missing"]:
         return "waiting", "waiting on " + ", ".join(milestone["missing"])
     if milestone["id"] in opened_ids:
@@ -227,6 +244,8 @@ def build_state(root, snapshot, now):
             entry["reserved_because"] = reserved[identifier]
         if identifier in taken:
             entry["claim"] = taken[identifier]
+        if status == "waiting" and len(entry["missing"]) == 1:
+            entry["next_after"] = entry["missing"][0]
         rows.append(entry)
 
     phases = {}
@@ -236,6 +255,10 @@ def build_state(root, snapshot, now):
         phase["landed"] += 1 if row["status"] == "landed" else 0
         phase["open"] += 1 if row["status"] == "open" else 0
         phase["building"] += 1 if row["status"] == "building" else 0
+    for entry in kept:
+        since = moment(entry["since"] + "T00:00:00Z") if entry["since"] else None
+        entry["days"] = (now - since).days if since else None
+        entry["needs_review"] = bool(entry["days"] is not None and entry["days"] >= HOLD_REVIEW_DAYS)
     for entry in kept:
         if entry["scope"].startswith("phase:"):
             number = int(entry["scope"].split(":")[1])
@@ -252,6 +275,7 @@ def build_state(root, snapshot, now):
                   "prompt": PROMPT, "claim": CLAIM_URL, "discord": DISCORD, "state": STATE_URL},
         "progress": load_json(os.path.join(root, PROGRESS), {}),
         "contributor_track": contributor_counts(root),
+        "other_open_work": other_work(snapshot, now),
         "counts": counted,
         "holds": kept,
         "phases": [phases[number] for number in sorted(phases)],
@@ -291,6 +315,27 @@ def busy_row(row):
         link = f'<a href="{escape(claim.get("url", REPOSITORY))}">#{escape(claim.get("number", ""))}</a>'
         return f'<li><span class="id">{escape(row["id"])}</span> {escape(row["title"])} <span class="who">{who}, {escape(claim.get("kind", ""))} {link}, since {escape(claim.get("since", ""))}</span></li>'
     return f'<li><span class="id">{escape(row["id"])}</span> {escape(row["title"])} <span class="who">{escape(row["note"])}</span></li>'
+
+
+def queue(rows, limit=6):
+    blockers = {}
+    for row in rows:
+        if row.get("next_after"):
+            blockers.setdefault(row["next_after"], []).append(row["id"])
+    known = {row["id"]: row for row in rows}
+    ordered = sorted(blockers.items(), key=lambda pair: (-len(pair[1]), pair[0]))
+    lines = []
+    for identifier, waiting in ordered[:limit]:
+        blocker = known.get(identifier)
+        if not blocker:
+            continue
+        status = blocker["status"]
+        who = f' ({blocker["note"]})' if blocker["note"] else ""
+        lines.append(f'<li><span class="id">{escape(identifier)}</span> {escape(blocker["title"])}'
+                     f'<span class="who">{escape(status)}{escape(who)} &middot; finishing it frees '
+                     f'{", ".join(escape(one) for one in waiting[:8])}'
+                     + (f' and {len(waiting) - 8} more' if len(waiting) > 8 else "") + "</span></li>")
+    return lines
 
 
 def phase_row(phase, dark):
@@ -405,12 +450,24 @@ def page(state, dark, light):
    <code>upstream/main</code>, name the branch as shown, and open a draft pull request on the first day, which is what holds it.</p>
 <div class="cards">{"".join(card(row) for row in open_rows) or '<p class="note">Nothing is open at this moment. Ask in the Discord and one will be opened.</p>'}</div>
 
+<h2>Next in line</h2>
+<p class="note">Each of these is the last thing standing between the project and several more milestones. Some are held, some are open:
+   if one you could build is on this list, it is the highest-value evening available.</p>
+<ul class="plain">{"".join(queue(rows)) or "<li>Nothing is waiting on a single milestone at this moment.</li>"}</ul>
+
 <h2>Being built right now</h2>
 <p class="note">Claimed work, from open pull requests and claims, and the sections the maintainer's own sessions hold.
    Nothing here is takeable. A claim with no push for {STALE_DAYS} days falls back to the open list by itself.</p>
 <ul class="plain">{"".join(busy_row(row) for row in building) or "<li>Nobody outside has a milestone open at this moment.</li>"}
-{"".join(f'<li><span class="id">Phase {escape(entry["scope"].split(":")[1])}</span> held by {escape(entry["who"])}<span class="who">{escape(entry["what"])}, since {escape(entry["since"])}</span></li>' for entry in held_phases)}
+{"".join(f'<li><span class="id">Phase {escape(entry["scope"].split(":")[1])}</span> held by {escape(entry["who"])}<span class="who">{escape(entry["what"])}, since {escape(entry["since"])}' + (f' &middot; not moved in {entry["days"]} days, so ask in the Discord before assuming it is still held' if entry.get("needs_review") else "") + '</span></li>' for entry in held_phases)}
 {"".join(busy_row(row) for row in held if not hold_for(row["id"], [h for h in state["holds"] if h["scope"].startswith("phase:")]))}</ul>
+
+<h2>The other track</h2>
+<p class="note">Work that is not a milestone: findings about the game, tools, schemas, fixtures, guides and proposals, in folders no milestone
+   touches. Nothing there is reserved, so two people may take the same item and both are read.
+   {state["contributor_track"]["merged"]} merged so far, {state["contributor_track"]["open"]} items open, listed in
+   <a href="{CONTRIBUTOR_URL}">the contributor track</a>.</p>
+<ul class="plain">{"".join(f'<li><span class="id">#{escape(row["number"])}</span> {escape(row["title"])}<span class="who">{escape(row["who"])}, {escape(row["kind"])}, updated {escape(row["updated"])} &middot; <a href="{escape(row["url"])}">open it</a></span></li>' for row in state["other_open_work"]) or "<li>No other pull request is open at this moment.</li>"}</ul>
 
 <h2>The phases</h2>
 <p class="note">Seventeen phases, built in order. A held phase is closed to outside work entirely, however ready a milestone inside it looks.</p>

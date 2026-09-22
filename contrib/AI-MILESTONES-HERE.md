@@ -97,12 +97,15 @@ Have me commit first, because these read committed work, then run these from the
 
 ```
 git fetch upstream
+curl -s https://justchicoo.github.io/Project-Ambrose/state.json | python -c "import json,sys; print([m for m in json.load(sys.stdin)['milestones'] if m['id']=='<my milestone>'])"
 python apps/ci/ci_contrib_paths.py --range upstream/main...HEAD --branch <my branch>
 python apps/codestyle/codestyle.py
 python apps/ci/ci_forbidden_files.py
 ctest --preset windows-debug
 git status --porcelain
 ```
+
+That first line is the board again: my milestone should still say `building` with my name on it. If it now says `held`, the maintainer's own sessions have taken that area since I started, and I should stop and ask in the Discord rather than push into it.
 
 Three dots, and the remote branch my pull request targets, never a local `main`, because a stale or moved-on `main` makes that check flag files I never touched. `upstream` is whichever of my remotes is github.com/Justchicoo/Project-Ambrose; a clone of my own fork has none until I add it with `git remote add upstream https://github.com/Justchicoo/Project-Ambrose.git`. `git status` must be clean: an extracted file, a dump or a generated database file left in the tree is the thing rule 2 exists to stop, and several milestones generate exactly those.
 
@@ -118,7 +121,9 @@ git switch -c milestone/<id>-<short-name>
 
 Always from `upstream/main`, never from another branch that has an open pull request, because that turns two independent contributions into a chain where revising the first breaks the second.
 
-**Open the pull request as a draft on the first day, before the work is done.** That is what reserves the milestone: whoever opens a draft first holds it, and the maintainer moves its row to "In flight". Building for a week in silence risks somebody else landing the same milestone first. Title it `<id> <what you are building>`.
+**Open the pull request as a draft on the first day, before the work is done.** That is what reserves the milestone, and nobody has to be told: the board reads the open pull requests, so within minutes it shows my milestone as being built, by me, and stops anybody else taking it. Building for a week in silence risks somebody else landing it first. Title it `<id> <what you are building>`.
+
+A claim is not forever. Fourteen days with no push and the board puts the milestone back on the open list, with whatever I pushed left in place, so somebody else can carry it. A push is all it takes to keep it.
 
 Check before opening it: `git log --oneline upstream/main..HEAD` shows only this milestone's commits, and `git diff --name-only upstream/main...HEAD` only its files.
 

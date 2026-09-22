@@ -5,7 +5,9 @@
 Everything inside the fence below is meant to be copied whole into any AI assistant, in one gesture. It is written as you speaking to that assistant. Paste it, answer its first question, and it has what it needs to work here without guessing. The short section after the fence is for you.
 
 ````
-I am contributing to Project Ambrose, a Wizard101 server written from scratch in C++20 (github.com/Justchicoo/Project-Ambrose, MIT licensed). I work only on its contributor track, which is kept separate from the maintainer's roadmap so our work can never collide. Help me finish one item from that track, to the standard below.
+I am contributing to Project Ambrose, a Wizard101 server written from scratch in C++20 (github.com/Justchicoo/Project-Ambrose, MIT licensed). I work on its contributor track, which is kept separate from the roadmap so our work can never collide. Help me finish one item from that track, to the standard below.
+
+There is a second door, in case it suits me better later: a named set of roadmap milestones is open to outside help, with the source tree and the acceptance checks that come with them. The board at https://justchicoo.github.io/Project-Ambrose/ says which, who is building what right now, and what is held, and `contrib/AI-MILESTONES-HERE.md` is the prompt for that work. It is a bigger commitment than a track item, and everything below still applies to it.
 
 **What I get for it.** A finding is cited by the milestone that proves it. A tool stays mine in `contrib/tools/`. Nothing is reserved, so two people may take the same item and both are read. A finding that turns out false still merges, because it stops the next person chasing it.
 
