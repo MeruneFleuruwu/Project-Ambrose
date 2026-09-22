@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * The four test projects: the logic and token checks with no browser, and every story in Chromium and in WebKit with the accessibility gate, because the launcher window runs in WebKitGTK.
+ * The test projects: the logic and token checks with no browser, every story in Chromium and in WebKit with the accessibility gate, because the launcher window runs in WebKitGTK, and the panel's own logic with no browser and its pages mounted in Chromium.
  */
 
 import { storybookTest } from "@storybook/addon-vitest/vitest-plugin";
@@ -11,6 +11,7 @@ import { ambrosePlugins } from "./packages/ui/vite.ts";
 
 const storybook = await storybookTest({ configDir: "packages/ui/.storybook" });
 const browserSetup = fileURLToPath(new URL("./packages/ui/src/test/browser.setup.ts", import.meta.url));
+const panelLib = { $lib: fileURLToPath(new URL("./apps/dashboard/src/lib", import.meta.url)) };
 
 function browserProject(name: "chromium" | "webkit") {
     return {
@@ -41,6 +42,31 @@ export default defineConfig({
             },
             browserProject("chromium"),
             browserProject("webkit"),
+            {
+                plugins: ambrosePlugins(),
+                resolve: { alias: panelLib },
+                test: {
+                    name: "dashboard",
+                    environment: "node",
+                    server: { deps: { inline: ["@lucide/svelte"] } },
+                    include: ["apps/dashboard/src/**/*.test.ts"],
+                    exclude: ["apps/dashboard/src/**/*.browser.test.ts"],
+                },
+            },
+            {
+                plugins: ambrosePlugins(),
+                resolve: { alias: panelLib },
+                test: {
+                    name: "dashboard-browser",
+                    include: ["apps/dashboard/src/**/*.browser.test.ts"],
+                    browser: {
+                        enabled: true,
+                        headless: true,
+                        provider: playwright(),
+                        instances: [{ browser: "chromium" }],
+                    },
+                },
+            },
         ],
     },
 });

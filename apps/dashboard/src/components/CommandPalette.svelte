@@ -1,18 +1,13 @@
-<!-- Project Ambrose by Imjustchico: The command palette that Ctrl+K or Cmd+K opens from anywhere: type to jump to a page the viewer may use, open an app's console or logs, send a power action, or switch between light and dark. -->
+<!-- Project Ambrose by Imjustchico: The command palette that Ctrl+K or Cmd+K opens from anywhere: type to jump to a page the viewer may use, open the overview of an app the panel reads, or switch between light and dark. -->
 <script lang="ts">
     import * as Command from "$lib/components/ui/command/index.js";
+    import { live } from "$lib/status.svelte.js";
     import { chooseTheme, type ThemeChoice } from "$lib/theme.svelte.js";
-    import FileTextIcon from "@lucide/svelte/icons/file-text";
+    import GaugeIcon from "@lucide/svelte/icons/gauge";
     import MonitorIcon from "@lucide/svelte/icons/monitor";
     import MoonIcon from "@lucide/svelte/icons/moon";
-    import PlayIcon from "@lucide/svelte/icons/play";
-    import RotateCcwIcon from "@lucide/svelte/icons/rotate-ccw";
-    import SquareTerminalIcon from "@lucide/svelte/icons/square-terminal";
     import SunIcon from "@lucide/svelte/icons/sun";
-    import { openFor } from "../focus.svelte";
-    import { requestPower } from "../power";
     import type { Route } from "../routes";
-    import { apps } from "../sample";
 
     type Props = { open: boolean; pages: Route[] };
     let { open = $bindable(false), pages }: Props = $props();
@@ -40,8 +35,8 @@
     }
 </script>
 
-<Command.Dialog bind:open title="Command palette" description="Jump to a page, open a server's console or logs, or run an action.">
-    <Command.Input placeholder="Type a page, a server or an action" />
+<Command.Dialog bind:open title="Command palette" description="Jump to a page, open an app's overview, or change the theme.">
+    <Command.Input placeholder="Type a page, an app or a theme" />
     <Command.List>
         <Command.Empty>Nothing matches that.</Command.Empty>
         <Command.Group heading="Pages">
@@ -52,38 +47,21 @@
                 </Command.Item>
             {/each}
         </Command.Group>
-        <Command.Separator />
-        <Command.Group heading="Servers">
-            {#each apps as app (app.name)}
-                <Command.Item
-                    value={`${app.name} console`}
-                    keywords={[app.role, "terminal", "command"]}
-                    onSelect={() => run(() => openFor(app.name, "console"))}
-                >
-                    <SquareTerminalIcon />
-                    <span>Open the {app.name} console</span>
-                </Command.Item>
-                <Command.Item
-                    value={`${app.name} logs`}
-                    keywords={[app.role, "log", "records"]}
-                    onSelect={() => run(() => openFor(app.name, "logs"))}
-                >
-                    <FileTextIcon />
-                    <span>Follow the {app.name} logs</span>
-                </Command.Item>
-                {#if app.state === "unknown"}
-                    <Command.Item value={`start ${app.name}`} onSelect={() => run(() => requestPower("start", app.name))}>
-                        <PlayIcon />
-                        <span>Start {app.name}</span>
+        {#if live.apps.length > 0}
+            <Command.Separator />
+            <Command.Group heading="Apps">
+                {#each live.apps as app (app.name)}
+                    <Command.Item
+                        value={`${app.name} overview`}
+                        keywords={[app.role, app.realm]}
+                        onSelect={() => run(() => (window.location.hash = "#overview"))}
+                    >
+                        <GaugeIcon />
+                        <span>Open the {app.name} overview</span>
                     </Command.Item>
-                {:else}
-                    <Command.Item value={`restart ${app.name}`} onSelect={() => run(() => requestPower("restart", app.name))}>
-                        <RotateCcwIcon />
-                        <span>Restart {app.name}</span>
-                    </Command.Item>
-                {/if}
-            {/each}
-        </Command.Group>
+                {/each}
+            </Command.Group>
+        {/if}
         <Command.Separator />
         <Command.Group heading="Appearance">
             {#each looks as look (look.choice)}

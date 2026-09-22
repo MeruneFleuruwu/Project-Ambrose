@@ -312,14 +312,34 @@ AdminServer::AdminServer(Log& log, std::string appName, std::filesystem::path da
         AMBROSE_LOG(_log, level, "server.admin", "{} {} from {} answered {} {} (request {})", request.Method, request.Path, request.RemoteAddress, response.Status, code, request.Id);
     });
     _router.AddPublic("POST", "/api/session", [this](AdminRequest const& request) { return SignIn(request); });
-    _router.Add("GET", "/api/session", [this](AdminRequest const& request)
+    _router.AddPublic("GET", "/api/session", [this](AdminRequest const& request)
     {
         nlohmann::json body;
         body["app"] = _appName;
-        body["signed_in_with"] = request.SessionCsrf ? "session" : "token";
-        body["csrf"] = request.SessionCsrf ? nlohmann::json(*request.SessionCsrf) : nlohmann::json(nullptr);
         body["idle_seconds"] = _sessions.GetIdleLifetime().count();
         body["lifetime_seconds"] = _sessions.GetAbsoluteLifetime().count();
+        body["signed_in"] = false;
+        body["signed_in_with"] = nullptr;
+        body["csrf"] = nullptr;
+        if (!request.Authorization.empty())
+        {
+            AdminRequest checked = request;
+            AdminAuthResult const result = _router.Authenticate(checked);
+            if (result != AdminAuthResult::Ok)
+                return AdminRouter::Refused(result);
+            body["signed_in"] = true;
+            body["signed_in_with"] = "token";
+            return AdminResponse::Json(200, body.dump());
+        }
+        if (std::optional<std::string> const secret = _router.SessionSecret(request))
+        {
+            if (std::optional<std::string> const csrf = _sessions.Find(*secret))
+            {
+                body["signed_in"] = true;
+                body["signed_in_with"] = "session";
+                body["csrf"] = *csrf;
+            }
+        }
         return AdminResponse::Json(200, body.dump());
     });
     _router.Add("DELETE", "/api/session", [this](AdminRequest const& request)
@@ -365,6 +385,7 @@ AdminResponse AdminServer::SignIn(AdminRequest const& request)
     AMBROSE_LOG(_log, LogLevel::Info, "server.admin", "A browser signed in to the admin API from {} (request {})", request.RemoteAddress, request.Id);
     nlohmann::json answer;
     answer["app"] = _appName;
+    answer["signed_in"] = true;
     answer["signed_in_with"] = "session";
     answer["csrf"] = opened.Csrf;
     answer["idle_seconds"] = _sessions.GetIdleLifetime().count();
