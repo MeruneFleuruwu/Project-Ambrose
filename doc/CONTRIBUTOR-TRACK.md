@@ -123,7 +123,6 @@ Each item is worth doing, needs nothing from the phases, and lands inside the tr
 | F-53 | Which classes the type dump marks as having no reflected properties, grouped by base class, with counts | `contrib/findings/objects/` | The static, countable half of F-38 |
 | F-54 | The sizes and counts of every archive in the install: files per archive, compressed and uncompressed totals, as a table | `contrib/findings/data/` | The patch server plans transfers against this |
 | F-55 | What a name table row holds: the fields the extractor reads from each name table, checked against the dump | `contrib/findings/data/` | The world database's name columns are shaped by it |
-| C-74 | A capture-free replay corpus for C-23: manifests of frame sequences in the shape the replayer reads, for a login, a wrong password and a keepalive exchange, built from the message definitions rather than a capture | `contrib/fixtures/` | The replayer exists; it has nothing to replay |
 
 ### The second list
 
@@ -207,6 +206,7 @@ The first list is mostly taken, and what remains of it waits on servers that do 
 | C-71 | A checker for the roadmap files: ids, dependencies, sizes and, on request, the evidence beside a ticked box | `contrib/tools/roadmap-check/` | MeruneFleuruwu, in #117 |
 | C-72 | A dead-link checker for the documents, relative targets and heading anchors, with its clean run recorded as a note | `contrib/tools/dead-link-check/` | MeruneFleuruwu, in #118 |
 | C-73 | An audit of every manifest against the notices file, and the nine dependencies it found with no row | `contrib/tools/dependency-notices-audit/` | MeruneFleuruwu, in #119 |
+| C-74 | Three capture-free replay manifests built from the message definitions, whose bodies tell a login from a refusal | `contrib/fixtures/` | MeruneFleuruwu, in #120 and #122 |
 | C-75 | A second observation of the merged log-category audit: the command, the exit code, each stream and the honest nothing it found | `contrib/notes/` | MeruneFleuruwu, in #121 |
 
 An item stays listed until its pull request is merged. Ask before starting something not on the list: the answer is usually yes if it lands in the paths above.
@@ -217,4 +217,4 @@ Notes, proposals and guides are read by the agents building the milestones they 
 
 ### Started, still open
 
-These carry a first delivery and stay listed above because the item is not what landed: C-01 has its `zone_teleport` table (#55) and no rows; C-11 has its seed folder's README (#56) and no seeds; F-12 has a finding that Ambrose's launcher applies its options and leaves the install untouched (#53), not yet what each of the client's own options does; C-74 has three replay manifests whose frames the reassembler reads (#120), with every message body empty, so its login and wrong-password exchanges are byte for byte the same and nothing replayed tells a success from a refusal.
+These carry a first delivery and stay listed above because the item is not what landed: C-01 has its `zone_teleport` table (#55) and no rows; C-11 has its seed folder's README (#56) and no seeds; F-12 has a finding that Ambrose's launcher applies its options and leaves the install untouched (#53), not yet what each of the client's own options does.
