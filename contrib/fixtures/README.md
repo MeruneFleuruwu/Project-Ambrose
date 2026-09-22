@@ -1,17 +1,43 @@
-<!-- Project Ambrose by Imjustchico: Synthetic fixture corpora for contributor-track parsers and protocol-independent tests. -->
+<!-- Project Ambrose by Imjustchico: Synthetic console-log corpus for the value classifier and the console's own layout rules. -->
 
-# Contributor fixture corpora
+# C-58: log corpus
 
-The C-58 corpus is a hand-shaped, deterministic set of 500 synthetic Ambrose
-console records. It contains no captures, client-derived text, credentials,
-real account names, or private paths.
+This directory holds a deterministic corpus of 500 synthetic console log lines.
+The file is shaped to the console's fixed-column layout and to the 13 logging
+categories documented in `doc/guides/logging.md`:
 
-Run its validator from the repository root:
+- `server.app`
+- `server.config`
+- `server.logging`
+- `network`
+- `network.session`
+- `server.admin`
+- `server.threading`
+- `server.loading`
+- `sql.updates`
+- `sql.driver`
+- `network.opcode`
+- `sql`
+- `sql.sql`
+
+Each record carries:
+
+- a stable `id`;
+- the full `line` text;
+- the `level` and `category` metadata;
+- the expected `C-29` value spans with `value_class`, `text`, `start` and `end`
+  using UTF-8 byte offsets.
+
+The validator imports the classifier in
+`contrib/tools/ambrose-log-value-classifier/classify.py`, checks that each saved
+span matches what the classifier emits, and requires all six levels and all 13
+categories to be present.
+
+Run it from the repository root:
 
 ```powershell
 python contrib\fixtures\validate_c58.py
 ```
 
-The validator checks record identity, fixed-column level and category fields,
-all six severity levels, the documented logging categories, every expected
-C-29 value-class span, UTF-8 byte offsets, and the required C-58 count.
+The corpus is synthetic only. It contains no captures, no client-derived data,
+and no private paths.

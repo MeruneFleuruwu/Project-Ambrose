@@ -12,12 +12,7 @@ from classify import Span, classify, check_spans
 
 LEVELS = {"TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"}
 CATEGORIES = {
-    "accounts",
-    "characters",
-    "commands.console",
-    "server.dbimport",
-    "server.gameserver",
-    "server.loginserver",
+    "server.app",
     "server.config",
     "server.logging",
     "network",
