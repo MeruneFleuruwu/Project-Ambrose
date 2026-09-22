@@ -323,7 +323,11 @@ ConfigLoadResult ConfigMgr::Build(std::filesystem::path const& file, State& stat
         ParsedConfig parsed = ParseText(*content, path, kind);
         result.Errors.insert(result.Errors.end(), parsed.Errors.begin(), parsed.Errors.end());
         for (auto& [key, entry] : parsed.Entries)
+        {
+            if (kind == ConfigSourceKind::Default || kind == ConfigSourceKind::ModuleDefault)
+                state.Defaults[key] = entry;
             state.Values[key] = std::move(entry);
+        }
     };
 
     std::filesystem::path const moduleDirectory = file.parent_path() / "conf.d";
@@ -415,6 +419,15 @@ std::optional<ConfigEntry> ConfigMgr::Resolve(std::string const& name) const
         return ConfigEntry{ std::move(*environmentValue), ConfigSourceKind::Environment, environmentName, 0 };
     auto const it = _state.Values.find(name);
     if (it == _state.Values.end())
+        return std::nullopt;
+    return it->second;
+}
+
+std::optional<ConfigEntry> ConfigMgr::ResolveDefault(std::string const& name) const
+{
+    std::shared_lock lock(_stateMutex);
+    auto const it = _state.Defaults.find(name);
+    if (it == _state.Defaults.end())
         return std::nullopt;
     return it->second;
 }

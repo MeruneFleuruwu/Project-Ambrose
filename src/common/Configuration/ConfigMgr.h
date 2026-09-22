@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Layered typed configuration: defaults, local config, conf.d drop-ins, AMBROSE_ environment variables, and overrides.
+ * Layered typed configuration: defaults, local config, conf.d drop-ins, AMBROSE_ environment variables, and overrides, with the shipped defaults kept readable under every layer, and the shape a subsystem declares an option it reads only at startup in, with the reason.
  */
 
 #ifndef AMBROSE_CONFIGMGR_H
@@ -57,6 +57,12 @@ struct ConfigEntry
     std::size_t Line = 0;
 };
 
+struct RestartRequiredOption
+{
+    std::string_view Key;
+    std::string_view Reason;
+};
+
 struct ParsedConfig
 {
     std::vector<std::pair<std::string, ConfigEntry>> Entries;
@@ -108,6 +114,7 @@ public:
     std::string GetOption(std::string const& name, char const* defaultValue, bool quiet = false) const;
 
     std::optional<ConfigEntry> Resolve(std::string const& name) const;
+    std::optional<ConfigEntry> ResolveDefault(std::string const& name) const;
     std::vector<std::string> GetKeysByString(std::string_view prefix) const;
     std::filesystem::path GetFilename() const;
     std::vector<std::string> GetArguments() const;
@@ -135,6 +142,7 @@ private:
         std::filesystem::path File;
         std::vector<std::string> Arguments;
         std::map<std::string, ConfigEntry> Values;
+        std::map<std::string, ConfigEntry> Defaults;
         std::map<std::string, std::string> Overrides;
     };
 

@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Login server entry point: runs setup in Setup.Mode for the install and type dump, stopping cleanly when a stop arrives meanwhile and never saving an install it has no type dump for, loads account and login settings and the type dump, declares the login message table and checks it against the client's message definitions, refuses to serve clients from an install without a type dump, naming why and where ClientDir came from, or without both databases, opens the login and characters databases, listens for clients, and offers account console commands until shutdown, telling connected clients before it shuts down and closing the databases, which drains their callbacks, before its network threads stop.
+ * Login server entry point: runs setup in Setup.Mode for the install and type dump, stopping cleanly when a stop arrives meanwhile and never saving an install it has no type dump for, loads account and login settings and the type dump, declares the login message table and checks it against the client's message definitions, refuses to serve clients from an install without a type dump, naming why and where ClientDir came from, or without both databases, opens the login and characters databases, which the admin API reports, lists the updates of and applies data-only updates to while the server runs, listens for clients, and offers account console commands until shutdown, telling connected clients before it shuts down and closing the databases, which drains their callbacks, before its network threads stop.
  */
 
 #include "AccountCommands.h"
@@ -11,6 +11,8 @@
 #include "StatsRegistry.h"
 #include "ConfigMgr.h"
 #include "DatabaseEnv.h"
+#include "AdminDatabaseView.h"
+#include "AdminServer.h"
 #include "DatabaseLoader.h"
 #include "Environment.h"
 #include "Log.h"
@@ -44,11 +46,25 @@ namespace
     public:
         static constexpr uint16 DefaultPort = 12000;
 
-        LoginServerApp() : ServerApp({ "loginserver", "loginserver.conf", 12010 }, sConfigMgr, sLog, std::cout, std::cerr)
+        LoginServerApp() : ServerApp({ "loginserver", "loginserver.conf", 12010 }, sConfigMgr, sLog, std::cout, std::cerr), _databases(Config()), _databaseView(_databases)
         {
+            _databases.AddDatabase(LoginDatabase, "Login", DatabaseLoader::DATABASE_LOGIN)
+                .AddDatabase(CharacterDatabase, "Character", DatabaseLoader::DATABASE_CHARACTER);
         }
 
     protected:
+        void OnAdminApiReady(AdminServer& admin) override
+        {
+            _databaseView.Register(admin.Routes());
+        }
+
+        std::vector<RestartRequiredOption> GetRestartRequiredOptions() const override
+        {
+            std::vector<RestartRequiredOption> options(ClientSetup::RestartRequiredOptions.begin(), ClientSetup::RestartRequiredOptions.end());
+            options.insert(options.end(), DatabaseLoader::RestartRequiredOptions.begin(), DatabaseLoader::RestartRequiredOptions.end());
+            return options;
+        }
+
         bool OnStart() override
         {
             LocalClientSystem const system;
@@ -142,13 +158,9 @@ namespace
                 return false;
             }
 
-            _databases = std::make_unique<DatabaseLoader>(Config());
-            _databases->AddDatabase(LoginDatabase, "Login", DatabaseLoader::DATABASE_LOGIN)
-                .AddDatabase(CharacterDatabase, "Character", DatabaseLoader::DATABASE_CHARACTER);
-            if (!_databases->Load())
+            if (!_databases.Load())
             {
                 LOG_ERROR("server.loginserver", "Cannot open the login and characters databases");
-                _databases.reset();
                 return false;
             }
             AppenderDB::Enable(Logger(), 0);
@@ -169,8 +181,7 @@ namespace
                 LOG_ERROR("server.loginserver", "Cannot listen for clients: {}", error);
                 _sockets.reset();
                 AppenderDB::Disable(Logger());
-                _databases->Close();
-                _databases.reset();
+                _databases.Close();
                 return false;
             }
             SetListener(network.BindIp, _sockets->GetPort());
@@ -192,18 +203,17 @@ namespace
             if (_sockets)
                 LoginShutdown::NotifyAndDrain(*_sockets, sLoginMgr.GetSettings()->ShutdownGrace);
             AppenderDB::Disable(Logger());
-            if (_databases)
-                _databases->Close();
+            _databases.Close();
             if (_sockets)
                 _sockets->StopNetwork();
             _sockets.reset();
-            _databases.reset();
         }
 
     private:
         std::shared_ptr<SessionContext> _context;
         std::unique_ptr<SocketMgr<LoginSession>> _sockets;
-        std::unique_ptr<DatabaseLoader> _databases;
+        DatabaseLoader _databases;
+        AdminDatabaseView _databaseView;
     };
 }
 

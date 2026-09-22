@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Walks SQL text tracking quoted strings, comments, executable version comments and stored-routine BEGIN...END bodies, and cuts statements at top-level semicolons the way the server counts them.
+ * Walks SQL text tracking quoted strings, comments, executable version comments and stored-routine BEGIN...END bodies, and cuts statements at top-level semicolons the way the server counts them; a statement counts as data-only when its leading words make it a row change, a read that writes no file, a transaction step, a table lock or a session-scoped SET, and anything else, an executable comment included, counts as able to change the schema.
  */
 
 #include "SqlScript.h"
@@ -53,6 +53,52 @@ namespace
             if (upper.find(kind) != std::string::npos)
                 return true;
         return false;
+    }
+
+    bool OpensExecutableComment(std::string_view sql, std::size_t position)
+    {
+        return position + 2 < sql.size() && (sql[position + 2] == '!' || sql[position + 2] == '+' || (sql[position + 2] == 'M' && position + 3 < sql.size() && sql[position + 3] == '!'));
+    }
+
+    bool OpensLineComment(std::string_view sql, std::size_t position)
+    {
+        char const c = sql[position];
+        return (c == '-' && position + 1 < sql.size() && sql[position + 1] == '-' && (position + 2 >= sql.size() || std::isspace(static_cast<unsigned char>(sql[position + 2])))) || c == '#';
+    }
+
+    std::vector<std::string> LeadingWords(std::string_view sql, std::size_t count)
+    {
+        std::vector<std::string> words;
+        std::size_t i = 0;
+        while (i < sql.size() && words.size() < count)
+        {
+            char const c = sql[i];
+            if (std::isspace(static_cast<unsigned char>(c)))
+            {
+                ++i;
+                continue;
+            }
+            if (OpensLineComment(sql, i))
+            {
+                std::size_t const end = sql.find('\n', i);
+                i = end == std::string_view::npos ? sql.size() : end + 1;
+                continue;
+            }
+            if (c == '/' && i + 1 < sql.size() && sql[i + 1] == '*' && !OpensExecutableComment(sql, i))
+            {
+                std::size_t const end = sql.find("*/", i + 2);
+                if (end == std::string_view::npos)
+                    break;
+                i = end + 2;
+                continue;
+            }
+            if (!IsWordCharacter(c))
+                break;
+            std::string_view const word = WordAt(sql, i);
+            words.push_back(Ambrose::ToUpper(word));
+            i += word.size();
+        }
+        return words;
     }
 
     std::size_t SkipByteOrderMark(std::string_view sql)
@@ -146,7 +192,7 @@ bool SqlScript::Split(std::string_view input, std::vector<Statement>& statements
             }
             continue;
         }
-        if ((c == '-' && i + 1 < sql.size() && sql[i + 1] == '-' && (i + 2 >= sql.size() || std::isspace(static_cast<unsigned char>(sql[i + 2])))) || c == '#')
+        if (OpensLineComment(sql, i))
         {
             while (i < sql.size() && sql[i] != '\n')
                 ++i;
@@ -154,7 +200,7 @@ bool SqlScript::Split(std::string_view input, std::vector<Statement>& statements
         }
         if (c == '/' && i + 1 < sql.size() && sql[i + 1] == '*')
         {
-            bool const executable = i + 2 < sql.size() && (sql[i + 2] == '!' || sql[i + 2] == '+' || (sql[i + 2] == 'M' && i + 3 < sql.size() && sql[i + 3] == '!'));
+            bool const executable = OpensExecutableComment(sql, i);
             std::size_t const end = sql.find("*/", i + 2);
             if (end == std::string_view::npos)
             {
@@ -267,4 +313,40 @@ std::string SqlScript::Excerpt(std::string_view statement, std::size_t maxLength
         }
     }
     return text;
+}
+
+std::string SqlScript::LeadingKeyword(std::string_view statement)
+{
+    std::vector<std::string> words = LeadingWords(statement, 1);
+    return words.empty() ? std::string() : std::move(words.front());
+}
+
+bool SqlScript::IsDataOnly(std::string_view statement)
+{
+    std::vector<std::string> const words = LeadingWords(statement, 2);
+    if (words.empty())
+        return Ambrose::Trim(statement).empty();
+    std::string const& first = words[0];
+    std::string_view const second = words.size() > 1 ? std::string_view(words[1]) : std::string_view();
+    if (first == "INSERT" || first == "REPLACE" || first == "UPDATE" || first == "DELETE" || first == "COMMIT" || first == "ROLLBACK" || first == "SAVEPOINT")
+        return true;
+    std::string const upper = Ambrose::ToUpper(statement);
+    if (first == "SELECT" || first == "WITH")
+        return upper.find("OUTFILE") == std::string::npos && upper.find("DUMPFILE") == std::string::npos;
+    if (first == "START")
+        return second == "TRANSACTION";
+    if (first == "BEGIN")
+        return second.empty() || second == "WORK";
+    if (first == "RELEASE")
+        return second == "SAVEPOINT";
+    if (first == "LOCK" || first == "UNLOCK")
+        return second == "TABLES" || second == "TABLE";
+    if (first == "SET")
+    {
+        for (std::string_view const scope : { "GLOBAL", "PERSIST", "PERSIST_ONLY", "PASSWORD", "ROLE", "DEFAULT", "STATEMENT" })
+            if (second == scope)
+                return false;
+        return upper.find("@@GLOBAL") == std::string::npos && upper.find("@@PERSIST") == std::string::npos;
+    }
+    return false;
 }

@@ -1,8 +1,10 @@
 /*
  * Project Ambrose by Imjustchico
- * Game server entry point: runs setup in Setup.Mode for the install and type dump, stopping cleanly when a stop arrives meanwhile, loads the type dump and the locale text of the install's Root.wad in Locale.Default, brings the login, characters and world databases current and opens them, loads the character name tables when the world database is open and, when they are empty, extracts them from the install and reloads them, automatically in auto mode, after a yes in ask mode and never in off mode, then runs the world update tick whose interval follows World.UpdateInterval live.
+ * Game server entry point: runs setup in Setup.Mode for the install and type dump, stopping cleanly when a stop arrives meanwhile, loads the type dump and the locale text of the install's Root.wad in Locale.Default, brings the login, characters and world databases current and opens them, which the admin API reports, lists the updates of and applies data-only updates to while the server runs, reloading the character name tables after the world database takes one, loads the character name tables when the world database is open and, when they are empty, extracts them from the install and reloads them, automatically in auto mode, after a yes in ask mode and never in off mode, then runs the world update tick whose interval follows World.UpdateInterval live.
  */
 
+#include "AdminDatabaseView.h"
+#include "AdminServer.h"
 #include "AppenderDB.h"
 #include "CharacterNameExtractor.h"
 #include "CharacterNameMgr.h"
@@ -35,11 +37,39 @@ namespace
     class GameServerApp : public ServerApp
     {
     public:
-        GameServerApp() : ServerApp({ "gameserver", "gameserver.conf", 12343 }, sConfigMgr, sLog, std::cout, std::cerr)
+        GameServerApp() : ServerApp({ "gameserver", "gameserver.conf", 12343 }, sConfigMgr, sLog, std::cout, std::cerr), _databases(Config()), _databaseView(_databases)
         {
+            _databases.AddDatabase(LoginDatabase, "Login", DatabaseLoader::DATABASE_LOGIN)
+                .AddDatabase(CharacterDatabase, "Character", DatabaseLoader::DATABASE_CHARACTER)
+                .AddDatabase(WorldDatabase, "World", DatabaseLoader::DATABASE_WORLD);
+            _databaseView.AddStore("character names", WorldDatabase.GetName(), []
+            {
+                CharacterNameLoadResult const names = sCharacterNameMgr.Load();
+                if (names.Loaded)
+                    LOG_INFO("server.gameserver", "Reloaded {} character name tables holding {} names in {} locales, and {} disallowed names", names.Tables, names.Parts, names.HumanLocales, names.Disallowed);
+                else
+                    for (std::string const& problem : names.Errors)
+                        LOG_ERROR("server.gameserver", "Character name tables were not reloaded, and the loaded ones stay in use: {}", problem);
+                for (std::string const& warning : names.Warnings)
+                    LOG_WARN("server.gameserver", "Character name tables: {}", warning);
+                return AdminStoreReload{ names.Loaded, names.Errors, names.Warnings };
+            });
         }
 
     protected:
+        void OnAdminApiReady(AdminServer& admin) override
+        {
+            _databaseView.Register(admin.Routes());
+        }
+
+        std::vector<RestartRequiredOption> GetRestartRequiredOptions() const override
+        {
+            std::vector<RestartRequiredOption> options(ClientSetup::RestartRequiredOptions.begin(), ClientSetup::RestartRequiredOptions.end());
+            options.insert(options.end(), DatabaseLoader::RestartRequiredOptions.begin(), DatabaseLoader::RestartRequiredOptions.end());
+            options.push_back({ "RealmID", "A running game server keeps the realm it started as, because its players and log rows belong to that realm, so a change takes effect at the next start" });
+            return options;
+        }
+
         bool OnStart() override
         {
             LocalClientSystem const system;
@@ -95,14 +125,9 @@ namespace
                     locale, table->GetFileCount(), table->GetKeyCount(), table->GetDuplicateCount(), table->GetProblems().size(), sLocaleStore.GetLocales().size());
             }
 
-            _databases = std::make_unique<DatabaseLoader>(Config());
-            _databases->AddDatabase(LoginDatabase, "Login", DatabaseLoader::DATABASE_LOGIN)
-                .AddDatabase(CharacterDatabase, "Character", DatabaseLoader::DATABASE_CHARACTER)
-                .AddDatabase(WorldDatabase, "World", DatabaseLoader::DATABASE_WORLD);
-            if (!_databases->Load())
+            if (!_databases.Load())
             {
                 LOG_ERROR("server.gameserver", "Cannot open the realm's databases");
-                _databases.reset();
                 return false;
             }
             sCharacterNameMgr.SetDefaultLocale(locale);
@@ -118,8 +143,7 @@ namespace
                     for (std::string const& problem : names.Errors)
                         LOG_ERROR("server.gameserver", "Character name tables: {}", problem);
                     LOG_ERROR("server.gameserver", "Cannot load the character name tables from the world database");
-                    _databases->Close();
-                    _databases.reset();
+                    _databases.Close();
                     return false;
                 }
                 if (names.Tables == 0)
@@ -181,9 +205,7 @@ namespace
         void OnStop() override
         {
             AppenderDB::Disable(Logger());
-            if (_databases)
-                _databases->Close();
-            _databases.reset();
+            _databases.Close();
         }
 
         std::chrono::milliseconds GetUpdateInterval() const override
@@ -201,7 +223,8 @@ namespace
 
     private:
         mutable std::atomic<uint32> _reportedInterval{ 0 };
-        std::unique_ptr<DatabaseLoader> _databases;
+        DatabaseLoader _databases;
+        AdminDatabaseView _databaseView;
     };
 }
 

@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * One generation of a pool's connections: sync connections with exclusive leases, async workers on a shared queue, a keepalive pinger, and the statement table, shut down as a unit.
+ * One generation of a pool's connections: sync connections with exclusive leases, async workers on a shared queue, a keepalive pinger, and the statement table, shut down as a unit, whose use is read at once: connections running a statement, sync leases, callers waiting for one, queued work and reconnects.
  */
 
 #ifndef AMBROSE_DATABASECONNECTIONSET_H
@@ -30,6 +30,17 @@ struct PoolStatementInfo
 };
 
 using PoolStatementTable = std::unordered_map<uint32, PoolStatementInfo>;
+
+struct DatabasePoolUse
+{
+    std::size_t AsyncConnections = 0;
+    std::size_t SyncConnections = 0;
+    std::size_t AsyncActive = 0;
+    std::size_t SyncLeased = 0;
+    std::size_t SyncWaiting = 0;
+    std::size_t Queued = 0;
+    uint64 Reconnects = 0;
+};
 
 class DatabaseConnectionSet
 {
@@ -63,6 +74,7 @@ public:
     std::size_t GetQueueSize() const { return _queue.Size(); }
     uint64 GetReconnectCount() const;
     uint64 GetConcurrentUseCount() const;
+    DatabasePoolUse GetUse() const;
 
 private:
     uint32 OpenConnection(ConnectionFactory const& factory, MySQLConnectionInfo const& info, MySQLConnectionSettings settings, ConnectionFlags flags, std::vector<std::unique_ptr<MySQLConnection>>& into);
@@ -77,7 +89,7 @@ private:
     DatabaseWorker::Queue _queue;
     std::vector<std::unique_ptr<DatabaseWorker>> _workers;
 
-    std::mutex _syncMutex;
+    mutable std::mutex _syncMutex;
     std::condition_variable _syncCondition;
     std::vector<bool> _syncBusy;
     std::size_t _nextSync = 0;

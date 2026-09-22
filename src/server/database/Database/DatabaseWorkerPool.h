@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * A named connection pool for one database that serves every call from the current connection generation, so opening, closing and live reconfiguring never block callers, with typed statements, including executes that report the rows they changed and several queries read from one consistent snapshot, holders and transactions whose async forms can signal a handler once their result is ready.
+ * A named connection pool for one database that serves every call from the current connection generation, so opening, closing and live reconfiguring never block callers, with typed statements, including executes that report the rows they changed and several queries read from one consistent snapshot, holders and transactions whose async forms can signal a handler once their result is ready, and the current generation's use for the panel.
  */
 
 #ifndef AMBROSE_DATABASEWORKERPOOL_H
@@ -61,6 +61,7 @@ public:
     std::size_t GetSyncConnectionCount() const;
     uint64 GetReconnectCount() const;
     uint64 GetConcurrentUseCount() const;
+    DatabasePoolUse GetUse() const;
 
 protected:
     std::optional<std::size_t> GetParameterCount(uint32 index) const;

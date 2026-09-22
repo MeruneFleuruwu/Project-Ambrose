@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Opens a generation's connections with client and server version checks and prepared statements, leases sync connections fairly, pings idle ones, and shuts down by draining the queue until a deadline and then cancelling.
+ * Opens a generation's connections with client and server version checks and prepared statements, leases sync connections fairly, pings idle ones, counts what is in use, and shuts down by draining the queue until a deadline and then cancelling.
  */
 
 #include "DatabaseConnectionSet.h"
@@ -239,6 +239,24 @@ uint64 DatabaseConnectionSet::GetReconnectCount() const
         for (std::unique_ptr<MySQLConnection> const& connection : *list)
             total += connection->GetReconnectCount();
     return total;
+}
+
+DatabasePoolUse DatabaseConnectionSet::GetUse() const
+{
+    DatabasePoolUse use;
+    use.AsyncConnections = _asyncConnections.size();
+    use.SyncConnections = _syncConnections.size();
+    for (std::unique_ptr<MySQLConnection> const& connection : _asyncConnections)
+        if (connection->IsInUse())
+            ++use.AsyncActive;
+    {
+        std::lock_guard<std::mutex> lock(_syncMutex);
+        use.SyncLeased = static_cast<std::size_t>(std::count(_syncBusy.begin(), _syncBusy.end(), true));
+        use.SyncWaiting = _syncWaiters;
+    }
+    use.Queued = _queue.Size();
+    use.Reconnects = GetReconnectCount();
+    return use;
 }
 
 uint64 DatabaseConnectionSet::GetConcurrentUseCount() const

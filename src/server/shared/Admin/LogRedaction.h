@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Which settings are secrets and how their values are hidden in text a person or a stream may see: the admin token and the passwords inside database connection strings never leave the process in the clear.
+ * Which settings are secrets and how their values are hidden in text a person or a stream may see: the admin token, the passwords inside database connection strings and the verifier keys never leave the process in the clear.
  */
 
 #ifndef AMBROSE_LOGREDACTION_H

@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Tests SQL splitting, update names and LF-normalized hashes offline, and with AMBROSE_TEST_DB set runs the updater on fresh databases: base import, ordered and custom updates, a folder an update adds applied in the same run, bad names, failing files, and the repository's own login schema.
+ * Tests SQL splitting, data-only statement and file classification, update names and LF-normalized hashes offline, and with AMBROSE_TEST_DB set runs the updater on fresh databases: base import, ordered and custom updates, a folder an update adds applied in the same run, bad names, failing files, the repository's own login schema, and a live listing and data-only apply that stops before a schema change and rolls a failing file back.
  */
 
 #include "DBUpdater.h"
@@ -148,6 +148,47 @@ TEST(UpdateFetcherTest, NamesStatesAndHashes)
     EXPECT_EQ(UpdateFetcher::HashContents(""), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
 }
 
+TEST(SqlScriptTest, TellsDataOnlyStatementsFromOnesThatCanChangeTheSchema)
+{
+    for (std::string_view const data : { "INSERT INTO t VALUES (1)", "insert ignore into t values (1)", "REPLACE INTO t VALUES (1)", "UPDATE t SET a = 1", "DELETE FROM t",
+             "-- note\nINSERT INTO t VALUES (1)", "# note\nDELETE FROM t", "/* note */ UPDATE t SET a = 2", "SELECT 1", "WITH x AS (SELECT 1) SELECT * FROM x",
+             "START TRANSACTION", "BEGIN", "BEGIN WORK", "COMMIT", "ROLLBACK", "SAVEPOINT a", "RELEASE SAVEPOINT a", "SET @a = 1", "SET NAMES utf8mb4",
+             "SET SESSION sql_mode = ''", "LOCK TABLES t WRITE", "UNLOCK TABLES", "" })
+        EXPECT_TRUE(SqlScript::IsDataOnly(data)) << data;
+    for (std::string_view const schema : { "CREATE TABLE t (a INT)", "ALTER TABLE t ADD b INT", "DROP TABLE t", "TRUNCATE t", "RENAME TABLE a TO b", "CALL p()",
+             "BEGIN NOT ATOMIC SELECT 1", "START SLAVE", "SET GLOBAL max_connections = 10", "SET @@GLOBAL.max_connections = 10", "SET PERSIST max_connections = 10",
+             "SET PASSWORD = 'x'", "SET STATEMENT max_statement_time = 1 FOR ALTER TABLE t ADD c INT", "SELECT * FROM t INTO OUTFILE '/tmp/x'",
+             "/*!40101 SET NAMES utf8 */", "LOAD DATA INFILE 'x' INTO TABLE t", "GRANT ALL ON *.* TO a", "CREATE OR REPLACE VIEW v AS SELECT 1", "DO SLEEP(1)" })
+        EXPECT_FALSE(SqlScript::IsDataOnly(schema)) << schema;
+    EXPECT_EQ(SqlScript::LeadingKeyword("  -- c\n# d\n/* e */ insert into t values (1)"), "INSERT");
+    EXPECT_EQ(SqlScript::LeadingKeyword("/*!40101 SET NAMES utf8 */"), "");
+    EXPECT_EQ(SqlScript::LeadingKeyword(""), "");
+}
+
+TEST(UpdateFetcherTest, ClassifiesAFileByItsFirstStatementThatCanChangeTheSchema)
+{
+    UpdateClassification const data = UpdateFetcher::Classify("-- header\nINSERT INTO t VALUES (1);\nUPDATE t SET a = 2;\n");
+    EXPECT_EQ(data.Kind, UpdateKind::Data);
+    EXPECT_TRUE(data.Transactional);
+    EXPECT_TRUE(UpdateFetcher::IsDataOnly("DELETE FROM t;"));
+
+    UpdateClassification const locked = UpdateFetcher::Classify("LOCK TABLES t WRITE;\nINSERT INTO t VALUES (1);\nUNLOCK TABLES;\n");
+    EXPECT_EQ(locked.Kind, UpdateKind::Data);
+    EXPECT_FALSE(locked.Transactional);
+
+    UpdateClassification const schema = UpdateFetcher::Classify("INSERT INTO t VALUES (1);\n\nCREATE TABLE u (a INT);\nINSERT INTO u VALUES (1);\n");
+    EXPECT_EQ(schema.Kind, UpdateKind::Schema);
+    EXPECT_FALSE(schema.Transactional);
+    EXPECT_EQ(schema.Line, 3u);
+    EXPECT_EQ(schema.Statement, "CREATE TABLE u (a INT)");
+    EXPECT_TRUE(schema.Problem.empty());
+
+    UpdateClassification const broken = UpdateFetcher::Classify("INSERT INTO t VALUES ('open);\n");
+    EXPECT_EQ(broken.Kind, UpdateKind::Schema);
+    EXPECT_FALSE(broken.Problem.empty());
+    EXPECT_FALSE(UpdateFetcher::IsDataOnly("INSERT INTO t VALUES ('open);"));
+}
+
 TEST(DBUpdaterTest, FreshDatabaseImportsBaseAppliesUpdatesInOrderAndThenIsUpToDate)
 {
     std::optional<MySQLConnectionInfo> const info = TestDatabase("ambrose_updater_order");
@@ -283,4 +324,64 @@ TEST(DBUpdaterTest, AnUpdateThatAddsAFolderHasItsFilesAppliedInTheSameRun)
     ASSERT_TRUE(DBUpdater::Run(*info, "test", settings));
     EXPECT_TRUE(log.Contains("The test database is up to date"));
     EXPECT_EQ(Count(*info, "SELECT COUNT(*) FROM `sequence`"), 1u);
+}
+
+TEST(DBUpdaterTest, ALiveDataOnlyApplyStopsBeforeASchemaChangeAndRollsAFailingFileBack)
+{
+    std::optional<MySQLConnectionInfo> const info = TestDatabase("ambrose_updater_live");
+    if (!info)
+        GTEST_SKIP() << "AMBROSE_TEST_DB is not set";
+    DropDatabase(*info);
+    ScopeExit const drop([&info] { DropDatabase(*info); });
+    UpdaterSource source;
+    UpdaterSettings settings;
+    settings.SourceDirectory = source.Root();
+
+    UpdateReport report;
+    std::string error;
+    EXPECT_FALSE(DBUpdater::Inspect(*info, settings, report, error));
+    EXPECT_FALSE(error.empty());
+
+    WriteFile(source.Updates() / "2026_03_01_00.sql", "CREATE TABLE `rows` (`id` INT PRIMARY KEY, `note` VARCHAR(20) NOT NULL);\n");
+    ASSERT_TRUE(DBUpdater::Run(*info, "test", settings));
+    WriteFile(source.Updates() / "2026_03_02_00.sql", "INSERT INTO `rows` VALUES (1, 'one');\nUPDATE `rows` SET `note` = 'first' WHERE `id` = 1;\n");
+    WriteFile(source.Updates() / "2026_03_03_00.sql", "ALTER TABLE `rows` ADD `extra` INT NOT NULL DEFAULT 0;\n");
+    WriteFile(source.Updates() / "2026_03_04_00.sql", "INSERT INTO `rows` VALUES (2, 'two', 2);\n");
+
+    ASSERT_TRUE(DBUpdater::Inspect(*info, settings, report, error)) << error;
+    ASSERT_EQ(report.Applied.size(), 1u);
+    EXPECT_EQ(report.Applied[0].Name, "2026_03_01_00.sql");
+    EXPECT_TRUE(report.Applied[0].Present);
+    EXPECT_FALSE(report.Applied[0].Changed);
+    EXPECT_GT(report.Applied[0].AppliedAt, 0);
+    ASSERT_EQ(report.Pending.size(), 3u);
+    EXPECT_EQ(report.Pending[0].Classification.Kind, UpdateKind::Data);
+    EXPECT_TRUE(report.Pending[0].Classification.Transactional);
+    EXPECT_EQ(report.Pending[1].Classification.Kind, UpdateKind::Schema);
+    EXPECT_EQ(report.Pending[1].Classification.Line, 1u);
+    EXPECT_EQ(report.Pending[2].Classification.Kind, UpdateKind::Data);
+    EXPECT_EQ(Count(*info, "SELECT COUNT(*) FROM `rows`"), 0u);
+
+    {
+        CapturedLog log;
+        UpdateSummary const applied = DBUpdater::ApplyDataOnly(*info, "test", settings);
+        ASSERT_TRUE(applied.Succeeded) << applied.Failure;
+        EXPECT_EQ(applied.AppliedNames, std::vector<std::string>{ "2026_03_02_00.sql" });
+        EXPECT_EQ(applied.StoppedAt, "2026_03_03_00.sql");
+        EXPECT_TRUE(log.Contains("2026_03_03_00.sql can change the schema"));
+    }
+    EXPECT_EQ(Count(*info, "SELECT COUNT(*) FROM `rows` WHERE `note` = 'first'"), 1u);
+    EXPECT_EQ(Count(*info, "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'rows' AND column_name = 'extra'"), 0u);
+    EXPECT_EQ(Count(*info, "SELECT COUNT(*) FROM `updates` WHERE `name` IN ('2026_03_03_00.sql', '2026_03_04_00.sql')"), 0u);
+
+    std::filesystem::remove(source.Updates() / "2026_03_03_00.sql");
+    std::filesystem::remove(source.Updates() / "2026_03_04_00.sql");
+    WriteFile(source.Updates() / "2026_03_05_00.sql", "INSERT INTO `rows` VALUES (5, 'five');\nINSERT INTO `rows` VALUES (1, 'duplicate');\n");
+    CapturedLog log;
+    UpdateSummary const failed = DBUpdater::ApplyDataOnly(*info, "test", settings);
+    EXPECT_FALSE(failed.Succeeded);
+    EXPECT_EQ(failed.FailedAt, "2026_03_05_00.sql");
+    EXPECT_NE(failed.Failure.find("nothing it changed was kept"), std::string::npos) << failed.Failure;
+    EXPECT_EQ(Count(*info, "SELECT COUNT(*) FROM `rows` WHERE `id` = 5"), 0u);
+    EXPECT_EQ(Count(*info, "SELECT COUNT(*) FROM `updates` WHERE `name` = '2026_03_05_00.sql'"), 0u);
 }

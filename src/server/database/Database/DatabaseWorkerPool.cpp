@@ -425,6 +425,12 @@ uint64 DatabaseWorkerPoolBase::GetConcurrentUseCount() const
     return set ? set->GetConcurrentUseCount() : 0;
 }
 
+DatabasePoolUse DatabaseWorkerPoolBase::GetUse() const
+{
+    std::shared_ptr<DatabaseConnectionSet> const set = GetCurrent();
+    return set ? set->GetUse() : DatabasePoolUse{};
+}
+
 void DatabaseWorkerPoolBase::WaitForRetired(std::chrono::milliseconds drainTimeout)
 {
     std::vector<RetiredGeneration> retired;

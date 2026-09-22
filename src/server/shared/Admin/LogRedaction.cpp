@@ -1,11 +1,12 @@
 /*
  * Project Ambrose by Imjustchico
- * Names the secret settings, masks a connection string's password segment and a token's whole value, and scrubs any text that quotes a secret setting's value after its key.
+ * Names the secret settings, masks a connection string's password segment, each key of a key list while keeping its id, and a token's whole value, leaves an empty value empty because it hides nothing, and scrubs any text that quotes a secret setting's value after its key, reading a key list through its commas.
  */
 
 #include "LogRedaction.h"
 #include "StringUtil.h"
 
+#include <algorithm>
 #include <cctype>
 #include <string>
 
@@ -38,6 +39,32 @@ namespace
         return masked;
     }
 
+    bool IsKeyList(std::string_view lowered) noexcept
+    {
+        return lowered == "account.verifierkeys";
+    }
+
+    std::string MaskKeyList(std::string_view value)
+    {
+        std::string masked;
+        std::size_t start = 0;
+        while (true)
+        {
+            std::size_t const end = value.find(',', start);
+            std::string_view const part = value.substr(start, end == std::string_view::npos ? std::string_view::npos : end - start);
+            std::size_t const colon = part.find(':');
+            std::string_view const id = colon == std::string_view::npos ? std::string_view() : Ambrose::Trim(part.substr(0, colon));
+            if (!id.empty() && std::all_of(id.begin(), id.end(), [](char c) { return std::isdigit(static_cast<unsigned char>(c)) != 0; }))
+                masked.append(id).push_back(':');
+            masked.append(LogRedaction::Mask);
+            if (end == std::string_view::npos)
+                break;
+            masked.push_back(',');
+            start = end + 1;
+        }
+        return masked;
+    }
+
     bool IsKeyCharacter(char character) noexcept
     {
         return std::isalnum(static_cast<unsigned char>(character)) || character == '.' || character == '_';
@@ -47,15 +74,18 @@ namespace
 bool LogRedaction::IsSecretSetting(std::string_view key) noexcept
 {
     std::string const lowered = Ambrose::ToLower(std::string(key));
-    return lowered == "admin.token" || EndsWith(lowered, "databaseinfo");
+    return lowered == "admin.token" || IsKeyList(lowered) || EndsWith(lowered, "databaseinfo");
 }
 
 std::string LogRedaction::RedactSettingValue(std::string_view key, std::string_view value)
 {
-    if (!IsSecretSetting(key))
+    if (!IsSecretSetting(key) || Ambrose::Trim(value).empty())
         return std::string(value);
-    if (EndsWith(Ambrose::ToLower(std::string(key)), "databaseinfo"))
+    std::string const lowered = Ambrose::ToLower(std::string(key));
+    if (EndsWith(lowered, "databaseinfo"))
         return MaskConnectionString(value);
+    if (IsKeyList(lowered))
+        return MaskKeyList(value);
     return std::string(Mask);
 }
 
@@ -109,7 +139,8 @@ std::string LogRedaction::Redact(std::string_view text)
         }
         else
         {
-            while (valueEnd < text.size() && text[valueEnd] != ' ' && text[valueEnd] != ',' && text[valueEnd] != '\n' && text[valueEnd] != '\r')
+            bool const list = IsKeyList(Ambrose::ToLower(std::string(text.substr(keyStart, keyEnd - keyStart))));
+            while (valueEnd < text.size() && text[valueEnd] != ' ' && (list || text[valueEnd] != ',') && text[valueEnd] != '\n' && text[valueEnd] != '\r')
                 ++valueEnd;
         }
         out.append(text.substr(keyEnd, cursor - keyEnd));

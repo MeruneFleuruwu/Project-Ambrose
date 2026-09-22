@@ -1,12 +1,13 @@
 /*
  * Project Ambrose by Imjustchico
- * The lifecycle every server app shares: options, config, logging, banner, the one start time and lifecycle state its console and its admin API both report, the optional admin API listener an app fills with its own routes before it opens and the live log stream that runs on it, shutdown signals that a start in progress can poll for, an optional update tick, console commands on their own thread with their replies on the log's own writer, and a clean exit code.
+ * The lifecycle every server app shares: options, config, logging, banner, the one start time and lifecycle state its console and its admin API both report, the optional admin API listener an app fills with its own routes before it opens, with the live log stream, the read half of the settings API and a shutdown with a countdown on it, shutdown signals that a start in progress can poll for, an optional update tick, console commands on their own thread with their replies on the log's own writer, and a clean exit code.
  */
 
 #ifndef AMBROSE_SERVERAPP_H
 #define AMBROSE_SERVERAPP_H
 
 #include "AdminStatus.h"
+#include "ConfigMgr.h"
 #include "ConsoleCommandTable.h"
 #include "Duration.h"
 #include "IoContext.h"
@@ -30,7 +31,6 @@
 #include <vector>
 
 class AdminServer;
-class ConfigMgr;
 class ConsoleInput;
 class ConsoleReader;
 class Log;
@@ -65,6 +65,7 @@ public:
     ServerApp& operator=(ServerApp const&) = delete;
 
     static constexpr std::size_t MaxQueuedCommands = 256;
+    static constexpr int64 MaxShutdownDelaySeconds = 86400;
 
     int Run(std::vector<std::string> const& arguments);
     void RequestStop(std::string reason = "a stop request");
@@ -95,6 +96,7 @@ protected:
     virtual std::unique_ptr<ConsoleInput> CreateConsoleInput();
     virtual std::string GetRealmName() const;
     virtual void OnAdminApiReady(AdminServer& admin);
+    virtual std::vector<RestartRequiredOption> GetRestartRequiredOptions() const;
 
     ConfigMgr& Config() noexcept { return _config; }
     Log& Logger() noexcept { return _log; }
@@ -105,7 +107,7 @@ private:
     bool IsStopping() const noexcept { return GetLifecycleState() == AppLifecycle::Stopping; }
     bool StartAdminApi();
     void ScheduleUpdate();
-    void ScheduleStop(Seconds delay);
+    void ScheduleStop(Seconds delay, std::string reason);
     bool CancelScheduledStop();
     void StopNow(std::string const& reason);
     void LogLifecycle(LogLevel level, std::string const& text);

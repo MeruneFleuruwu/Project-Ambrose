@@ -1,10 +1,11 @@
 /*
  * Project Ambrose by Imjustchico
- * Runs an app from arguments to exit: rejects bad options and missing config with exit code 1, opens the admin API with the app's own routes and the live log stream already in it before the app starts, keeping a generated token in the data folder or, where the machine names none, beside the config file, and refuses to run when its binding is unsafe, stops gracefully on signals, requests or the shutdown command, now or after a delay, moves the one lifecycle state the console and the admin API both read, lets a start in progress run queued signal handlers without blocking so a stop during OnStart exits cleanly without reporting ready, ticks updates on its io loop, and runs queued console lines on a command thread that shutdown waits for, answering on the same writer the log lines use.
+ * Runs an app from arguments to exit: rejects bad options and missing config with exit code 1, opens the admin API with the app's own routes and the live log stream already in it before the app starts, keeping a generated token in the data folder or, where the machine names none, beside the config file, and refuses to run when its binding is unsafe, stops gracefully on signals, requests, the shutdown command or POST /api/shutdown, now or after a delay either can cancel, with the reason logged when the delay runs out, answers GET /api/settings with the options the app declares restart-required, moves the one lifecycle state the console and the admin API both read, lets a start in progress run queued signal handlers without blocking so a stop during OnStart exits cleanly without reporting ready, ticks updates on its io loop, and runs queued console lines on a command thread that shutdown waits for, answering on the same writer the log lines use.
  */
 
 #include "ServerApp.h"
 #include "AdminCapabilities.h"
+#include "AdminConfigView.h"
 #include "AdminServer.h"
 #include "AdminSettings.h"
 #include "AppOptions.h"
@@ -25,6 +26,8 @@
 #include <asio/post.hpp>
 
 #include <fmt/format.h>
+
+#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <cstdlib>
@@ -82,7 +85,7 @@ ServerApp::ServerApp(ServerAppInfo info, ConfigMgr& config, Log& log, std::ostre
             std::optional<Seconds> const delay = Ambrose::ParseDuration(arguments.front());
             if (!delay)
                 return false;
-            ScheduleStop(*delay);
+            ScheduleStop(*delay, "the shutdown command");
             reply(fmt::format("{} stops in {}", _info.Name, Ambrose::FormatDuration(*delay)));
             return true;
         } });
@@ -130,6 +133,11 @@ std::string ServerApp::GetRealmName() const
 
 void ServerApp::OnAdminApiReady(AdminServer&)
 {
+}
+
+std::vector<RestartRequiredOption> ServerApp::GetRestartRequiredOptions() const
+{
+    return {};
 }
 
 void ServerApp::OnProblems(std::vector<AdminProblem>&)
@@ -258,6 +266,56 @@ bool ServerApp::StartAdminApi()
     sAdminCapabilities.RegisterStandardProblems();
     sAdminCapabilities.AddReloadTarget("admin");
     AdminStatus::Register(_admin->Routes(), [this] { return BuildStatus(); });
+    AdminConfigView::Register(_admin->Routes(), _config, GetRestartRequiredOptions());
+    _admin->Routes().Add("POST", "/api/shutdown", [this](AdminRequest const& request)
+    {
+        nlohmann::json const body = request.Body.empty() ? nlohmann::json::object() : nlohmann::json::parse(request.Body, nullptr, false);
+        if (!body.is_object())
+            return AdminResponse::Invalid("A shutdown takes a JSON object", { { "seconds", "Give the countdown in whole seconds, or cancel" } });
+        std::vector<std::pair<std::string, std::string>> fields;
+        for (auto const& [key, value] : body.items())
+            if (key != "seconds" && key != "cancel")
+                fields.emplace_back(key, "A shutdown takes only seconds or cancel");
+        bool cancel = false;
+        if (body.contains("cancel"))
+        {
+            if (body["cancel"].is_boolean())
+                cancel = body["cancel"].get<bool>();
+            else
+                fields.emplace_back("cancel", "Give cancel as true or false");
+        }
+        std::optional<int64> seconds;
+        if (body.contains("seconds"))
+        {
+            nlohmann::json const& value = body["seconds"];
+            if (!value.is_number_integer() || value.get<int64>() < 0 || value.get<int64>() > MaxShutdownDelaySeconds)
+                fields.emplace_back("seconds", fmt::format("Give the countdown in whole seconds from 0 to {}", MaxShutdownDelaySeconds));
+            else
+                seconds = value.get<int64>();
+        }
+        if (cancel && seconds)
+            fields.emplace_back("cancel", "Cancel a shutdown or schedule one, not both");
+        if (!fields.empty())
+            return AdminResponse::Invalid("The shutdown request has problems", std::move(fields));
+
+        if (cancel)
+        {
+            bool const cancelled = CancelScheduledStop();
+            LogLifecycle(LogLevel::Info, fmt::format("The admin API {} (request {})", cancelled ? "cancelled the pending shutdown" : "found no shutdown to cancel", request.Id));
+            nlohmann::json answer;
+            answer["cancelled"] = cancelled;
+            return AdminResponse::Json(200, answer.dump());
+        }
+        int64 const delay = seconds.value_or(0);
+        LogLifecycle(LogLevel::Info, fmt::format("The admin API asked {} to stop {} (request {})", _info.Name, delay == 0 ? std::string("now") : fmt::format("in {}", Ambrose::FormatDuration(Seconds(delay))), request.Id));
+        if (delay == 0)
+            RequestStop("the admin API");
+        else
+            ScheduleStop(Seconds(delay), "the admin API");
+        nlohmann::json answer;
+        answer["stopping_in"] = delay;
+        return AdminResponse::Json(202, answer.dump());
+    });
     _logStream = std::make_unique<LogStreamService>(_log.GetStreamHub());
     _logStream->Start();
     _admin->AddSocket(_logStream->MakeSocketRoute("/api/logs"));
@@ -561,20 +619,20 @@ void ServerApp::ScheduleUpdate()
     });
 }
 
-void ServerApp::ScheduleStop(Seconds delay)
+void ServerApp::ScheduleStop(Seconds delay, std::string reason)
 {
     _stopScheduled = true;
-    asio::post(_io.GetExecutor(), [this, delay]
+    asio::post(_io.GetExecutor(), [this, delay, reason = std::move(reason)]
     {
         if (!_stopScheduled.load())
             return;
         LogLifecycle(LogLevel::Info, fmt::format("{} stops in {}", _info.Name, Ambrose::FormatDuration(delay)));
         _shutdownTimer.expires_after(delay);
-        _shutdownTimer.async_wait([this](std::error_code const& error)
+        _shutdownTimer.async_wait([this, reason](std::error_code const& error)
         {
             if (error || !_stopScheduled.exchange(false))
                 return;
-            StopNow("the shutdown command");
+            StopNow(reason);
         });
     });
 }

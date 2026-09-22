@@ -7,8 +7,10 @@
 #define AMBROSE_CLIENTSETUP_H
 
 #include "ClientLocator.h"
+#include "ConfigMgr.h"
 #include "SetupPrompt.h"
 
+#include <array>
 #include <chrono>
 #include <cstddef>
 #include <filesystem>
@@ -65,6 +67,13 @@ public:
     static constexpr std::string_view PromptTimeoutKey = "Setup.PromptTimeout";
     static constexpr std::string_view TypeExtractorKey = "Setup.TypeExtractor";
     static constexpr std::string_view TypeExtractTimeoutKey = "Setup.TypeExtractTimeout";
+    static constexpr std::string_view StartupOnlyReason = "Setup runs only while the server starts, so a change takes effect at the next start";
+    static constexpr std::array<RestartRequiredOption, 4> RestartRequiredOptions{ {
+        { ModeKey, StartupOnlyReason },
+        { PromptTimeoutKey, StartupOnlyReason },
+        { TypeExtractorKey, StartupOnlyReason },
+        { TypeExtractTimeoutKey, StartupOnlyReason }
+    } };
     static constexpr std::string_view ModeVariable = "AMBROSE_SETUP_MODE";
     static constexpr std::string_view PromptTimeoutVariable = "AMBROSE_SETUP_PROMPT_TIMEOUT";
     static constexpr std::string_view SavedFileName = "client-data.conf";

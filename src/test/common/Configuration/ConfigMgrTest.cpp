@@ -190,6 +190,34 @@ TEST(ConfigMgrTest, LayersApplyInDocumentedOrder)
     EXPECT_EQ(config.Resolve("F")->Kind, ConfigSourceKind::Override);
 }
 
+TEST(ConfigMgrTest, DefaultsStayReadableUnderEveryLayer)
+{
+    TempDirectory directory;
+    FakeEnvironment environment;
+    directory.Write("gameserver.conf.dist", Header + "A = dist\nB = dist\n");
+    directory.Write("conf.d/pets.conf.dist", Header + "B = moduledist\n");
+    std::filesystem::path const file = directory.Write("gameserver.conf", Header + "A = conf\nB = conf\nC = conf\n");
+    environment.Values["AMBROSE_A"] = "environment";
+    ConfigMgr config(environment.Lookup());
+    ASSERT_TRUE(config.LoadInitial(file, {}, { { "B", "override" } }).Succeeded());
+
+    std::optional<ConfigEntry> const a = config.ResolveDefault("A");
+    ASSERT_TRUE(a.has_value());
+    EXPECT_EQ(a->Value, "dist");
+    EXPECT_EQ(a->Kind, ConfigSourceKind::Default);
+    EXPECT_EQ(a->File.filename(), "gameserver.conf.dist");
+    EXPECT_EQ(config.Resolve("A")->Value, "environment");
+
+    std::optional<ConfigEntry> const b = config.ResolveDefault("B");
+    ASSERT_TRUE(b.has_value());
+    EXPECT_EQ(b->Value, "moduledist");
+    EXPECT_EQ(b->Kind, ConfigSourceKind::ModuleDefault);
+    EXPECT_EQ(config.Resolve("B")->Kind, ConfigSourceKind::Override);
+
+    EXPECT_FALSE(config.ResolveDefault("C").has_value());
+    EXPECT_EQ(config.Resolve("C")->Value, "conf");
+}
+
 TEST(ConfigMgrTest, ModuleDefaultsNeverOverrideTheLocalConfig)
 {
     TempDirectory directory;

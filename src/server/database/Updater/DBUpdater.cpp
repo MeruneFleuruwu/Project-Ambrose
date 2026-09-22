@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Creates a missing schema with utf8mb4 when auto setup allows, imports base files into an empty schema with the update bookkeeping tables last, and runs every SQL file on its own multi-statement connection in batches under max_allowed_packet.
+ * Creates a missing schema with utf8mb4 when auto setup allows, imports base files into an empty schema with the update bookkeeping tables last, and runs every SQL file on its own multi-statement connection in batches under max_allowed_packet, inside one transaction when asked so a failure leaves nothing behind; a live listing or data-only apply first checks that the updater set the database up, and every failure is kept as text for the caller as well as logged.
  */
 
 #include "DBUpdater.h"
@@ -54,16 +54,25 @@ std::string DBUpdater::QuoteIdentifier(std::string_view identifier)
     return quoted;
 }
 
-bool DBUpdater::ApplyScript(MySQLConnectionInfo const& info, MySQLConnectionSettings const& connectionSettings, std::string_view fileLabel, std::string_view contents)
+std::filesystem::path DBUpdater::SourceDirectoryFor(UpdaterSettings const& settings)
 {
+    return settings.SourceDirectory.empty() ? GetBuiltInSourceDirectory() : settings.SourceDirectory;
+}
+
+bool DBUpdater::ApplyScript(MySQLConnectionInfo const& info, MySQLConnectionSettings const& connectionSettings, std::string_view fileLabel, std::string_view contents, std::string* failure, bool inTransaction)
+{
+    auto const fail = [failure](std::string text)
+    {
+        LOG_ERROR("sql.updates", "{}", text);
+        if (failure)
+            *failure = std::move(text);
+        return false;
+    };
     std::string_view const body = SqlScript::StripByteOrderMark(contents);
     std::vector<SqlScript::Statement> statements;
     std::string error;
     if (!SqlScript::Split(body, statements, error))
-    {
-        LOG_ERROR("sql.updates", "{} cannot be applied: {}", fileLabel, error);
-        return false;
-    }
+        return fail(fmt::format("{} cannot be applied: {}", fileLabel, error));
     if (statements.empty())
         return true;
 
@@ -74,10 +83,7 @@ bool DBUpdater::ApplyScript(MySQLConnectionInfo const& info, MySQLConnectionSett
     settings.WriteTimeout = std::max<std::chrono::seconds>(settings.WriteTimeout, ScriptWriteTimeout);
     MySQLConnection connection(info, settings);
     if (connection.Open() != 0)
-    {
-        LOG_ERROR("sql.updates", "{} cannot be applied: no connection to {}", fileLabel, info.ToLogString());
-        return false;
-    }
+        return fail(fmt::format("{} cannot be applied: no connection to {}", fileLabel, info.ToLogString()));
 
     uint64 maxPacket = DefaultMaxPacket;
     if (QueryResult const packet = connection.Query("SELECT @@max_allowed_packet"))
@@ -94,10 +100,7 @@ bool DBUpdater::ApplyScript(MySQLConnectionInfo const& info, MySQLConnectionSett
         {
             std::string_view const text = statements[index].Text;
             if (text.size() + 2 > limit)
-            {
-                LOG_ERROR("sql.updates", "{} cannot be applied: statement {} on line {} is {} bytes, more than the server's max_allowed_packet of {}", fileLabel, index + 1, statements[index].Line, text.size(), maxPacket);
-                return false;
-            }
+                return fail(fmt::format("{} cannot be applied: statement {} on line {} is {} bytes, more than the server's max_allowed_packet of {}", fileLabel, index + 1, statements[index].Line, text.size(), maxPacket));
             if (!current.Text.empty() && current.Text.size() + text.size() + 2 > limit)
             {
                 batches.push_back(std::move(current));
@@ -111,22 +114,75 @@ bool DBUpdater::ApplyScript(MySQLConnectionInfo const& info, MySQLConnectionSett
             batches.push_back(std::move(current));
     }
 
+    if (inTransaction && !connection.Execute("START TRANSACTION"))
+        return fail(fmt::format("{} cannot be applied: no transaction could start: [{}] {}", fileLabel, connection.GetLastErrorCode(), connection.GetLastErrorText()));
     for (Batch const& batch : batches)
     {
         std::size_t failedInBatch = 0;
         if (connection.ExecuteScript(batch.Text, failedInBatch))
             continue;
         std::size_t const failed = failedInBatch ? batch.FirstStatement + failedInBatch - 1 : 0;
+        std::string_view const undone = inTransaction ? "; nothing it changed was kept" : "";
         if (failed >= 1 && failed <= statements.size())
         {
             SqlScript::Statement const& statement = statements[failed - 1];
-            LOG_ERROR("sql.updates", "{} failed at statement {} on line {}: [{}] {} in: {}", fileLabel, failed, statement.Line, connection.GetLastErrorCode(), connection.GetLastErrorText(), SqlScript::Excerpt(statement.Text));
+            return fail(fmt::format("{} failed at statement {} on line {}: [{}] {} in: {}{}", fileLabel, failed, statement.Line, connection.GetLastErrorCode(), connection.GetLastErrorText(), SqlScript::Excerpt(statement.Text), undone));
         }
-        else
-            LOG_ERROR("sql.updates", "{} failed: [{}] {}", fileLabel, connection.GetLastErrorCode(), connection.GetLastErrorText());
+        return fail(fmt::format("{} failed: [{}] {}{}", fileLabel, connection.GetLastErrorCode(), connection.GetLastErrorText(), undone));
+    }
+    if (inTransaction && !connection.Execute("COMMIT"))
+        return fail(fmt::format("{} could not be committed: [{}] {}; nothing it changed was kept", fileLabel, connection.GetLastErrorCode(), connection.GetLastErrorText()));
+    return true;
+}
+
+bool DBUpdater::OpenBookkeeping(MySQLConnection& connection, MySQLConnectionInfo const& info, std::string& error)
+{
+    if (connection.Open() != 0)
+    {
+        error = fmt::format("cannot connect to {}: [{}] {}", info.ToLogString(), connection.GetLastErrorCode(), connection.GetLastErrorText());
+        return false;
+    }
+    QueryResult const tables = connection.Query(fmt::format(
+        "SELECT CAST(COALESCE(SUM(table_name IN ('updates', 'updates_include')), 0) AS UNSIGNED) FROM information_schema.tables WHERE table_schema = '{}'",
+        connection.Escape(info.Database)));
+    if (connection.GetLastErrorCode() != 0)
+    {
+        error = fmt::format("cannot read the tables of {}: [{}] {}", info.Database, connection.GetLastErrorCode(), connection.GetLastErrorText());
+        return false;
+    }
+    if (!tables || (*tables)[0].Get<uint64>() != 2)
+    {
+        error = fmt::format("{} has no updates and updates_include tables, so the updater has not set it up", info.Database);
         return false;
     }
     return true;
+}
+
+bool DBUpdater::Inspect(MySQLConnectionInfo const& info, UpdaterSettings const& settings, UpdateReport& report, std::string& error, MySQLConnectionSettings const& connectionSettings)
+{
+    report = UpdateReport{};
+    MySQLConnection bookkeeping(info, connectionSettings);
+    if (!OpenBookkeeping(bookkeeping, info, error))
+        return false;
+    UpdateFetcher const fetcher(bookkeeping, SourceDirectoryFor(settings), {});
+    return fetcher.Inspect(report, error);
+}
+
+UpdateSummary DBUpdater::ApplyDataOnly(MySQLConnectionInfo const& info, std::string_view folderName, UpdaterSettings const& settings, MySQLConnectionSettings const& connectionSettings)
+{
+    UpdateSummary summary;
+    MySQLConnection bookkeeping(info, connectionSettings);
+    if (!OpenBookkeeping(bookkeeping, info, summary.Failure))
+    {
+        LOG_ERROR("sql.updates", "Cannot apply data-only updates to the {} database: {}", folderName, summary.Failure);
+        summary.Succeeded = false;
+        return summary;
+    }
+    UpdateFetcher fetcher(bookkeeping, SourceDirectoryFor(settings), [&info, &connectionSettings](UpdateFile const& file, std::string_view contents, std::string& failure)
+    {
+        return ApplyScript(info, connectionSettings, ConfigMgr::PathToUtf8(file.Path), contents, &failure, UpdateFetcher::Classify(contents).Transactional);
+    });
+    return fetcher.Update(folderName, [](UpdateFile const&, std::string_view contents) { return UpdateFetcher::IsDataOnly(contents); });
 }
 
 bool DBUpdater::Populate(MySQLConnection& bookkeeping, MySQLConnectionInfo const& info, MySQLConnectionSettings const& connectionSettings, std::filesystem::path const& baseDirectory)
@@ -192,7 +248,7 @@ bool DBUpdater::Run(MySQLConnectionInfo const& info, std::string_view folderName
         LOG_ERROR("sql.updates", "The {} connection string names no database to update", folderName);
         return false;
     }
-    std::filesystem::path const source = settings.SourceDirectory.empty() ? GetBuiltInSourceDirectory() : settings.SourceDirectory;
+    std::filesystem::path const source = SourceDirectoryFor(settings);
 
     MySQLConnectionInfo serverOnly = info;
     serverOnly.Database.clear();
@@ -233,9 +289,9 @@ bool DBUpdater::Run(MySQLConnectionInfo const& info, std::string_view folderName
         }
         return false;
     }
-    UpdateFetcher fetcher(bookkeeping, source, [&info, &connectionSettings](UpdateFile const& file, std::string_view contents)
+    UpdateFetcher fetcher(bookkeeping, source, [&info, &connectionSettings](UpdateFile const& file, std::string_view contents, std::string& failure)
     {
-        return ApplyScript(info, connectionSettings, ConfigMgr::PathToUtf8(file.Path), contents);
+        return ApplyScript(info, connectionSettings, ConfigMgr::PathToUtf8(file.Path), contents, &failure);
     });
     return fetcher.Update(folderName).Succeeded;
 }
