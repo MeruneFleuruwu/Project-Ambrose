@@ -65,6 +65,26 @@ A finding that does not survive becomes `refuted`, with `refuted_how` saying wha
 
 Findings still `claimed` are never quoted as fact in the repository's documents. A document may cite one as a lead, saying it is unverified.
 
+## Optional machine check
+
+A finding may carry the optional `machine_check` object proposed in
+`contrib/proposals/machine-checkable-findings.md`. Before a runner is trusted,
+validate the block without executing it:
+
+```powershell
+.\contrib\tools\ambrose-finding-check\build\Debug\ambrose-finding-check.exe `
+  contrib\findings\protocol\example.json
+```
+
+The dependency-free validator accepts schema `1` and kind `command`. It
+requires a regular repository-relative `entrypoint` below the finding's own
+folder, an argv `arguments` array, unique declared `inputs`, and `pass`,
+`fail`, and `unable` result contracts with exit codes `0`, `1`, and `77`.
+`${name}` placeholders must refer to exactly one declared input. The
+validator is deliberately dry: it never opens an input, starts an entrypoint,
+runs a shell, contacts a network, or changes a finding's `claimed` status.
+Missing `machine_check` blocks remain valid.
+
 ## Which findings are wanted most
 
 The list in doc/CONTRIBUTOR-TRACK.md names them with their ids. The short version: anything phase 5 and later needs and nobody has written down, above all combat, quests, pets, housing and the zone data, and anything that tells Ambrose what a newer client revision changed.
