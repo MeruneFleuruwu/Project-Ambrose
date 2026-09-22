@@ -13,6 +13,7 @@
 #include "Log.h"
 #include "AppOptions.h"
 #include "Panel.h"
+#include "PanelUsers.h"
 #include "ServerApp.h"
 #include "StringUtil.h"
 #include "Supervisor.h"
@@ -21,6 +22,7 @@
 #include <fmt/format.h>
 
 #include <algorithm>
+#include <ctime>
 #include <filesystem>
 #include <iterator>
 #include <iostream>
@@ -115,6 +117,18 @@ namespace
         return 0;
     }
 
+    std::string WhenText(int64 epochMs)
+    {
+        std::time_t const value = static_cast<std::time_t>(epochMs / 1000);
+        std::tm parts = {};
+#ifdef _WIN32
+        localtime_s(&parts, &value);
+#else
+        localtime_r(&value, &parts);
+#endif
+        return fmt::format("{:04}-{:02}-{:02} {:02}:{:02}:{:02}", parts.tm_year + 1900, parts.tm_mon + 1, parts.tm_mday, parts.tm_hour, parts.tm_min, parts.tm_sec);
+    }
+
     std::optional<uint32> ParseCountdown(std::string_view text)
     {
         if (text == "0")
@@ -195,6 +209,100 @@ namespace
     private:
         void RegisterCommands()
         {
+            Commands().Register({ "panel user list", "", "list the panel's operators", false,
+                [this](std::vector<std::string> const& arguments, ConsoleCommandTable::Reply const& reply)
+                {
+                    if (!arguments.empty())
+                        return false;
+                    std::string error;
+                    std::vector<PanelUser> const users = _panel.Users().List(error);
+                    if (!error.empty())
+                    {
+                        reply(error);
+                        return true;
+                    }
+                    if (users.empty())
+                        reply("The panel has no operator yet; its console printed a one-time link when it started");
+                    for (PanelUser const& user : users)
+                        reply(fmt::format("{}{}{} last signed in {}", user.Username, user.IsOwner ? " (owner)" : "", user.Disabled ? " (disabled)" : "",
+                            user.SignedInEpochMs ? WhenText(*user.SignedInEpochMs) : std::string("never")));
+                    return true;
+                } });
+            Commands().Register({ "panel user create", "<name>", "make an operator and print a one-time link they set their password from", false,
+                [this](std::vector<std::string> const& arguments, ConsoleCommandTable::Reply const& reply)
+                {
+                    if (arguments.size() != 1)
+                        return false;
+                    std::string error;
+                    std::string const password = PanelUsers::Unguessable();
+                    int64 id = 0;
+                    PanelUserResult const made = _panel.Users().Create(arguments[0], password, false, true, &id, error);
+                    if (made != PanelUserResult::Ok)
+                    {
+                        reply(fmt::format("{} was not made: {}", arguments[0], made == PanelUserResult::StoreFailed ? error : std::string(PanelUsers::Explain(made))));
+                        return true;
+                    }
+                    reply(fmt::format("{} was made. They set their own password once, from this machine, within 30 minutes: {}",
+                        arguments[0], _panel.LinkFor(_panel.MintPasswordLink(id))));
+                    return true;
+                } });
+            Commands().Register({ "panel user reset-password", "<name>", "print a one-time link that operator sets a new password from", false,
+                [this](std::vector<std::string> const& arguments, ConsoleCommandTable::Reply const& reply)
+                {
+                    if (arguments.size() != 1)
+                        return false;
+                    std::string error;
+                    std::optional<PanelUser> const user = _panel.Users().Find(arguments[0], error);
+                    if (!user)
+                    {
+                        reply(error.empty() ? fmt::format("The panel has no operator named {}", arguments[0]) : error);
+                        return true;
+                    }
+                    reply(fmt::format("{} sets a new password once, from this machine, within 30 minutes: {}",
+                        user->Username, _panel.LinkFor(_panel.MintPasswordLink(user->Id))));
+                    return true;
+                } });
+            Commands().Register({ "panel user disable", "<name>", "stop an operator signing in and end the sessions they have", false,
+                [this](std::vector<std::string> const& arguments, ConsoleCommandTable::Reply const& reply)
+                {
+                    if (arguments.size() != 1)
+                        return false;
+                    std::string error;
+                    std::optional<PanelUser> const user = _panel.Users().Find(arguments[0], error);
+                    if (!user)
+                    {
+                        reply(error.empty() ? fmt::format("The panel has no operator named {}", arguments[0]) : error);
+                        return true;
+                    }
+                    if (!_panel.Users().SetDisabled(user->Id, true, error))
+                    {
+                        reply(error.empty() ? fmt::format("{} was not disabled", user->Username) : error);
+                        return true;
+                    }
+                    _panel.Sessions().CloseEveryOne(user->Id, "the operator was disabled", error);
+                    reply(fmt::format("{} can no longer sign in, and the sessions they had have ended", user->Username));
+                    return true;
+                } });
+            Commands().Register({ "panel user enable", "<name>", "let a disabled operator sign in again", false,
+                [this](std::vector<std::string> const& arguments, ConsoleCommandTable::Reply const& reply)
+                {
+                    if (arguments.size() != 1)
+                        return false;
+                    std::string error;
+                    std::optional<PanelUser> const user = _panel.Users().Find(arguments[0], error);
+                    if (!user)
+                    {
+                        reply(error.empty() ? fmt::format("The panel has no operator named {}", arguments[0]) : error);
+                        return true;
+                    }
+                    if (!_panel.Users().SetDisabled(user->Id, false, error))
+                    {
+                        reply(error.empty() ? fmt::format("{} was not enabled", user->Username) : error);
+                        return true;
+                    }
+                    reply(fmt::format("{} can sign in again", user->Username));
+                    return true;
+                } });
             Commands().Register({ "apps", "", "list the apps the supervisor runs and their state", false,
                 [this](std::vector<std::string> const& arguments, ConsoleCommandTable::Reply const& reply)
                 {

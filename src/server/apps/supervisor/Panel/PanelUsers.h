@@ -71,6 +71,7 @@ public:
 
     static std::string Fold(std::string_view username);
     static std::string_view Explain(PanelUserResult result) noexcept;
+    static std::string Unguessable();
     static bool HashPassword(std::string_view password, std::string& hash, std::string& error);
     static bool PasswordMatches(std::string const& hash, std::string_view password);
 

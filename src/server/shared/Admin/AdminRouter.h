@@ -30,6 +30,7 @@ struct AdminRequest
     std::string Body;
     std::string Host;
     std::string Origin;
+    std::string UserAgent;
     std::string Cookie;
     std::string Csrf;
     bool Upgrade = false;

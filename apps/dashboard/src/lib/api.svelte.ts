@@ -1,10 +1,10 @@
 /*
  * Project Ambrose by Imjustchico
- * The panel's one way to reach the API of the host that served it: relative requests the browser resolves against the page's own address, with the session's CSRF token on anything that changes something, every answer checked against its shape, every refusal turned into an error carrying its status, code, message, request id and field problems, and the browser session itself, probed on load where finding none is an answer rather than an error, opened by trading the admin token once, closed on request, and marked ended when an answer says so.
+ * The panel's one way to reach the API of the host that served it: relative requests the browser resolves against the page's own address, with the session's CSRF token on anything that changes something, every answer checked against its shape, every refusal turned into an error carrying its status, code, message, request id and field problems, and the browser session itself, probed on load where finding none is an answer rather than an error, opened by trading the admin token once on an app's own listener or by a panel user's name and password on the panel's, closed on request, and marked ended when an answer says so.
  */
 
 import * as v from "valibot";
-import { SessionAnswer } from "./schemas";
+import { PanelSessionAnswer, PanelSignedIn, SessionAnswer, type PanelUser } from "./schemas";
 
 export type Fields = Record<string, string>;
 
@@ -30,9 +30,21 @@ export type SessionState = {
     csrf: string | null;
     via: "session" | "token" | null;
     ended: boolean;
+    panel: boolean;
+    needsOwner: boolean;
+    user: PanelUser | null;
 };
 
-export const session = $state<SessionState>({ state: "checking", app: "", csrf: null, via: null, ended: false });
+export const session = $state<SessionState>({
+    state: "checking",
+    app: "",
+    csrf: null,
+    via: null,
+    ended: false,
+    panel: false,
+    needsOwner: false,
+    user: null,
+});
 
 const changing = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
@@ -120,9 +132,26 @@ function adopt(answer: SessionAnswer) {
     session.ended = false;
 }
 
+function adoptPanel(answer: v.InferOutput<typeof PanelSessionAnswer>) {
+    session.app = answer.app;
+    session.panel = answer.needs_owner !== undefined;
+    session.needsOwner = answer.needs_owner ?? false;
+    session.user = answer.user ?? null;
+    if (!answer.signed_in) {
+        session.state = "signed-out";
+        session.csrf = null;
+        session.via = null;
+        return;
+    }
+    session.state = "signed-in";
+    session.csrf = answer.csrf;
+    session.via = answer.signed_in_with ?? "session";
+    session.ended = false;
+}
+
 export async function probeSession() {
     try {
-        adopt(await request("GET", "api/session", SessionAnswer));
+        adoptPanel(await request("GET", "api/session", PanelSessionAnswer));
     } catch {
         session.state = "unreachable";
     }
@@ -132,8 +161,29 @@ export async function signIn(token: string) {
     adopt(await request("POST", "api/session", SessionAnswer, { token }));
 }
 
+export async function signInAsUser(username: string, password: string) {
+    const answer = await request("POST", "api/panel/session", PanelSignedIn, { username, password });
+    session.state = "signed-in";
+    session.csrf = answer.csrf;
+    session.via = "session";
+    session.ended = false;
+    session.needsOwner = false;
+    session.user = answer.user;
+}
+
+export async function claimOwner(token: string, username: string, password: string) {
+    const answer = await request("POST", "api/panel/claim", PanelSignedIn, { token, username, password });
+    session.state = "signed-in";
+    session.csrf = answer.csrf;
+    session.via = "session";
+    session.ended = false;
+    session.needsOwner = false;
+    session.user = answer.user;
+}
+
 export async function signOut() {
-    await request("DELETE", "api/session", null);
+    await request("DELETE", session.panel ? "api/panel/session" : "api/session", null);
+    session.user = null;
     session.state = "signed-out";
     session.csrf = null;
     session.via = null;

@@ -1207,13 +1207,13 @@ Done on 2026-09-22. The supervisor is a fourth executable in `src/server/apps/su
 
 **Acceptance**
 
-- [ ] A fresh supervisor has no default password and prints a one-time owner link that works once, only from localhost
-- [ ] Twenty failed sign-ins for one user within a minute are throttled, and the correct password works again once the window passes
-- [ ] A successful sign-in to one account from an address does not reset that address's failure count against another account
-- [ ] Sign-in against an unknown user, a disabled user and a wrong password answer the same message and take the same time within measurement noise
-- [ ] A password change ends that user's other sessions within one second
-- [ ] `panel user create` leaves the password in no console line, log file or audit row
-- [ ] A password that fails the policy is refused identically from the console, the reset link and the users page
+- [x] A fresh supervisor has no default password and prints a one-time owner link that works once, only from localhost. `PanelSignInTest.AFreshPanelHasNoPasswordAndItsLinkMakesTheOwnerOnce`: the account does not exist until the link is claimed, a second claim answers 410, and a claim from anywhere but loopback answers 403. Checked by hand against a running supervisor, which printed the link and made the maintainer's own owner account from a browser
+- [x] Twenty failed sign-ins for one user within a minute are throttled, and the correct password works again once the window passes. `PanelSignInTest.HoldsBackAGuesserUntilTheWindowPasses` sends twenty over HTTP and gets 429 with `Retry-After` on the twenty-first even with the right password, and `AFoldedNameIsTheSameGuessingAndTheWindowEndsOnItsOwn` moves a clock through the window
+- [x] A successful sign-in to one account from an address does not reset that address's failure count against another account. `PanelSignInTest.ASuccessForOneAccountDoesNotForgiveGuessesAtAnother`: the count is kept per account and per account-and-address together, never per address alone
+- [x] Sign-in against an unknown user, a disabled user and a wrong password answer the same message and take the same time within measurement noise. `PanelUsersTest.AnswersTheSameAndTakesTheSameTimeForEveryRefusal` times five rounds of each and holds the slowest median inside three times the quickest; an unknown name spends a verify against a decoy hash made at start, and a disabled account is checked after its password is
+- [x] A password change ends that user's other sessions within one second. `PanelSignInTest.APasswordChangeEndsTheSessionsThatUserHad`: a session carries the generation its user had when it opened, and the one statement that holds a session compares it, so the next request after the change is refused
+- [x] `panel user create` leaves the password in no console line, log file or audit row. It takes no password at all: it makes the account with an unguessable one nobody is told and prints a one-time link the operator sets their own from, and `panel user reset-password` does the same
+- [x] A password that fails the policy is refused identically from the console, the reset link and the users page. There is one `PanelPasswordPolicy::Check`, called by `Create` and `SetPassword`, which every path goes through; `PanelUsersTest.HoldsAPasswordToOnePolicyOnEveryPathThatSetsOne` covers both, and the claim and reset routes answer 422 with the same sentence
 
 ## 17.47 Two-factor sign-in, recovery codes and required enrollment
 

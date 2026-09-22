@@ -60,6 +60,8 @@ public:
     AdminServer& operator=(AdminServer const&) = delete;
 
     void SetHealthSource(std::function<AdminHealth()> health);
+    void SetSessionSource(SessionSource* source);
+    std::string MakeSessionCookie(std::string const& value, bool clear) const { return SessionCookie(value, clear); }
     void AddSocket(AdminSocketRoute route);
     AdminRouter& Routes() { return _router; }
 
@@ -99,6 +101,7 @@ private:
     std::filesystem::path _configFolder;
     AdminAuth _auth;
     AdminSessions _sessions;
+    SessionSource* _sessionSource = nullptr;
     AdminFiles _files;
     AdminRouter _router;
     std::function<AdminHealth()> _health;

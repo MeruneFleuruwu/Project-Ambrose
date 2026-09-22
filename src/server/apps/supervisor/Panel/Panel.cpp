@@ -5,12 +5,19 @@
 
 #include "Panel.h"
 #include "ConfigMgr.h"
+#include "ConstantTime.h"
+#include "CryptoRandom.h"
+#include "Base64.h"
+#include "IpAddress.h"
 #include "Log.h"
 #include "SourceFolder.h"
 #include "StringUtil.h"
 
 #include <fmt/format.h>
 
+#include <nlohmann/json.hpp>
+
+#include <array>
 #include <mutex>
 #include <utility>
 
@@ -26,9 +33,11 @@ namespace
 }
 
 Panel::Panel(Log& log, std::filesystem::path dataFolder, std::filesystem::path configFolder)
-    : _log(log), _dataFolder(std::move(dataFolder)), _listener(log, "panel", _dataFolder, std::move(configFolder))
+    : _log(log), _dataFolder(std::move(dataFolder)), _users(_store), _sessions(_store), _listener(log, "panel", _dataFolder, std::move(configFolder))
 {
     _listener.Routes().SetThrottle([this](AdminRequest const& request, uint32 cost) { return Throttle(request, cost); });
+    _listener.SetSessionSource(&_sessions);
+    RegisterSignIn();
 }
 
 ListenerSettings Panel::LoadSettings(ConfigMgr const& config, std::vector<std::string>* problems)
@@ -78,7 +87,13 @@ bool Panel::Start(ConfigMgr const& config, std::string& error)
         return false;
     _rateLimit.SetLimits(settings.RateLimitBurst, settings.RateLimitPerSecond);
     _secure = settings.HasTls();
-    return _listener.Start(settings, error);
+    _sessionIdle = std::chrono::minutes(settings.SessionIdleMinutes);
+    _sessionLifetime = std::chrono::hours(settings.SessionLifetimeHours);
+    _sessions.SetLifetimes(_sessionIdle, _sessionLifetime);
+    if (!_listener.Start(settings, error))
+        return false;
+    OfferTheOwnerLink();
+    return true;
 }
 
 bool Panel::Reload(ConfigMgr const& config)
@@ -150,4 +165,333 @@ std::optional<AdminResponse> Panel::Throttle(AdminRequest const& request, uint32
         fmt::format("The panel is holding this request back; try again in {} second{}", verdict.RetryAfterSeconds, verdict.RetryAfterSeconds == 1 ? "" : "s"));
     held.Headers.emplace_back("Retry-After", std::to_string(verdict.RetryAfterSeconds));
     return held;
+}
+
+void Panel::RegisterSignIn()
+{
+    AdminRouter& routes = _listener.Routes();
+    routes.AddPublic("POST", "/api/panel/session", [this](AdminRequest const& request) { return SignIn(request); });
+    routes.AddPublic("POST", "/api/panel/claim", [this](AdminRequest const& request) { return Claim(request); });
+    routes.AddPublic("GET", "/api/panel/session", [this](AdminRequest const& request) { return Probe(request); });
+    routes.AddPublic("GET", "/api/session", [this](AdminRequest const& request) { return Probe(request); });
+    routes.AddPublic("POST", "/api/panel/reset", [this](AdminRequest const& request) { return Reset(request); });
+    routes.Add("DELETE", "/api/panel/session", [this](AdminRequest const& request) { return SignOut(request); });
+    routes.Add("GET", "/api/panel/me", [this](AdminRequest const& request) { return WhoAmI(request); });
+}
+
+std::optional<PanelUser> Panel::UserOf(AdminRequest const& request)
+{
+    constexpr std::string_view Signed = "user:";
+    if (!request.Principal.starts_with(Signed))
+        return std::nullopt;
+    std::optional<int64> const id = Ambrose::StringTo<int64>(std::string_view(request.Principal).substr(Signed.size()));
+    if (!id)
+        return std::nullopt;
+    std::string error;
+    return _users.FindById(*id, error);
+}
+
+namespace
+{
+    nlohmann::json UserJson(PanelUser const& user)
+    {
+        nlohmann::json body;
+        body["id"] = user.Id;
+        body["username"] = user.Username;
+        body["display_name"] = user.DisplayName.empty() ? user.Username : user.DisplayName;
+        body["owner"] = user.IsOwner;
+        body["must_change_password"] = user.MustChange;
+        body["signed_in"] = user.SignedInEpochMs ? nlohmann::json(*user.SignedInEpochMs) : nlohmann::json(nullptr);
+        return body;
+    }
+}
+
+AdminResponse Panel::SignIn(AdminRequest const& request)
+{
+    nlohmann::json const body = request.Body.empty() ? nlohmann::json() : nlohmann::json::parse(request.Body, nullptr, false);
+    if (!body.is_object() || !body.contains("username") || !body["username"].is_string() || !body.contains("password") || !body["password"].is_string())
+        return AdminResponse::Invalid("Signing in takes a username and a password", { { "username", "Give the name you sign in with" }, { "password", "Give the password" } });
+
+    std::string const username = body["username"].get<std::string>();
+    std::string const password = body["password"].get<std::string>();
+    std::string const address = request.RemoteAddress;
+
+    PanelSignInVerdict const verdict = _signIn.Check(username, address);
+    if (!verdict.Allowed)
+    {
+        if (verdict.FirstThisWindow)
+        {
+            AuditEvent held;
+            held.Name = "panel:session.throttled";
+            held.Actor = AuditActor::User;
+            held.Address = address;
+            held.Result = AuditResult::Throttled;
+            held.Reason = fmt::format("too many failed sign-ins counted against the {}", verdict.Counted);
+            held.On("panel_user", "", username);
+            std::string failure;
+            if (!Record(held, {}, failure))
+                AMBROSE_LOG(_log, LogLevel::Error, PanelCategory, "A throttled sign-in could not be recorded: {}", failure);
+        }
+        AdminResponse answer = AdminResponse::Problem(429, "too_many_requests", "Too many sign-in attempts; wait and try again");
+        answer.Headers.emplace_back("Retry-After", std::to_string(verdict.RetryAfterSeconds));
+        return answer;
+    }
+
+    PanelUser user;
+    std::string error;
+    PanelUserResult const result = _users.Authenticate(username, password, user, error);
+    if (result != PanelUserResult::Ok)
+    {
+        _signIn.Failed(username, address);
+        AuditEvent refused;
+        refused.Name = "panel:session.refused";
+        refused.Actor = AuditActor::User;
+        refused.Address = address;
+        refused.UserAgent = request.UserAgent;
+        refused.Result = AuditResult::Refused;
+        refused.Reason = result == PanelUserResult::StoreFailed ? error : std::string(PanelUsers::Explain(result));
+        refused.On("panel_user", "", username);
+        std::string failure;
+        if (!Record(refused, {}, failure))
+            AMBROSE_LOG(_log, LogLevel::Error, PanelCategory, "A refused sign-in could not be recorded: {}", failure);
+        return AdminResponse::Problem(401, "sign_in_refused", std::string(PanelUsers::Explain(PanelUserResult::WrongPassword)));
+    }
+
+    _signIn.Succeeded(username, address);
+    return OpenFor(user, request, "a username and password");
+}
+
+AdminResponse Panel::SignOut(AdminRequest const& request)
+{
+    std::optional<PanelUser> const user = UserOf(request);
+    std::string const secret = _listener.Routes().SessionSecret(request).value_or(std::string());
+    if (!secret.empty())
+    {
+        std::string error;
+        _sessions.Close(secret, "the operator signed out", error);
+    }
+    if (user)
+    {
+        AuditEvent closed;
+        closed.Name = "panel:session.closed";
+        closed.Actor = AuditActor::User;
+        closed.ActorId = std::to_string(user->Id);
+        closed.ActorName = user->Username;
+        closed.Address = request.RemoteAddress;
+        closed.On("panel_user", std::to_string(user->Id), user->Username);
+        std::string failure;
+        Record(closed, {}, failure);
+    }
+    AdminResponse response = AdminResponse::Json(200, "{\"signed_out\":true}");
+    response.Headers.emplace_back("Set-Cookie", _listener.MakeSessionCookie("", true));
+    return response;
+}
+
+AdminResponse Panel::WhoAmI(AdminRequest const& request)
+{
+    std::optional<PanelUser> const user = UserOf(request);
+    if (!user)
+        return AdminResponse::Problem(404, "not_a_panel_user", "This request is not carrying a panel user's session");
+    nlohmann::json answer = UserJson(*user);
+    answer["csrf"] = request.SessionCsrf.value_or(std::string());
+    return AdminResponse::Json(200, answer.dump());
+}
+
+void Panel::OfferTheOwnerLink()
+{
+    std::string error;
+    if (!_users.IsEmpty(error))
+    {
+        if (!error.empty())
+            AMBROSE_LOG(_log, LogLevel::Error, PanelCategory, "The panel could not read its users: {}", error);
+        return;
+    }
+
+    std::array<uint8, 32> const bytes = Ambrose::Crypto::GetRandomArray<32>();
+    {
+        std::lock_guard const lock(_claimMutex);
+        _claimToken = Base64::Encode(bytes, Base64::Alphabet::UrlSafe, Base64::Padding::Omitted);
+        _claimExpires = std::chrono::steady_clock::now() + ClaimLifetime;
+    }
+    std::string const host = _listener.GetBindIp() == "0.0.0.0" || _listener.GetBindIp() == "::" ? std::string("127.0.0.1") : _listener.GetBindIp();
+    std::string const link = fmt::format("{}://{}:{}/#claim?token={}", _secure ? "https" : "http", host, _listener.GetPort(), _claimToken);
+    AMBROSE_LOG(_log, LogLevel::Info, PanelCategory, "The panel has no operator yet. Open this link from this machine within {} minutes to make the first one: {}",
+        ClaimLifetime.count(), link);
+}
+
+AdminResponse Panel::OpenFor(PanelUser const& user, AdminRequest const& request, std::string_view how)
+{
+    std::string error;
+    std::optional<PanelSessionOpened> opened = _sessions.Open(user.Id, user.Generation, request.RemoteAddress, request.UserAgent, error);
+    if (!opened)
+    {
+        AMBROSE_LOG(_log, LogLevel::Error, PanelCategory, "A session could not be opened for {}: {}", user.Username, error);
+        return AdminResponse::Problem(503, "store_unavailable", "The panel could not keep your session; try again");
+    }
+
+    AuditEvent signedIn;
+    signedIn.Name = "panel:session.opened";
+    signedIn.Actor = AuditActor::User;
+    signedIn.ActorId = std::to_string(user.Id);
+    signedIn.ActorName = user.Username;
+    signedIn.Address = request.RemoteAddress;
+    signedIn.UserAgent = request.UserAgent;
+    signedIn.Reason = std::string(how);
+    signedIn.On("panel_session", opened->Id).On("panel_user", std::to_string(user.Id), user.Username);
+    std::string failure;
+    if (!Record(signedIn, [&](std::string& why) { return _users.RecordSignIn(user.Id, why); }, failure))
+    {
+        std::string ignored;
+        _sessions.Close(opened->Secret, "the sign-in could not be recorded", ignored);
+        AMBROSE_LOG(_log, LogLevel::Error, PanelCategory, "A sign-in could not be recorded, so it was refused: {}", failure);
+        return AdminResponse::Problem(503, "audit_unavailable", "The panel could not record the sign-in, so it did not sign you in");
+    }
+
+    nlohmann::json answer;
+    answer["csrf"] = opened->Csrf;
+    answer["user"] = UserJson(user);
+    AdminResponse response = AdminResponse::Json(200, answer.dump());
+    response.Headers.emplace_back("Set-Cookie", _listener.MakeSessionCookie(opened->Secret, false));
+    return response;
+}
+
+AdminResponse Panel::Claim(AdminRequest const& request)
+{
+    nlohmann::json const body = request.Body.empty() ? nlohmann::json() : nlohmann::json::parse(request.Body, nullptr, false);
+    if (!body.is_object() || !body.contains("token") || !body["token"].is_string() || !body.contains("username") || !body["username"].is_string()
+        || !body.contains("password") || !body["password"].is_string())
+        return AdminResponse::Invalid("Making the first operator takes the link's token, a username and a password",
+            { { "token", "Give the token from the link the supervisor printed" }, { "username", "Give the name you want to sign in with" }, { "password", "Give the password" } });
+
+    std::optional<asio::ip::address> const from = Ambrose::Asio::MakeAddress(request.RemoteAddress);
+    if (!from || !Ambrose::Asio::IsLoopback(*from))
+        return AdminResponse::Problem(403, "not_this_machine", "The first operator is made from the machine the supervisor runs on");
+
+    std::string token;
+    {
+        std::lock_guard const lock(_claimMutex);
+        if (_claimToken.empty() || std::chrono::steady_clock::now() >= _claimExpires)
+            return AdminResponse::Problem(410, "link_expired", "That link has been used or has run out; restart the supervisor for another");
+        token = _claimToken;
+    }
+    if (!Ambrose::Crypto::ConstantTimeEquals(body["token"].get<std::string>(), token))
+        return AdminResponse::Problem(403, "link_refused", "That link is not the one the supervisor printed");
+
+    std::string error;
+    if (!_users.IsEmpty(error))
+    {
+        std::lock_guard const lock(_claimMutex);
+        _claimToken.clear();
+        return AdminResponse::Problem(409, "already_claimed", "The panel already has an operator");
+    }
+
+    std::string const username = body["username"].get<std::string>();
+    int64 id = 0;
+    PanelUserResult const made = _users.Create(username, body["password"].get<std::string>(), true, false, &id, error);
+    if (made != PanelUserResult::Ok)
+    {
+        std::string const why(PanelUsers::Explain(made));
+        return AdminResponse::Invalid("The first operator could not be made",
+            { { made == PanelUserResult::NameTaken || made == PanelUserResult::NameInvalid || made == PanelUserResult::NameTooLong || made == PanelUserResult::NameTooShort ? "username" : "password", why } });
+    }
+
+    {
+        std::lock_guard const lock(_claimMutex);
+        _claimToken.clear();
+    }
+    std::optional<PanelUser> const owner = _users.FindById(id, error);
+    if (!owner)
+        return AdminResponse::Problem(503, "store_unavailable", "The operator was made but could not be read back");
+    AMBROSE_LOG(_log, LogLevel::Info, PanelCategory, "{} is the panel's owner, made from the one-time link", owner->Username);
+    return OpenFor(*owner, request, "the one-time owner link");
+}
+
+AdminResponse Panel::Probe(AdminRequest const& request)
+{
+    std::optional<PanelUser> user;
+    std::string csrf;
+    if (std::optional<std::string> const secret = _listener.Routes().SessionSecret(request))
+    {
+        if (std::optional<SessionHolder> const held = _sessions.Hold(*secret))
+        {
+            csrf = held->Csrf;
+            AdminRequest carrying = request;
+            carrying.Principal = held->Principal;
+            user = UserOf(carrying);
+        }
+    }
+    std::string error;
+    nlohmann::json answer;
+    answer["app"] = "panel";
+    answer["signed_in"] = user.has_value();
+    answer["signed_in_with"] = user ? nlohmann::json("session") : nlohmann::json(nullptr);
+    answer["csrf"] = user ? nlohmann::json(csrf) : nlohmann::json(nullptr);
+    answer["idle_seconds"] = _sessionIdle.count();
+    answer["lifetime_seconds"] = _sessionLifetime.count();
+    answer["user"] = user ? UserJson(*user) : nlohmann::json(nullptr);
+    {
+        std::lock_guard const lock(_claimMutex);
+        answer["needs_owner"] = !user && !_claimToken.empty() && std::chrono::steady_clock::now() < _claimExpires;
+    }
+    return AdminResponse::Json(200, answer.dump());
+}
+
+std::string Panel::LinkFor(std::string_view token) const
+{
+    std::string const host = _listener.GetBindIp() == "0.0.0.0" || _listener.GetBindIp() == "::" ? std::string("127.0.0.1") : _listener.GetBindIp();
+    return fmt::format("{}://{}:{}/#password?token={}", _secure ? "https" : "http", host, _listener.GetPort(), token);
+}
+
+std::string Panel::MintPasswordLink(int64 userId)
+{
+    std::array<uint8, 32> const bytes = Ambrose::Crypto::GetRandomArray<32>();
+    std::string token = Base64::Encode(bytes, Base64::Alphabet::UrlSafe, Base64::Padding::Omitted);
+    std::lock_guard const lock(_claimMutex);
+    auto const now = std::chrono::steady_clock::now();
+    std::erase_if(_resets, [now](auto const& entry) { return now >= entry.second.second; });
+    _resets.emplace(token, std::pair{ userId, now + ClaimLifetime });
+    return token;
+}
+
+AdminResponse Panel::Reset(AdminRequest const& request)
+{
+    nlohmann::json const body = request.Body.empty() ? nlohmann::json() : nlohmann::json::parse(request.Body, nullptr, false);
+    if (!body.is_object() || !body.contains("token") || !body["token"].is_string() || !body.contains("password") || !body["password"].is_string())
+        return AdminResponse::Invalid("Setting a password takes the link's token and the password",
+            { { "token", "Give the token from the link" }, { "password", "Give the password you want" } });
+
+    int64 userId = 0;
+    {
+        std::lock_guard const lock(_claimMutex);
+        auto const now = std::chrono::steady_clock::now();
+        std::erase_if(_resets, [now](auto const& entry) { return now >= entry.second.second; });
+        auto const found = _resets.find(body["token"].get<std::string>());
+        if (found == _resets.end())
+            return AdminResponse::Problem(410, "link_expired", "That link has been used or has run out; ask for another");
+        userId = found->second.first;
+        _resets.erase(found);
+    }
+
+    std::string error;
+    PanelUserResult const set = _users.SetPassword(userId, body["password"].get<std::string>(), false, error);
+    if (set != PanelUserResult::Ok)
+    {
+        std::string const token = MintPasswordLink(userId);
+        AdminResponse answer = AdminResponse::Invalid("That password was not taken", { { "password", std::string(PanelUsers::Explain(set)) } });
+        nlohmann::json again = nlohmann::json::parse(answer.Body, nullptr, false);
+        if (again.is_object())
+        {
+            again["token"] = token;
+            answer.Body = again.dump();
+        }
+        return answer;
+    }
+
+    std::optional<PanelUser> const user = _users.FindById(userId, error);
+    if (!user)
+        return AdminResponse::Problem(503, "store_unavailable", "The password was set but the operator could not be read back");
+    _sessions.CloseEveryOne(userId, "the password was set from a one-time link", error);
+    _signIn.Succeeded(user->Username, request.RemoteAddress);
+    AMBROSE_LOG(_log, LogLevel::Info, PanelCategory, "{} set a password from a one-time link; every other session that operator had has ended", user->Username);
+    return OpenFor(*user, request, "a one-time password link");
 }

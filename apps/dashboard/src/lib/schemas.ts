@@ -14,6 +14,30 @@ export const SessionAnswer = v.looseObject({
     lifetime_seconds: v.number(),
 });
 
+export const PanelUser = v.looseObject({
+    id: v.number(),
+    username: v.string(),
+    display_name: v.string(),
+    owner: v.boolean(),
+    must_change_password: v.boolean(),
+});
+
+export const PanelSessionAnswer = v.looseObject({
+    app: v.string(),
+    signed_in: v.boolean(),
+    signed_in_with: v.nullable(v.picklist(["session", "token"])),
+    csrf: v.nullable(v.string()),
+    idle_seconds: v.number(),
+    lifetime_seconds: v.number(),
+    needs_owner: v.optional(v.boolean()),
+    user: v.optional(v.nullable(PanelUser)),
+});
+
+export const PanelSignedIn = v.looseObject({
+    csrf: v.string(),
+    user: PanelUser,
+});
+
 export const AppExit = v.looseObject({
     epoch_ms: v.number(),
     code: v.nullable(v.number()),
@@ -198,6 +222,8 @@ export const DatabaseApplyAnswer = v.looseObject({
 });
 
 export type SessionAnswer = v.InferOutput<typeof SessionAnswer>;
+export type PanelUser = v.InferOutput<typeof PanelUser>;
+export type PanelSessionAnswer = v.InferOutput<typeof PanelSessionAnswer>;
 export type AppEntry = v.InferOutput<typeof AppEntry>;
 export type Problem = v.InferOutput<typeof Problem>;
 export type Status = v.InferOutput<typeof Status>;

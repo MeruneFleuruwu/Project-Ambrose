@@ -4,6 +4,8 @@
  */
 
 #include "PanelUsers.h"
+#include "Base64.h"
+#include "CryptoRandom.h"
 #include "StringUtil.h"
 
 #include <botan/argon2fmt.h>
@@ -12,6 +14,7 @@
 #include <fmt/format.h>
 
 #include <algorithm>
+#include <array>
 #include <mutex>
 #include <utility>
 
@@ -90,6 +93,12 @@ std::string_view PanelUsers::Explain(PanelUserResult result) noexcept
         case PanelUserResult::StoreFailed: break;
     }
     return "the panel store refused the change";
+}
+
+std::string PanelUsers::Unguessable()
+{
+    std::array<uint8, 32> const bytes = Ambrose::Crypto::GetRandomArray<32>();
+    return Base64::Encode(bytes, Base64::Alphabet::UrlSafe, Base64::Padding::Omitted);
 }
 
 bool PanelUsers::HashPassword(std::string_view password, std::string& hash, std::string& error)

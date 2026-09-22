@@ -19,7 +19,7 @@ function settle() {
 }
 
 async function submit(token: string) {
-    const input = host.querySelector<HTMLInputElement>("#admin-token");
+    const input = host.querySelector<HTMLInputElement>("#sign-in-token");
     if (!input) throw new Error("no token field");
     input.value = token;
     input.dispatchEvent(new Event("input", { bubbles: true }));
@@ -34,6 +34,9 @@ beforeEach(() => {
     session.state = "signed-out";
     session.csrf = null;
     session.ended = false;
+    session.panel = false;
+    session.needsOwner = false;
+    session.user = null;
     vi.stubGlobal("fetch", async () => {
         const reply = replies.shift();
         if (!reply) throw new TypeError("no answer");
@@ -66,9 +69,9 @@ describe("the sign-in page", () => {
             id: "id-422",
         });
         await submit("not-empty");
-        const problem = host.querySelector("#admin-token-problem");
+        const problem = host.querySelector("#sign-in-token-problem");
         expect(problem?.textContent).toBe("Enter this app's admin token");
-        expect(host.querySelector("#admin-token")?.getAttribute("aria-invalid")).toBe("true");
+        expect(host.querySelector("#sign-in-token")?.getAttribute("aria-invalid")).toBe("true");
         expect(host.textContent).toContain("id-422");
     });
 
@@ -105,7 +108,7 @@ describe("the sign-in page", () => {
 
     it("marks an empty token without asking the server", async () => {
         await submit("   ");
-        expect(host.querySelector("#admin-token-problem")?.textContent).toBe("Enter this app's admin token.");
+        expect(host.querySelector("#sign-in-token-problem")?.textContent).toBe("Enter this app's admin token.");
     });
 
     it("signs in with the right token", async () => {

@@ -173,6 +173,7 @@ namespace
         incoming.Method = crow::method_name(request.method);
         incoming.Path = request.url;
         incoming.RemoteAddress = router.ResolveAddress(request.remote_ip_address, request.get_header_value("x-forwarded-for"));
+        incoming.UserAgent = request.get_header_value("user-agent");
         incoming.Authorization = request.get_header_value("Authorization");
         incoming.Body = request.body;
         incoming.Host = request.get_header_value("Host");
@@ -437,6 +438,11 @@ AdminServer::~AdminServer()
     Close();
 }
 
+void AdminServer::SetSessionSource(SessionSource* source)
+{
+    _sessionSource = source;
+}
+
 void AdminServer::SetHealthSource(std::function<AdminHealth()> health)
 {
     _health = std::move(health);
@@ -653,7 +659,7 @@ bool AdminServer::Open(ListenerSettings const& settings, std::string const& toke
     bool const secure = settings.HasTls();
     _router.SetSecure(secure);
     _router.SetTrustedProxies(TrustedProxies::Parse(settings.TrustedProxies, nullptr, settings.Option("TrustedProxies")));
-    _router.SetBrowserAccess({ &_sessions, fmt::format("{}ambrose_{}_{}", secure ? "__Host-" : "", Ambrose::ToLower(settings.Prefix), *reserved), secure });
+    _router.SetBrowserAccess({ _sessionSource ? _sessionSource : &_sessions, fmt::format("{}ambrose_{}_{}", secure ? "__Host-" : "", Ambrose::ToLower(settings.Prefix), *reserved), secure });
 
     LogBridge().Attach(&_log);
     crow::logger::setHandler(&LogBridge());
