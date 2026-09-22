@@ -1,15 +1,21 @@
-<!-- Project Ambrose by Imjustchico: The panel frame on the shadcn-svelte sidebar: the sections built from the route table, collapsible to icons on a desktop and a drawer on a phone, a top bar with the breadcrumb and the signed-in user's menu, the page the address names after its hash, and the access-denied page for a route the viewer may not use. -->
+<!-- Project Ambrose by Imjustchico: The panel frame on the shadcn-svelte sidebar: the sections built from the route table, collapsible to icons on a desktop and a drawer on a phone, a top bar with the breadcrumb and the signed-in user's menu, a search button that opens the command palette, the light and dark choice in the user's menu, toasts in the corner, the page the address names after its hash, and the access-denied page for a route the viewer may not use. -->
 <script lang="ts">
     import * as Avatar from "$lib/components/ui/avatar/index.js";
     import * as Breadcrumb from "$lib/components/ui/breadcrumb/index.js";
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
+    import * as Kbd from "$lib/components/ui/kbd/index.js";
     import * as Sidebar from "$lib/components/ui/sidebar/index.js";
     import { Badge } from "$lib/components/ui/badge/index.js";
+    import { Button } from "$lib/components/ui/button/index.js";
     import { Separator } from "$lib/components/ui/separator/index.js";
+    import { Toaster } from "$lib/components/ui/sonner/index.js";
+    import { chooseTheme, theme, type ThemeChoice } from "$lib/theme.svelte.js";
     import ChevronsUpDownIcon from "@lucide/svelte/icons/chevrons-up-down";
     import LogOutIcon from "@lucide/svelte/icons/log-out";
+    import SearchIcon from "@lucide/svelte/icons/search";
     import SparklesIcon from "@lucide/svelte/icons/sparkles";
     import UserCogIcon from "@lucide/svelte/icons/user-cog";
+    import CommandPalette from "./components/CommandPalette.svelte";
     import { findRoute, routes } from "./routes";
     import Overview from "./pages/Overview.svelte";
     import Servers from "./pages/Servers.svelte";
@@ -37,10 +43,13 @@
 
     const route = $derived(findRoute(path));
     const allowed = $derived(route !== undefined && (route.permission === "none" || granted.has(route.permission)));
+    const reachable = routes.filter((entry) => entry.nav && granted.has(entry.permission));
     const groups = (["Servers", "Game", "Panel"] as const).map((heading) => ({
         heading,
-        entries: routes.filter((entry) => entry.nav && entry.group === heading && granted.has(entry.permission)),
+        entries: reachable.filter((entry) => entry.group === heading),
     }));
+    const onMac = /Mac|iPhone|iPad/.test(navigator.userAgent);
+    let paletteOpen = $state(false);
 </script>
 
 <Sidebar.Provider>
@@ -109,6 +118,13 @@
                                 <div class="text-xs text-muted-foreground">Owner of this panel</div>
                             </DropdownMenu.Label>
                             <DropdownMenu.Separator />
+                            <DropdownMenu.Label class="text-xs font-normal text-muted-foreground">Theme</DropdownMenu.Label>
+                            <DropdownMenu.RadioGroup value={theme.choice} onValueChange={(choice) => chooseTheme(choice as ThemeChoice)}>
+                                <DropdownMenu.RadioItem value="system">Match the system</DropdownMenu.RadioItem>
+                                <DropdownMenu.RadioItem value="light">Light</DropdownMenu.RadioItem>
+                                <DropdownMenu.RadioItem value="dark">Dark</DropdownMenu.RadioItem>
+                            </DropdownMenu.RadioGroup>
+                            <DropdownMenu.Separator />
                             <DropdownMenu.Item><UserCogIcon />Account and security</DropdownMenu.Item>
                             <DropdownMenu.Item><SparklesIcon />What's new</DropdownMenu.Item>
                             <DropdownMenu.Separator />
@@ -121,9 +137,9 @@
         <Sidebar.Rail />
     </Sidebar.Root>
     <Sidebar.Inset>
-        <header class="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+        <header class="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background/90 px-4 backdrop-blur md:rounded-t-xl">
             <Sidebar.Trigger class="-ml-1" />
-            <Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
+            <Separator orientation="vertical" class="mr-2 data-vertical:h-4 data-vertical:self-auto" />
             <Breadcrumb.Root>
                 <Breadcrumb.List>
                     <Breadcrumb.Item class="hidden md:block">
@@ -135,7 +151,21 @@
                     </Breadcrumb.Item>
                 </Breadcrumb.List>
             </Breadcrumb.Root>
-            <Badge variant="outline" class="ml-auto gap-1.5 border-waiting/40 bg-waiting/10 text-waiting">
+            <Button
+                variant="outline"
+                size="sm"
+                class="ml-auto w-9 justify-start px-0 font-normal text-muted-foreground sm:w-64 sm:px-3"
+                aria-label="Search pages, servers and actions"
+                onclick={() => (paletteOpen = true)}
+            >
+                <SearchIcon class="mx-auto sm:mx-0" />
+                <span class="hidden truncate sm:inline">Search or jump to</span>
+                <Kbd.Group class="ml-auto hidden sm:inline-flex">
+                    <Kbd.Root>{onMac ? "⌘" : "Ctrl"}</Kbd.Root>
+                    <Kbd.Root>K</Kbd.Root>
+                </Kbd.Group>
+            </Button>
+            <Badge variant="outline" class="hidden gap-1.5 border-waiting/40 bg-waiting/10 text-waiting md:inline-flex">
                 <span class="size-1.5 rounded-full bg-waiting"></span>
                 Sample data
             </Badge>
@@ -165,3 +195,5 @@
         </main>
     </Sidebar.Inset>
 </Sidebar.Provider>
+<CommandPalette bind:open={paletteOpen} pages={reachable} />
+<Toaster position="bottom-right" />

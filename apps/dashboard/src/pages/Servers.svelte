@@ -1,4 +1,4 @@
-<!-- Project Ambrose by Imjustchico: The servers page: every app in one table with its state, place, uptime and build, a menu of actions per row, and the power buttons that act on all of them at once. -->
+<!-- Project Ambrose by Imjustchico: The servers page: every app in one table with its state, place, uptime and build, a menu of actions per row, and the power buttons that act on all of them at once, each answered with a toast while the data is a sample. -->
 <script lang="ts">
     import * as Card from "$lib/components/ui/card/index.js";
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
@@ -10,14 +10,16 @@
     import RotateCcwIcon from "@lucide/svelte/icons/rotate-ccw";
     import PageHeader from "../components/PageHeader.svelte";
     import StatusBadge from "../components/StatusBadge.svelte";
+    import { openFor } from "../focus.svelte";
+    import { requestPower } from "../power";
     import { apps } from "../sample";
 </script>
 
 <PageHeader title="Servers" description="Start, stop and restart the apps this panel runs.">
     {#snippet actions()}
-        <Button variant="outline" class="text-destructive hover:text-destructive"><PowerIcon />Stop all</Button>
-        <Button variant="outline"><RotateCcwIcon />Restart all</Button>
-        <Button><PlayIcon />Start all</Button>
+        <Button variant="outline" class="text-destructive hover:text-destructive" onclick={() => requestPower("stop", "every app")}><PowerIcon />Stop all</Button>
+        <Button variant="outline" onclick={() => requestPower("restart", "every app")}><RotateCcwIcon />Restart all</Button>
+        <Button onclick={() => requestPower("start", "every app")}><PlayIcon />Start all</Button>
     {/snippet}
 </PageHeader>
 
@@ -52,11 +54,17 @@
                                 {/snippet}
                             </DropdownMenu.Trigger>
                             <DropdownMenu.Content align="end">
-                                <DropdownMenu.Item>Restart</DropdownMenu.Item>
-                                <DropdownMenu.Item>Open logs</DropdownMenu.Item>
-                                <DropdownMenu.Item>Open settings</DropdownMenu.Item>
-                                <DropdownMenu.Separator />
-                                <DropdownMenu.Item variant="destructive">Stop</DropdownMenu.Item>
+                                {#if app.state === "unknown"}
+                                    <DropdownMenu.Item onSelect={() => requestPower("start", app.name)}>Start</DropdownMenu.Item>
+                                {:else}
+                                    <DropdownMenu.Item onSelect={() => requestPower("restart", app.name)}>Restart</DropdownMenu.Item>
+                                {/if}
+                                <DropdownMenu.Item onSelect={() => openFor(app.name, "logs")}>Open logs</DropdownMenu.Item>
+                                <DropdownMenu.Item onSelect={() => openFor(app.name, "console")}>Open console</DropdownMenu.Item>
+                                {#if app.state !== "unknown"}
+                                    <DropdownMenu.Separator />
+                                    <DropdownMenu.Item variant="destructive" onSelect={() => requestPower("stop", app.name)}>Stop</DropdownMenu.Item>
+                                {/if}
                             </DropdownMenu.Content>
                         </DropdownMenu.Root>
                     </Table.Cell>

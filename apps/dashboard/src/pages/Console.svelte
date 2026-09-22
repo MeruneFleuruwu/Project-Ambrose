@@ -6,9 +6,9 @@
     import { Input } from "$lib/components/ui/input/index.js";
     import SendIcon from "@lucide/svelte/icons/send-horizontal";
     import PageHeader from "../components/PageHeader.svelte";
+    import { focus } from "../focus.svelte";
     import { apps } from "../sample";
 
-    let app = $state("gameserver");
     let line = $state("");
     let history = $state<string[]>(["Ambrose> status", "gameserver 573f769, up 6 h 12 min, running, 9 sessions", "Ambrose> help account", "account create <name> <password>", "account set password <name> <password>"]);
 
@@ -22,8 +22,8 @@
 
 <PageHeader title="Console" description="Run server commands without opening the machine's terminal.">
     {#snippet actions()}
-        <Select.Root type="single" bind:value={app}>
-            <Select.Trigger class="w-48">{app}</Select.Trigger>
+        <Select.Root type="single" bind:value={focus.app}>
+            <Select.Trigger class="w-48">{focus.app}</Select.Trigger>
             <Select.Content>
                 {#each apps as entry (entry.name)}<Select.Item value={entry.name} label={entry.name} />{/each}
             </Select.Content>
@@ -36,7 +36,7 @@
         <span class="size-2.5 rounded-full bg-destructive/70"></span>
         <span class="size-2.5 rounded-full bg-waiting/70"></span>
         <span class="size-2.5 rounded-full bg-healthy/70"></span>
-        <span class="ml-2 font-mono text-xs text-muted-foreground">{app}</span>
+        <span class="ml-2 font-mono text-xs text-muted-foreground">{focus.app}</span>
     </div>
     <div class="h-[50vh] space-y-1 overflow-y-auto bg-sidebar/60 p-4 font-mono text-sm">
         {#each history as entry, index (index)}

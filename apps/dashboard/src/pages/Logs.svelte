@@ -6,10 +6,10 @@
     import SearchIcon from "@lucide/svelte/icons/search";
     import PageHeader from "../components/PageHeader.svelte";
     import StatusBadge from "../components/StatusBadge.svelte";
+    import { focus } from "../focus.svelte";
     import { apps, logRecords } from "../sample";
 
     const order = ["trace", "debug", "info", "warn", "error", "fatal"];
-    let app = $state("gameserver");
     let level = $state("info");
     let search = $state("");
 
@@ -31,8 +31,8 @@
 </PageHeader>
 
 <div class="flex flex-col gap-3 sm:flex-row">
-    <Select.Root type="single" bind:value={app}>
-        <Select.Trigger class="w-full sm:w-48">{app}</Select.Trigger>
+    <Select.Root type="single" bind:value={focus.app}>
+        <Select.Trigger class="w-full sm:w-48">{focus.app}</Select.Trigger>
         <Select.Content>
             {#each apps as entry (entry.name)}<Select.Item value={entry.name} label={entry.name} />{/each}
         </Select.Content>
