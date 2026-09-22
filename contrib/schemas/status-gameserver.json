@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "app": "gameserver",
+  "role": "gameserver",
+  "realm": "Ambrose",
+  "revision": "r806919.Wizard_1_610",
+  "state": "running",
+  "uptime": 42,
+  "memory": {
+    "resident_bytes": 73400320
+  },
+  "threads": 8,
+  "sessions": 2,
+  "tick": {
+    "average_ms": 1.8,
+    "max_ms": 6.4,
+    "samples": 840,
+    "window_seconds": 60
+  },
+  "stats": {
+    "sessions": 2
+  },
+  "problems": []
+}
