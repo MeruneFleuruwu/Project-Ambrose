@@ -13,7 +13,8 @@ Read this whole prompt before you answer. Then ask me the questions at the end, 
 
 ## Read these before you plan anything
 
-- `doc/MILESTONE-TRACK.md` - which milestones are open to me, how one is claimed, what finishing means, and what a milestone branch may change. If the one I name is not in its "Open now" table, stop and tell me, because a pull request for a reserved milestone is closed unread.
+- **https://justchicoo.github.io/Project-Ambrose/state.json first, before anything else.** It is the project's live state, generated from the roadmap and the open pull requests, and it carries every milestone with a `status` of `landed`, `building`, `held`, `open`, `waiting` or `reserved`, plus what each needs, what it unlocks, who holds it and a `how_to_use` list of the rules. Fetch it, and take only a milestone whose status is `open`. If mine is anything else, stop and tell me what it says: a pull request for a held or claimed milestone is closed unread, and CI refuses the branch outright. The board a person reads is https://justchicoo.github.io/Project-Ambrose/ .
+- `doc/MILESTONE-TRACK.md` - the rulebook behind that state: how one is claimed, what finishing means, what a milestone branch may change, and how holds work. A hold can cover a whole phase, so a milestone with every dependency built can still be closed to me.
 - The phase file of my milestone, `doc/roadmap/phase-NN-*.md`, whole. Not only my milestone's section: the phase's **Review notes** at the top name faults the roadmap's own critic found, and the ones that name my milestone are mine to resolve.
 - `doc/ARCHITECTURE.md` - the layering, the folder each subsystem belongs to, the file-header form per file type, the SQL update convention, and the settled Decisions. It is long; read the parts my milestone lands in.
 - `CONTRIBUTING.md` and `doc/REVIEWING.md`. The second is the maintainer's own rulebook for judging this work, so it tells us exactly what will be checked and how.

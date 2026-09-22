@@ -16,7 +16,7 @@ import ready
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TRACK = os.path.join("doc", "MILESTONE-TRACK.md")
-TRACK_URL = "https://github.com/Justchicoo/Project-Ambrose/blob/main/doc/MILESTONE-TRACK.md"
+TRACK_URL = "https://justchicoo.github.io/Project-Ambrose/"
 PROMPT_URL = "https://github.com/Justchicoo/Project-Ambrose/blob/main/contrib/AI-MILESTONES-HERE.md"
 GOLD = 0xE4B457
 ROW = re.compile(r"^\| *([\d.,  ]+?) *\| *(.+?) *\| *(.+?) *\| *(.+?) *\|")
@@ -63,6 +63,7 @@ def embed(root):
             "url": TRACK_URL,
             "description": (f"{count} milestone{'s' if count != 1 else ''} from the roadmap are open to anyone who wants one. "
                             "Say which you are taking, or open a draft pull request, which holds it. "
+                            f"The board says what is taken and what is free: <https://justchicoo.github.io/Project-Ambrose/>. "
                             f"The prompt for your own AI is in [contrib/AI-MILESTONES-HERE.md]({PROMPT_URL})."),
             "color": GOLD,
             "fields": fields,

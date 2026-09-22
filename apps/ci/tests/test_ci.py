@@ -16,6 +16,7 @@ from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "progress"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "site"))
 
 import ci_build
 import ci_commit_trailer
@@ -27,6 +28,7 @@ import ci_select_legs
 import ci_triage
 import ci_usage
 import ci_vcpkg_cache
+import build as board
 import ready as ready_report
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -758,6 +760,29 @@ class MilestoneTrackTests(unittest.TestCase):
         refused = ci_contrib_paths.check_milestone([self.PHASE, other], "4.04")
         self.assertEqual([entry[0] for entry in refused], [other])
         self.assertEqual(ci_contrib_paths.check_milestone([other], "5.01"), [])
+
+    def test_a_branch_for_a_milestone_the_maintainer_holds_is_refused(self):
+        kept = [{"scope": "phase:17", "who": "the panel session", "what": "the panel"},
+                {"scope": "milestone:4.02", "who": "the panel session", "what": "CommandMgr"}]
+        self.assertEqual(ci_contrib_paths.held_by("17.09", kept)["who"], "the panel session")
+        self.assertEqual(ci_contrib_paths.held_by("4.02", kept)["who"], "the panel session")
+        self.assertIsNone(ci_contrib_paths.held_by("4.04", kept))
+        self.assertIsNone(ci_contrib_paths.held_by("1.06", []))
+
+    def test_the_real_holds_stop_the_real_branches(self):
+        kept = ci_contrib_paths.holds(ROOT)
+        self.assertTrue(kept)
+        self.assertEqual(ci_contrib_paths.main(["--root", ROOT, "--paths", "src/x.cpp", "--branch", "milestone/17.09-metrics"]), 1)
+        self.assertEqual(ci_contrib_paths.main(["--root", ROOT, "--paths", "src/x.cpp", "--branch", "milestone/4.04-world-wire-math"]), 0)
+
+    def test_the_checker_and_the_board_read_the_same_holds(self):
+        from_checker = ci_contrib_paths.holds(ROOT)
+        from_board = board.holds(ROOT)
+        self.assertEqual(len(from_checker), len(from_board))
+        for milestone in ("17.09", "4.02", "4.04", "1.06", "3.23"):
+            checker = ci_contrib_paths.held_by(milestone, from_checker)
+            board_side = board.hold_for(milestone, from_board)
+            self.assertEqual(bool(checker), bool(board_side), milestone)
 
     def test_the_source_tree_needs_the_branch_name_to_be_allowed(self):
         source = ["src/server/game/Movement/MovementPacking.cpp"]

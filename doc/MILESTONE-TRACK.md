@@ -8,11 +8,30 @@ It exists because the phases are the project, and the maintainer's own agents bu
 
 Working with an AI assistant is expected here. contrib/AI-MILESTONES-HERE.md is a prompt to paste into yours; it carries what it needs to know before it writes a line. Ask in the Discord first if anything is unclear: https://discord.gg/Dx6ACDUj6N.
 
+## The board says what is true right now
+
+**https://justchicoo.github.io/Project-Ambrose/** is generated from this document, the phase files, the holds below and the open pull requests, and it is the thing to look at before anything else. It says for every milestone whether it is landed, being built right now, held, open to anyone, or waiting on a dependency, and it rebuilds whenever a claim opens or closes.
+
+Its **state.json** is the same thing for a machine: `https://justchicoo.github.io/Project-Ambrose/state.json` carries every milestone with its status, what it needs, what it unlocks, who holds it and how to claim it, plus the rules in a `how_to_use` list. A contributor's assistant should read that file before planning anything, and again before it pushes.
+
+This page stays the rulebook. The board is the live view of it, and where the two ever disagree, the checks in `apps/ci` and `apps/site` fail until they agree again.
+
 ## Only the milestones named below
 
 **Open now** is the whole list. A milestone that is not in it is reserved, whatever its dependencies say, because it is being built right now, it is next in the maintainer's own queue, or its acceptance can only be run on the maintainer's machine. A pull request for a reserved milestone is closed, and that is a waste of your evening, so take one from the table or ask in the Discord for another to be opened.
 
 `python apps/progress/ready.py` prints every milestone whose dependencies are all finished and marks each one from this document's tables, counting anything it does not name as reserved, so the tool and this page can never drift apart. `--open` narrows it to the ones nobody holds, `--blocked` says what is waiting and on what.
+
+## Holds, and why a whole phase can be closed
+
+`doc/work/holds.json` is where the maintainer's own sessions say what they are building. A hold names a scope, who holds it and what they are on, and it comes in two sizes:
+
+- `milestone:4.02` closes one milestone.
+- `phase:17` closes a whole phase, every milestone in it, however ready one of them looks on its own. The panel is built as one long thread of work, so a milestone taken out of the middle of it collides with something being built the same week.
+
+A hold is not advice. `apps/ci/ci_contrib_paths.py` refuses a branch named for a held milestone and says who holds it, so a pull request for one cannot pass its checks, and the board never lists it as open. When a session finishes and moves on, the hold goes and whatever it covered becomes takeable in the next build of the board.
+
+If a hold is in the way of something you want to build, say so in the Discord. Holds are there to stop collisions, not to hoard work.
 
 ## Taking one
 

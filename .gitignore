@@ -37,3 +37,4 @@ __screenshots__/
 coverage/
 *.tsbuildinfo
 .npm-cache/
+/site/

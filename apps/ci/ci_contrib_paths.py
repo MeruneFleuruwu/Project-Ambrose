@@ -1,6 +1,7 @@
 # Project Ambrose by Imjustchico
-# Checks that a change stays inside the contributor track's own folders, exactly the ones doc/CONTRIBUTOR-TRACK.md's table names, so outside work cannot collide with a milestone in flight, and that a branch named for a milestone, which is allowed the source tree instead, keeps off the files that govern the project and out of every phase file but its own.
+# Checks that a change stays inside the contributor track's own folders, exactly the ones doc/CONTRIBUTOR-TRACK.md's table names, so outside work cannot collide with a milestone in flight, and that a branch named for a milestone, which is allowed the source tree instead, is not one the maintainer holds, and keeps off the files that govern the project and out of every phase file but its own.
 import argparse
+import json
 import os
 import re
 import subprocess
@@ -24,6 +25,8 @@ ALLOWED_FILES = ()
 
 TRACK = "doc/CONTRIBUTOR-TRACK.md"
 MILESTONE_TRACK = "doc/MILESTONE-TRACK.md"
+HOLDS = "doc/work/holds.json"
+BOARD = "https://justchicoo.github.io/Project-Ambrose/"
 MILESTONE_BRANCH = re.compile(r"^(?:.*/)?milestone/(\d+)\.(\d+)(?:-.*)?$")
 ROADMAP_DIR = "doc/roadmap/"
 
@@ -85,6 +88,23 @@ def milestone_of(branch):
     return f"{found.group(1)}.{int(found.group(2)):02d}" if found else None
 
 
+def holds(root):
+    try:
+        with open(os.path.join(root, HOLDS), "r", encoding="utf-8") as handle:
+            return json.load(handle).get("holds", [])
+    except (OSError, ValueError):
+        return []
+
+
+def held_by(milestone, kept):
+    phase = milestone.split(".")[0]
+    for entry in kept:
+        scope = str(entry.get("scope", ""))
+        if scope == "milestone:" + milestone or scope == "phase:" + phase:
+            return entry
+    return None
+
+
 def phase_prefix(milestone):
     return f"{ROADMAP_DIR}phase-{int(milestone.split('.')[0]):02d}-"
 
@@ -99,7 +119,14 @@ def check_milestone(paths, milestone):
     return refused
 
 
-def report_milestone(paths, milestone):
+def report_milestone(paths, milestone, root=None):
+    hold = held_by(milestone, holds(root)) if root else None
+    if hold:
+        scope = "phase " + hold["scope"].split(":")[1] if hold["scope"].startswith("phase:") else "milestone " + milestone
+        print(f"{milestone} is held: {scope} belongs to {hold.get('who', 'the maintainer')}"
+              + (f", who is building {hold['what']}" if hold.get("what") else ""))
+        print(f"Nothing inside a hold can be taken from outside. The board says what is open right now: {BOARD}")
+        return 1
     refused = check_milestone(paths, milestone)
     for path, reason in refused:
         print(f"{path}: {reason}")
@@ -134,7 +161,7 @@ def main(argv=None):
 
     milestone = milestone_of(arguments.branch)
     if milestone:
-        return report_milestone(paths, milestone)
+        return report_milestone(paths, milestone, arguments.root)
 
     outside = check(paths)
     for path in outside:

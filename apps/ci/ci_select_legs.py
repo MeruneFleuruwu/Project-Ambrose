@@ -45,7 +45,7 @@ LABEL_PREFIX = "ci:"
 MILESTONE_PREFIX = "milestone/"
 
 SMOKE_PATHS = (".github/", "apps/ci/ci_build.py", "apps/ci/ci_vcpkg_cache.py", "vcpkg.json")
-PUSH_PATHS = (".github/**", "apps/ci/**", "apps/designtokens/**", "apps/progress/**", "design/**", "doc/ROADMAP.md", "doc/roadmap/**", "vcpkg.json")
+PUSH_PATHS = (".github/**", "apps/ci/**", "apps/designtokens/**", "apps/progress/**", "apps/site/**", "design/**", "doc/ROADMAP.md", "doc/roadmap/**", "doc/work/**", "vcpkg.json")
 CODE_PATHSPEC = (".", ":(exclude)doc", ":(exclude,glob)**/*.md")
 ZERO_SHA = re.compile(r"^0*$")
 

@@ -5,7 +5,7 @@ name: core-build
 on:
   push:
     branches: [main]
-    paths: [".github/**", "apps/ci/**", "apps/designtokens/**", "apps/progress/**", "design/**", "doc/ROADMAP.md", "doc/roadmap/**", "vcpkg.json"]
+    paths: [".github/**", "apps/ci/**", "apps/designtokens/**", "apps/progress/**", "apps/site/**", "design/**", "doc/ROADMAP.md", "doc/roadmap/**", "doc/work/**", "vcpkg.json"]
   pull_request:
     types: [opened, synchronize, reopened, labeled]
   schedule:
@@ -73,6 +73,12 @@ jobs:
       - name: Progress card
         if: ${{ !cancelled() }}
         run: python apps/progress/progress.py --check
+      - name: Work board self-tests
+        if: ${{ !cancelled() }}
+        run: python apps/site/tests/test_site.py
+      - name: Work board
+        if: ${{ !cancelled() }}
+        run: python apps/site/build.py --check
       - name: Front-end check self-tests
         if: ${{ !cancelled() }}
         run: python apps/ci/tests/test_ci_frontend.py
