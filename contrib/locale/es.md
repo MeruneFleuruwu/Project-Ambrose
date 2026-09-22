@@ -134,3 +134,16 @@ This is a wording proposal held for review until the dashboard's translation
 loader defines its final catalog schema. A future loader must preserve keys,
 placeholders, permission filtering, and fallback-to-English behavior when a
 translation is missing.
+
+## Safe failure messages
+
+| Key | English source | Spanish |
+| --- | --- | --- |
+| `error.permission_denied` | You do not have permission for this action. | No tienes permiso para esta acciÃ³n. |
+| `error.not_found` | The requested resource was not found. | No se encontrÃ³ el recurso solicitado. |
+| `error.source_unavailable` | This data source is unavailable. | Esta fuente de datos no estÃ¡ disponible. |
+| `error.stale_data` | This information may be out of date. | Esta informaciÃ³n puede estar desactualizada. |
+| `error.operation_failed` | The operation failed. | La operaciÃ³n fallÃ³. |
+| `error.correlation_id` | Reference: {correlation_id} | Referencia: {correlation_id} |
+
+`{correlation_id}` is an opaque value and must remain unchanged. Status words are short labels; they are not evidence that an app or realm is healthy without the corresponding status data.

@@ -75,6 +75,10 @@ One JSON file at `contrib/findings/<area>/<subject>.json`, where the folder matc
 
 A merged finding stays `claimed` and nothing is built on it until Ambrose re-derives it with its own tools. Extra keys are allowed for anything that would help a later proof.
 
+**A finding states what the game does.** A record that the repository holds no evidence about a subject is not a finding, however well its steps are written: its claim is about this repository, its evidence is that files do not exist, and its disproof is somebody doing the item. Forty-one of those arrived in one day and every one was closed unmerged, and `ci_findings.py` now refuses a claim about the repository and a file named as a gap record. If I have not observed the game yet, the right output is nothing, or a proposal, not a finding. The `how_to_repeat` plan is worth keeping: run it, then send what the game actually did.
+
+**An item is done when its row moves to the merged table in `doc/CONTRIBUTOR-TRACK.md`, and not before.** A pull request that ships the shape of an item without its substance does not close it: a table with no rows is not the door table, a README about seeds is not seeds, and a catalog of scenarios is not a scenario. Deliver what the item's own row says, and if only part of it is possible, say which part.
+
 ## How I want you to work
 
 1. Ask which item id I am taking and what I already have: a client installation, a packet capture, a running Ambrose server, a build, or nothing yet. If I am unsure, recommend one that fits what I have and takes an evening.
@@ -114,7 +118,7 @@ git switch --detach upstream/main
 git switch -c contrib/<item-id>-<short-name>
 ```
 
-**Never branch from a branch that has an open pull request.** That is the mistake that turns a queue of independent contributions into a chain: the second pull request then contains the first one's changes, a review that revises the first breaks the second, and both have to be rebuilt. Branching from `upstream/main` every time keeps each one reviewable and mergeable on its own, in any order.
+**Never branch from a branch that has an open pull request, and never open a pull request from my fork's `main`.** That is the mistake that turns a queue of independent contributions into a chain: the second pull request then contains the first one's changes, a review that revises the first breaks the second, and both have to be rebuilt. Branching from `upstream/main` every time keeps each one reviewable and mergeable on its own, in any order.
 
 Check it before opening the pull request. `git log --oneline upstream/main..HEAD` must show only this item's commits, and `git diff --name-only upstream/main...HEAD` only this item's files. If either shows another item's work, the branch was taken from the wrong place.
 

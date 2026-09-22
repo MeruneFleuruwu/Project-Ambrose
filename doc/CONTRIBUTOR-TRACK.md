@@ -103,28 +103,9 @@ Each item is worth doing, needs nothing from the phases, and lands inside the tr
 | F-39 | Patching: how the retail patcher handles concurrency, resume and a corrupted file | `contrib/findings/patching/` | Phase 16 serves patches, and the failure paths are what a server has to survive |
 | F-40 | Revisions: how to prove a change between two client revisions is real, rather than inferring it from a size | `contrib/findings/data/` | Milestone 3.23 follows revisions; F-15 asks what changed, this asks how you prove it |
 | C-01 | Door destinations for Wizard City: every doorway a player can walk through, with the zone it leads to | `data/sql/updates/pending_db_world/` | `ResTeleport` carries no properties, so this table has to be authored. Phase 10 needs it and cannot generate it |
-| C-02 | A capture decoder: read a pcapng of a session against your own Ambrose server and print each message with its fields | `contrib/tools/` | Turns a capture into something readable when a message misbehaves |
-| C-03 | Scenarios for the client driver: the idle timeouts, a ban taking effect, a shutdown notice, a reconnect | `apps/clientdriver/scenarios/` | Every scenario becomes a check that runs itself from then on |
-| C-05 | A tool that reads your own install and reports what Ambrose does not yet understand: classes missing from the type data, files no reader handles | `contrib/tools/` | Points the next milestones at the real gaps |
-| C-07 | A tool that renders a zone's objects as a map image from your own install | `contrib/tools/` | Makes a zone reviewable at a glance instead of row by row |
-| C-09 | A tool that checks a world database against the client's own data and reports rows that disagree | `contrib/tools/` | Keeps authored content honest as the client changes |
-| C-10 | A load generator: many fake clients against a server, reporting what it does under load | `contrib/tools/` | Nothing in the plan measures the server under load before phase 12 |
 | C-11 | Fuzz seeds: inputs that made a decoder work hard, from your own captures | `data/fuzz/` | The fuzzers exist; they are only as good as their corpus |
-| C-13 | A guide to running the client under Wine or Proton against an Ambrose server | `doc/guides/` | Decides whether Linux players are possible at all, which no milestone answers |
-| C-14 | A guide to running everything in Docker, from nothing to a login screen | `doc/guides/` | Milestone 17.23 packages it; a walked path first makes that milestone cheap |
-| C-16 | Translations of Ambrose's own text into a language the client supports | `contrib/locale/` | The client ships eight locales; the panel and launcher should not be English-only |
 | C-17 | Notes on how the client picks and shows realms after login | `contrib/findings/protocol/` | Milestone 4.03 builds the realm registry and has to match this behaviour |
-| C-18 | A proposal for anything in this document that is wrong or missing | `contrib/proposals/` | The track should improve as people use it |
-| C-19 | A proposal for a panel page or feature you would want as an operator, with what it shows and what it does | `contrib/proposals/` | The panel is being built now, so a good proposal lands in a real milestone quickly |
-| C-21 | A finding verifier: read a finding's machine-checkable block and run it against a live Ambrose server or your own install, printing pass, fail or unable to run | `contrib/tools/` | Turns a merged claim into something a suite proves instead of something somebody gets to |
-| C-23 | A capture replayer: replay a captured session against your own Ambrose server and report every message where the answer differs | `contrib/tools/` | Turns any capture into a regression test, and it is how F-17's disagreement gets settled in an afternoon |
-| C-24 | A message coverage tool: which of the message ids a running server has ever seen, sent or refused | `contrib/tools/` | Points every later phase at the messages that actually occur rather than at the full list |
-| C-25 | A message definition differ: what changed in the client's own message XML between two revisions | `contrib/tools/` | Feeds F-40 and 3.23, and it is the fastest way to know a revision is safe to follow |
-| C-33 | A light-theme accent ramp with every pair computed, for any accent doc/DESIGN.md has not already settled | `contrib/proposals/` | Somebody has to do the arithmetic and the taste, and a computed proposal is worth more than an opinion |
-| C-43 | A load report: run the load generator against your own server and write down what happened, with the hardware named | `contrib/notes/` | Nothing in the plan measures the server under load before phase 12 |
 | C-48 | Door destinations for a world beyond Wizard City | `data/sql/updates/pending_db_world/` | C-01's shape, more of it: the teleport class carries no properties, so this can only be authored |
-| C-50 | Locale catalogs for the newer pages: the command palette, the health page, the digest and the alert notices | `contrib/locale/` | C-16's shape, and translating is the fastest way to find a figure somebody formatted by hand |
-| C-51 | The machine-checkable finding block: extend `contrib/findings/README.md` with it and write the tool that validates it, which the maintainer folds into the findings checker | `contrib/tools/` and the README this track already owns | C-22 as a pull request, which is what makes a claim provable by a suite |
 
 ### Merged so far
 
@@ -162,9 +143,32 @@ Each item is worth doing, needs nothing from the phases, and lands inside the tr
 | C-49 | A content pack format for content that ships as data | `contrib/proposals/content-pack-format.md` | solanazaru-eng, in #15 |
 | C-52 | Worked examples of a verified and a refuted finding | `contrib/proposals/finding-examples.md` | solanazaru-eng, in #14 |
 | C-54 | A quality bar for the admin API's authentication | `contrib/proposals/admin-auth-quality-bar.md` | solanazaru-eng, in #13 |
+| C-02 | A metadata-only capture decoder | `contrib/tools/ambrose-capture-decoder/` | MeruneFleuruwu, in #50 |
+| C-03 | Scenarios for the failures a client has to survive, delivered as C-39, with their catalog | `apps/clientdriver/scenarios/README.md` | MeruneFleuruwu, in #54 |
+| C-05 | A report of what Ambrose does not yet understand in an install | `contrib/tools/ambrose-install-gap-report/` | MeruneFleuruwu, in #49 |
+| C-07 | A zone map renderer from a manifest | `contrib/tools/ambrose-zone-map-renderer/` | MeruneFleuruwu, in #52 |
+| C-09 | A world manifest checker | `contrib/tools/ambrose-world-manifest-checker/` | MeruneFleuruwu, in #51 |
+| C-10 | A bounded TCP load generator | `contrib/tools/ambrose-load-generator/` | MeruneFleuruwu, in #48 |
+| C-13 | A guide to the client under Wine or Proton | `doc/guides/wine-proton.md` | MeruneFleuruwu, in #43 |
+| C-14 | A guide to running Ambrose in Docker | `doc/guides/docker.md` | MeruneFleuruwu, in #42 |
+| C-16 | A Spanish catalog for the operator and launcher text | `contrib/locale/es.md` | MeruneFleuruwu, in #45 and #46 |
+| C-18 | An item contract for every open item, and a character creation slice as a proposal | `contrib/proposals/contributor-track-improvements.md` | MeruneFleuruwu in #41, lRayZ24 in #98 |
+| C-19 | An operator incident workspace | `contrib/proposals/operator-incident-workspace.md` | MeruneFleuruwu, in #40 |
+| C-21 | A verifier for a finding's machine-checkable block | `contrib/tools/ambrose-finding-verifier/` | MeruneFleuruwu, in #38 |
+| C-23 | A capture replayer against a local server | `contrib/tools/ambrose-capture-replayer/` | MeruneFleuruwu, in #39 |
+| C-24 | A message coverage report from a server log | `contrib/tools/ambrose-message-coverage/` | MeruneFleuruwu, in #37 |
+| C-25 | A diff between two message definition files | `contrib/tools/ambrose-message-definition-diff/` | MeruneFleuruwu, in #36 |
+| C-33 | The light theme accent ramp, with its reasoning | `contrib/proposals/light-theme-accent-ramp.md` | MeruneFleuruwu, in #44 |
+| C-43 | What a reproducible load report has to record | `contrib/notes/load-report-c43.md` | MeruneFleuruwu, in #58 |
+| C-50 | Spanish for the dashboard pages | `contrib/locale/es.md` | MeruneFleuruwu, in #46 |
+| C-51 | A dry validator for the machine-checkable finding block | `contrib/tools/ambrose-finding-check/` | MeruneFleuruwu, in #47 |
 
 An item stays listed until its pull request is merged. Ask before starting something not on the list: the answer is usually yes if it lands in the paths above.
 
 ## What happens to your work
 
 Notes, proposals and guides are read by the agents building the milestones they touch, and cited in the milestone that uses them. A tool stays yours in `contrib/tools/`, and if the project later needs it in the servers, it is rebuilt inside `src/` under the architecture's rules, with your note kept. Scenarios, SQL and fuzz seeds are used where they are. Everything merged is MIT, as LICENSE says.
+
+### Started, still open
+
+These carry a first delivery and stay listed above because the item is not what landed: C-01 has its `zone_teleport` table (#55) and no rows; C-11 has its seed folder's README (#56) and no seeds; F-12 has a finding that Ambrose's launcher applies its options and leaves the install untouched (#53), not yet what each of the client's own options does.

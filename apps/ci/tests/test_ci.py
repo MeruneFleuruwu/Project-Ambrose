@@ -566,6 +566,29 @@ class ContributorPathTests(unittest.TestCase):
         self.assertEqual(ci_contrib_paths.check([windows]), [windows])
 
 
+
+class GapRecordTests(unittest.TestCase):
+    def finding(self, **overrides):
+        document = {"subject": "A", "area": "combat", "claim": "The client sends MSG_COMBATMOVE before the planning timer expires.",
+                    "revision": "r806919.Wizard_1_610", "method": "observation", "how_to_repeat": ["Start a duel."],
+                    "evidence": ["Frame 3 carries it."], "disproof": "A capture where it arrives afterwards.",
+                    "confidence": "medium", "submitted_by": "t", "submitted_on": "2026-09-19", "status": "claimed"}
+        document.update(overrides)
+        return document
+
+    def test_a_claim_about_the_game_passes(self):
+        self.assertEqual(ci_findings.problems_for("contrib/findings/combat/move-order.json", self.finding()), [])
+
+    def test_a_claim_that_the_repository_lacks_evidence_is_refused(self):
+        found = ci_findings.problems_for("contrib/findings/combat/move-order.json",
+                                         self.finding(claim="The repository does not yet establish when MSG_COMBATMOVE is sent."))
+        self.assertTrue(any("about this repository" in problem for problem in found), found)
+
+    def test_a_file_named_as_a_gap_record_is_refused(self):
+        found = ci_findings.problems_for("contrib/findings/combat/move-order-evidence-gap.json", self.finding())
+        self.assertTrue(any("named as a gap record" in problem for problem in found), found)
+
+
 class FindingsTests(unittest.TestCase):
     def sound(self, **changes):
         finding = {

@@ -1,5 +1,5 @@
 # Project Ambrose by Imjustchico
-# Checks that every reverse-engineering finding carries the fields Ambrose needs to prove or refute it later, and that none of them carries game data.
+# Checks that every reverse-engineering finding carries the fields Ambrose needs to prove or refute it later, that its claim is about the game rather than about this repository, and that none of them carries game data.
 import argparse
 import json
 import os
@@ -20,6 +20,8 @@ DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 REVISION = re.compile(r"^r\d+\.[A-Za-z0-9_]+$")
 BASE64_RUN = re.compile(r"[A-Za-z0-9+/]{120,}={0,2}")
 HEX_RUN = re.compile(r"(?:[0-9a-fA-F]{2}[ ,]?){48,}")
+ABOUT_THE_REPOSITORY = re.compile(r"\b(?:the |this )?repository (?:does not|has not|holds no|contains no|lacks)\b|\bevidence gap\b|\bgap record\b|\bnot yet (?:contain|establish|verif|have)|\bdoes not yet establish\b", re.IGNORECASE)
+GAP_NAME = re.compile(r"(?:^|[-_])gap(?:[-_]|\.json$)", re.IGNORECASE)
 
 
 def problems_for(path, document):
@@ -59,6 +61,12 @@ def problems_for(path, document):
     for field in ("claim", "disproof"):
         if not isinstance(document[field], str) or len(document[field].strip()) < 20:
             fail(f"{field} must say enough to be checked")
+
+    claim = str(document["claim"])
+    if ABOUT_THE_REPOSITORY.search(claim):
+        fail("the claim is about this repository, not about the game; a finding states what the game does, and a note that nothing is known yet is not one")
+    if GAP_NAME.search(os.path.basename(path)):
+        fail("the file is named as a gap record; a finding is named for the claim it makes about the game")
 
     expected_area = path.replace("\\", "/").split("/")
     if len(expected_area) >= 2 and expected_area[-2] != document["area"] and expected_area[-2] != "findings":

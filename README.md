@@ -8,13 +8,14 @@
 [![License](https://img.shields.io/badge/license-MIT-E4B457?style=for-the-badge&labelColor=0B1020)](LICENSE)
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-5FD3C4?style=for-the-badge&logo=cplusplus&logoColor=white&labelColor=0B1020)](doc/ARCHITECTURE.md)
 [![Discord](https://img.shields.io/badge/Discord-join%20us-C77DFF?style=for-the-badge&logo=discord&logoColor=white&labelColor=0B1020)](https://discord.gg/Dx6ACDUj6N)
+[![Reddit](https://img.shields.io/badge/Reddit-r%2FProjectAmbrose-FF4500?style=for-the-badge&logo=reddit&logoColor=white&labelColor=0B1020)](https://www.reddit.com/r/ProjectAmbrose/)
 [![Milestones](https://img.shields.io/badge/roadmap-386%20milestones-E2725B?style=for-the-badge&labelColor=0B1020)](doc/ROADMAP.md)
 
 [![Build](https://github.com/Justchicoo/Project-Ambrose/actions/workflows/core-build.yml/badge.svg)](https://github.com/Justchicoo/Project-Ambrose/actions/workflows/core-build.yml)
 [![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20Linux-8798BC?labelColor=131B31)](#building)
-[![Contributor track](https://img.shields.io/badge/open%20items-63-5FD3C4?labelColor=131B31)](doc/CONTRIBUTOR-TRACK.md)
+[![Contributor track](https://img.shields.io/badge/open%20items-44-5FD3C4?labelColor=131B31)](doc/CONTRIBUTOR-TRACK.md)
 
-[Roadmap](doc/ROADMAP.md) &nbsp;.&nbsp; [Architecture](doc/ARCHITECTURE.md) &nbsp;.&nbsp; [Contribute](doc/CONTRIBUTOR-TRACK.md) &nbsp;.&nbsp; [Start with your AI](contrib/AI-START-HERE.md) &nbsp;.&nbsp; [Discord](https://discord.gg/Dx6ACDUj6N)
+[Roadmap](doc/ROADMAP.md) &nbsp;.&nbsp; [Architecture](doc/ARCHITECTURE.md) &nbsp;.&nbsp; [Contribute](doc/CONTRIBUTOR-TRACK.md) &nbsp;.&nbsp; [Start with your AI](contrib/AI-START-HERE.md) &nbsp;.&nbsp; [Discord](https://discord.gg/Dx6ACDUj6N) &nbsp;.&nbsp; [Reddit](https://www.reddit.com/r/ProjectAmbrose/)
 
 </div>
 
@@ -87,11 +88,11 @@ The phases are built in order by the maintainer's own agents, so nobody else wor
 
 | | |
 |---|---|
-| **63 open items** | [doc/CONTRIBUTOR-TRACK.md](doc/CONTRIBUTOR-TRACK.md) - F-01 to F-40 for proven findings, C-01 to C-55 for tools, data, guides and proposals |
+| **44 open items** | [doc/CONTRIBUTOR-TRACK.md](doc/CONTRIBUTOR-TRACK.md) - F-01 to F-40 for proven findings, C-01 to C-55 for tools, data, guides and proposals |
 | **Start in one paste** | [contrib/AI-START-HERE.md](contrib/AI-START-HERE.md) - a prompt for any AI assistant, with everything it needs to work here without guessing |
 | **The shape of a finding** | [contrib/findings/README.md](contrib/findings/README.md) - one claim about how the game behaves, written so it can be proven or refuted |
 | **House rules** | [CONTRIBUTING.md](CONTRIBUTING.md) - AI-written changes are expected, not merely allowed |
-| **Ask anything** | [Discord](https://discord.gg/Dx6ACDUj6N) |
+| **Ask anything** | [Discord](https://discord.gg/Dx6ACDUj6N) for questions as they come up, [r/ProjectAmbrose](https://www.reddit.com/r/ProjectAmbrose/) for longer threads and announcements |
 
 The most valuable thing anyone can add is a **proven finding**: Ambrose is built only on data it has re-derived itself, and every finding is verified or refuted before a milestone is built on it. A finding that turns out false is still worth sending, because it stops the next person chasing it.
 
