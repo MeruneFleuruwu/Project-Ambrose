@@ -187,10 +187,11 @@ export type LogRecord = { sequence: number; seconds: number; time: string; level
 export function logRecord(index: number): LogRecord {
     const [level, category, message] = index >= 150 && index < 168 ? burst[index % burst.length] : lines[index % lines.length];
     const seconds = 9 * 3600 + index * 3;
+    const millis = String((index * 379) % 1000).padStart(3, "0");
     return {
         sequence: 1000 + index,
         seconds,
-        time: `2026-09-22 ${clock(Math.floor(seconds / 60))}:${String(seconds % 60).padStart(2, "0")}`,
+        time: `2026-09-22 ${clock(Math.floor(seconds / 60))}:${String(seconds % 60).padStart(2, "0")}.${millis}`,
         level,
         category,
         message,

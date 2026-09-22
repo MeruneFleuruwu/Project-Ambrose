@@ -37,6 +37,7 @@
     --secondary-foreground: var(--ambrose-color-fg-body);
     --muted: var(--ambrose-color-surface-sunken);
     --muted-foreground: var(--ambrose-color-fg-muted);
+    --faint: var(--ambrose-color-fg-faint);
     --accent: var(--ambrose-color-surface-sunken);
     --accent-foreground: var(--ambrose-color-fg-body);
     --destructive: var(--ambrose-color-state-wrong);
@@ -82,6 +83,7 @@
     --color-secondary-foreground: var(--secondary-foreground);
     --color-muted: var(--muted);
     --color-muted-foreground: var(--muted-foreground);
+    --color-faint: var(--faint);
     --color-accent: var(--accent);
     --color-accent-foreground: var(--accent-foreground);
     --color-destructive: var(--destructive);

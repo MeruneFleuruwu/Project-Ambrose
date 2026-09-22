@@ -1,4 +1,4 @@
-<!-- Project Ambrose by Imjustchico: The remote console laid out like Pterodactyl's: the app and its power buttons on top, the console with each app's own output and a prompt that recalls earlier commands with the arrow keys, and the app's address, state, uptime, sessions, tick and build beside it, answered locally until 17.05 sends commands to the server. -->
+<!-- Project Ambrose by Imjustchico: The remote console laid out like Pterodactyl's: the app and its power buttons on top, the console with each app's own output and a prompt that recalls the commands typed on this page with the arrow keys, held in memory only, and the app's address, state, uptime, sessions, tick and build beside it, answered locally until 17.05 sends commands to the server. -->
 <script lang="ts">
     import * as Card from "$lib/components/ui/card/index.js";
     import * as Select from "$lib/components/ui/select/index.js";
@@ -56,22 +56,14 @@
         { icon: GitCommitIcon, title: "Build", value: app.revision, copy: true, tone: "" },
     ]);
 
+    const typed: Record<string, string[]> = {};
+
     function history(name: string): string[] {
-        try {
-            const saved = JSON.parse(window.localStorage.getItem(`ambrose.panel.console.${name}`) ?? "[]");
-            return Array.isArray(saved) ? saved.filter((entry) => typeof entry === "string") : [];
-        } catch {
-            return [];
-        }
+        return typed[name] ?? [];
     }
 
     function remember(name: string, command: string) {
-        const next = [command, ...history(name).filter((entry) => entry !== command)].slice(0, 50);
-        try {
-            window.localStorage.setItem(`ambrose.panel.console.${name}`, JSON.stringify(next));
-        } catch {
-            return;
-        }
+        typed[name] = [command, ...history(name).filter((entry) => entry !== command)].slice(0, 50);
     }
 
     function answer(command: string): string {
