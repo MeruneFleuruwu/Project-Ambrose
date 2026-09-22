@@ -234,11 +234,13 @@ Visual Studio Build Tools 18.6.3 (MSVC 19.51.36246.0), Windows SDK
 10.0.26100.0, CMake 4.4.3, Python 3.13.1, and vcpkg tool version 2026-07-27.
 The `windows-msvc-x64` configure and `windows-debug` build completed
 successfully after vcpkg built all 15 requested packages. `dbimport --help`
-completed successfully. The test preset ran all 1,148 registered tests:
-codestyle passed, and the two local-git `ci.selftest` cases that require a
-specific synthetic history failed because this checkout has additional local
-commits; the remaining tests completed without a failure reported by the
-preset.
+completed successfully. The test preset ran every registered test, a count that depends on which
+targets the build produced: codestyle passed, and two cases failed on that
+machine. Their names were not recorded, and the cause is not the checkout's
+own history: the CI self-tests build a throwaway repository in a temporary
+folder for each case, with their own author identity and signing disabled, so
+local commits cannot reach them. If they fail for you, run
+`ctest --preset windows-debug --output-on-failure -R ci` and report the names.
 
 The login-server `--check` path was also exercised with a temporary copied
 configuration. It reached client-data discovery and type-dump loading, then
