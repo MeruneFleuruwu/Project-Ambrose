@@ -6,15 +6,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import {
-    componentColors,
-    contrastPairs,
-    durationMs,
-    semanticColors,
-    seriesColors,
-    terminalColors,
-    themes,
-} from "../tokens/tokens";
+import { componentColors, contrastPairs, durationMs, semanticColors, seriesColors, terminalColors, themes } from "../tokens/tokens";
 
 const css = readFileSync(fileURLToPath(new URL("../tokens/tokens.css", import.meta.url)), "utf8");
 const header = readFileSync(fileURLToPath(new URL("../../../../src/common/Design/Tokens.h", import.meta.url)), "utf8");

@@ -8,7 +8,9 @@
     const width = 300;
     const height = 56;
     const top = $derived(Math.max(...values) * 1.1);
-    const points = $derived(values.map((value, index) => `${(index / (values.length - 1)) * width},${height - (value / top) * height}`).join(" "));
+    const points = $derived(
+        values.map((value, index) => `${(index / (values.length - 1)) * width},${height - (value / top) * height}`).join(" "),
+    );
 </script>
 
 <figure class="space-y-1">
@@ -20,7 +22,14 @@
             </linearGradient>
         </defs>
         <polygon points={`0,${height} ${points} ${width},${height}`} fill={`url(#${id}-fill)`} />
-        <polyline {points} fill="none" stroke="var(--chart-2)" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round" />
+        <polyline
+            {points}
+            fill="none"
+            stroke="var(--chart-2)"
+            stroke-width="2"
+            vector-effect="non-scaling-stroke"
+            stroke-linejoin="round"
+        />
     </svg>
     <table class="sr-only">
         <caption>{label}</caption>

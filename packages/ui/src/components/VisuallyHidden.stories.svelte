@@ -13,7 +13,10 @@
 
 <Story name="Inside a control">
     {#snippet template()}
-        <button type="button" class="inline-flex min-h-44 min-w-44 items-center justify-center rounded-input bg-surface-sunken text-fg-body">
+        <button
+            type="button"
+            class="inline-flex min-h-44 min-w-44 items-center justify-center rounded-input bg-surface-sunken text-fg-body"
+        >
             <Icon name="copy" />
             <VisuallyHidden>Copy the connection string</VisuallyHidden>
         </button>

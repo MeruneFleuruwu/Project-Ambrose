@@ -16,7 +16,10 @@ describe("the motion module", () => {
     it("never overshoots, because every easing ends at its target", () => {
         for (const curve of Object.values(easing)) {
             expect(curve.startsWith("cubic-bezier(")).toBe(true);
-            const points = curve.slice("cubic-bezier(".length, -1).split(",").map((part) => Number.parseFloat(part));
+            const points = curve
+                .slice("cubic-bezier(".length, -1)
+                .split(",")
+                .map((part) => Number.parseFloat(part));
             expect(points).toHaveLength(4);
             expect(points[1]).toBeLessThanOrEqual(1);
             expect(points[3]).toBeLessThanOrEqual(1);

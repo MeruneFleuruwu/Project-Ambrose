@@ -3,7 +3,6 @@
     import { defineMeta } from "@storybook/addon-svelte-csf";
     import CollectionState from "./CollectionState.svelte";
 
-
     const { Story } = defineMeta({
         title: "Components/CollectionState",
         component: CollectionState,

@@ -86,58 +86,61 @@
 {#if status !== "ready"}
     <CollectionState {status} label={caption} {noResults} {error} class={extra} />
 {:else}
-<div class={classes("overflow-x-auto rounded-card border border-edge-quiet bg-surface-card", extra)}>
-    <table class="w-full border-collapse text-13">
-        <caption class="ambrose-label px-16 py-10 text-start">{caption}</caption>
-        <thead>
-            <tr class="border-b border-edge-quiet">
-                {#each table.getHeaderGroups()[0].headers as header (header.id)}
-                    {@const column = byId.get(header.column.id)}
-                    <th
-                        scope="col"
-                        aria-sort={direction(header.column.id) === "none" ? undefined : direction(header.column.id)}
-                        class={classes("px-16 py-10", column?.align === "end" ? "text-end" : "text-start")}
-                    >
-                        {#if column?.sortable !== false}
-                            <button
-                                type="button"
-                                class="ambrose-hover ambrose-label inline-flex min-h-44 items-center gap-6 text-fg-faint hover:text-fg-body"
-                                onclick={() => header.column.toggleSorting()}
-                            >
-                                {column?.header ?? header.column.id}
-                                {#if direction(header.column.id) !== "none"}
-                                    <Icon name={direction(header.column.id) === "ascending" ? "chevron-down" : "chevron-right"} size="13" />
-                                {/if}
-                            </button>
-                        {:else}
-                            <span class="ambrose-label">{column?.header ?? header.column.id}</span>
-                        {/if}
-                    </th>
-                {/each}
-            </tr>
-        </thead>
-        <tbody>
-            {#each table.getRowModel().rows as row (row.id)}
-                <tr class="border-b border-edge-quiet last:border-b-0 odd:bg-surface-sunken">
-                    {#each row.getAllCells() as cell (cell.id)}
-                        {@const column = byId.get(cell.column.id)}
-                        <td
-                            class={classes(
-                                "px-16 py-10 text-fg-body",
-                                column?.mono ? "ambrose-mono" : null,
-                                column?.align === "end" ? "text-end" : "text-start",
-                            )}
+    <div class={classes("overflow-x-auto rounded-card border border-edge-quiet bg-surface-card", extra)}>
+        <table class="w-full border-collapse text-13">
+            <caption class="ambrose-label px-16 py-10 text-start">{caption}</caption>
+            <thead>
+                <tr class="border-b border-edge-quiet">
+                    {#each table.getHeaderGroups()[0].headers as header (header.id)}
+                        {@const column = byId.get(header.column.id)}
+                        <th
+                            scope="col"
+                            aria-sort={direction(header.column.id) === "none" ? undefined : direction(header.column.id)}
+                            class={classes("px-16 py-10", column?.align === "end" ? "text-end" : "text-start")}
                         >
-                            {String(cell.getValue() ?? "")}
-                        </td>
+                            {#if column?.sortable !== false}
+                                <button
+                                    type="button"
+                                    class="ambrose-hover ambrose-label inline-flex min-h-44 items-center gap-6 text-fg-faint hover:text-fg-body"
+                                    onclick={() => header.column.toggleSorting()}
+                                >
+                                    {column?.header ?? header.column.id}
+                                    {#if direction(header.column.id) !== "none"}
+                                        <Icon
+                                            name={direction(header.column.id) === "ascending" ? "chevron-down" : "chevron-right"}
+                                            size="13"
+                                        />
+                                    {/if}
+                                </button>
+                            {:else}
+                                <span class="ambrose-label">{column?.header ?? header.column.id}</span>
+                            {/if}
+                        </th>
                     {/each}
                 </tr>
-            {:else}
-                <tr>
-                    <td colspan={columns.length} class="px-16 py-20 text-center text-fg-muted">{empty}</td>
-                </tr>
-            {/each}
-        </tbody>
-    </table>
-</div>
+            </thead>
+            <tbody>
+                {#each table.getRowModel().rows as row (row.id)}
+                    <tr class="border-b border-edge-quiet last:border-b-0 odd:bg-surface-sunken">
+                        {#each row.getAllCells() as cell (cell.id)}
+                            {@const column = byId.get(cell.column.id)}
+                            <td
+                                class={classes(
+                                    "px-16 py-10 text-fg-body",
+                                    column?.mono ? "ambrose-mono" : null,
+                                    column?.align === "end" ? "text-end" : "text-start",
+                                )}
+                            >
+                                {String(cell.getValue() ?? "")}
+                            </td>
+                        {/each}
+                    </tr>
+                {:else}
+                    <tr>
+                        <td colspan={columns.length} class="px-16 py-20 text-center text-fg-muted">{empty}</td>
+                    </tr>
+                {/each}
+            </tbody>
+        </table>
+    </div>
 {/if}

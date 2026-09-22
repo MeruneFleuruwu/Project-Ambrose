@@ -40,14 +40,19 @@
     let viewport = $state<HTMLDivElement | null>(null);
 
     const needle = $derived(search.trim().toLowerCase());
-    const passes = (record: LogRecord) => levels.includes(record.level) && (needle === "" || `${record.category} ${record.message}`.toLowerCase().includes(needle));
+    const passes = (record: LogRecord) =>
+        levels.includes(record.level) && (needle === "" || `${record.category} ${record.message}`.toLowerCase().includes(needle));
     const shown = $derived(records.filter(passes));
     const counts = $derived(Object.fromEntries(order.map((level) => [level, records.filter((record) => record.level === level).length])));
 
     const buckets = $derived.by(() => {
         const first = records[0]?.seconds ?? 0;
         const span = Math.max(1, (records.at(-1)?.seconds ?? 0) - first + 1);
-        const slots = Array.from({ length: 36 }, (_, index) => ({ from: first + (index * span) / 36, tally: {} as Record<string, number>, total: 0 }));
+        const slots = Array.from({ length: 36 }, (_, index) => ({
+            from: first + (index * span) / 36,
+            tally: {} as Record<string, number>,
+            total: 0,
+        }));
         for (const record of shown) {
             const slot = slots[Math.min(35, Math.floor(((record.seconds - first) / span) * 36))];
             slot.tally[record.level] = (slot.tally[record.level] ?? 0) + 1;
@@ -147,7 +152,15 @@
         </div>
     </div>
     <div class="flex flex-wrap items-center gap-3">
-        <ToggleGroup.Root type="multiple" variant="outline" size="sm" spacing={1} class="flex-wrap" bind:value={levels} aria-label="Levels to show">
+        <ToggleGroup.Root
+            type="multiple"
+            variant="outline"
+            size="sm"
+            spacing={1}
+            class="flex-wrap"
+            bind:value={levels}
+            aria-label="Levels to show"
+        >
             {#each order as level (level)}
                 <ToggleGroup.Item value={level} class="gap-1.5 px-2.5">
                     <span class={`size-1.5 rounded-full ${looks[level].fill}`}></span>{level}
@@ -175,7 +188,10 @@
                 >
                     {#each order as level (level)}
                         {#if slot.tally[level]}
-                            <div class={`${looks[level].fill} first:rounded-b-[1px] last:rounded-t-[1px]`} style={`height: ${(slot.tally[level] / busiest) * 100}%`}></div>
+                            <div
+                                class={`${looks[level].fill} first:rounded-b-[1px] last:rounded-t-[1px]`}
+                                style={`height: ${(slot.tally[level] / busiest) * 100}%`}
+                            ></div>
                         {/if}
                     {/each}
                 </div>
@@ -188,7 +204,13 @@
         </div>
     </div>
     <div class="relative">
-        <div bind:this={viewport} onscroll={followScroll} class="h-[58vh] overflow-y-auto bg-sidebar/60 py-2 font-mono text-xs leading-6" role="log" aria-live="off">
+        <div
+            bind:this={viewport}
+            onscroll={followScroll}
+            class="h-[58vh] overflow-y-auto bg-sidebar/60 py-2 font-mono text-xs leading-6"
+            role="log"
+            aria-live="off"
+        >
             {#each shown as record (record.sequence)}
                 <div class={opened === record.sequence ? "bg-muted/60" : ""}>
                     <button
@@ -202,7 +224,8 @@
                         <span class={`w-11 shrink-0 uppercase ${looks[record.level].text}`}>{record.level}</span>
                         <span class="hidden w-32 shrink-0 truncate text-chart-5 md:inline">{record.category}</span>
                         <span class={`min-w-0 flex-1 ${wrap ? "break-words whitespace-pre-wrap" : "truncate"}`}
-                            >{#each pieces(record.message) as piece, index (index)}{#if piece.hit}<mark class="rounded-sm bg-primary/35 text-foreground">{piece.text}</mark
+                            >{#each pieces(record.message) as piece, index (index)}{#if piece.hit}<mark
+                                        class="rounded-sm bg-primary/35 text-foreground">{piece.text}</mark
                                     >{:else}{piece.text}{/if}{/each}</span
                         >
                     </button>

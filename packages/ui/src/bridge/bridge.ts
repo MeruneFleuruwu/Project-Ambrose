@@ -119,15 +119,23 @@ export function createHost(base = "/api", scope: Window | undefined = typeof win
     const kind = hostKind(scope);
     if (kind === "webview2") {
         const view = (scope as WebView2Window).chrome!.webview!;
-        return new PostMessageHost(kind, (message) => view.postMessage(message), (receive) => {
-            view.addEventListener("message", (event) => receive(event.data));
-        });
+        return new PostMessageHost(
+            kind,
+            (message) => view.postMessage(message),
+            (receive) => {
+                view.addEventListener("message", (event) => receive(event.data));
+            },
+        );
     }
     if (kind === "webkit") {
         const handler = (scope as WebKitWindow).webkit!.messageHandlers![HANDLER];
-        return new PostMessageHost(kind, (message) => handler.postMessage(message), (receive) => {
-            (scope as WebKitWindow).ambroseHostReply = receive;
-        });
+        return new PostMessageHost(
+            kind,
+            (message) => handler.postMessage(message),
+            (receive) => {
+                (scope as WebKitWindow).ambroseHostReply = receive;
+            },
+        );
     }
     return new HttpHost(base);
 }

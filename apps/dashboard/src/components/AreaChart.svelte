@@ -38,7 +38,12 @@
             {/each}
         </div>
         <div class="relative flex-1" role="presentation" onpointermove={follow} onpointerleave={() => (hovered = null)}>
-            <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" class="absolute inset-0 size-full overflow-visible" aria-hidden="true">
+            <svg
+                viewBox={`0 0 ${width} ${height}`}
+                preserveAspectRatio="none"
+                class="absolute inset-0 size-full overflow-visible"
+                aria-hidden="true"
+            >
                 <defs>
                     <linearGradient id={`${id}-fill`} x1="0" x2="0" y1="0" y2="1">
                         <stop offset="0%" stop-color={color} stop-opacity="0.45" />
@@ -46,10 +51,25 @@
                     </linearGradient>
                 </defs>
                 {#each guides as guide, index (index)}
-                    <line x1="0" x2={width} y1={y(guide)} y2={y(guide)} stroke="var(--border)" stroke-dasharray="4 4" vector-effect="non-scaling-stroke" />
+                    <line
+                        x1="0"
+                        x2={width}
+                        y1={y(guide)}
+                        y2={y(guide)}
+                        stroke="var(--border)"
+                        stroke-dasharray="4 4"
+                        vector-effect="non-scaling-stroke"
+                    />
                 {/each}
                 <polygon points={`0,${height} ${line} ${width},${height}`} fill={`url(#${id}-fill)`} />
-                <polyline points={line} fill="none" stroke={color} stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
+                <polyline
+                    points={line}
+                    fill="none"
+                    stroke={color}
+                    stroke-width="2"
+                    stroke-linejoin="round"
+                    vector-effect="non-scaling-stroke"
+                />
             </svg>
             {#if hovered !== null}
                 {@const point = points[hovered]}

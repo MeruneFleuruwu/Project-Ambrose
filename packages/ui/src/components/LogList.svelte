@@ -56,24 +56,24 @@
 {#if placeholder}
     <CollectionState status={placeholder} {label} {empty} {noResults} {error} class={extra} />
 {:else}
-<div
-    aria-label={label}
-    role="log"
-    style="height: {height}"
-    class={classes("ambrose-mono rounded-card border border-edge-quiet bg-surface-sunken text-12", extra)}
-    data-ambrose-scroll
->
-    <VList data={records} getKey={(record: LogRecord) => record.sequence} style="height: 100%" tabindex={0}>
-        {#snippet children(record: LogRecord)}
-            <div class="flex items-start gap-12 px-12 py-4">
-                <span class="shrink-0 text-fg-faint">{record.time}</span>
-                <span class={classes("w-44 shrink-0 uppercase", levels[record.level])}>{record.level}</span>
-                <span class="shrink-0 text-fg-faint">{record.category}</span>
-                <span class="min-w-0 break-all text-fg-body">
-                    {#each pieces(record.message) as piece, index (index)}<span>{piece}</span>{/each}
-                </span>
-            </div>
-        {/snippet}
-    </VList>
-</div>
+    <div
+        aria-label={label}
+        role="log"
+        style="height: {height}"
+        class={classes("ambrose-mono rounded-card border border-edge-quiet bg-surface-sunken text-12", extra)}
+        data-ambrose-scroll
+    >
+        <VList data={records} getKey={(record: LogRecord) => record.sequence} style="height: 100%" tabindex={0}>
+            {#snippet children(record: LogRecord)}
+                <div class="flex items-start gap-12 px-12 py-4">
+                    <span class="shrink-0 text-fg-faint">{record.time}</span>
+                    <span class={classes("w-44 shrink-0 uppercase", levels[record.level])}>{record.level}</span>
+                    <span class="shrink-0 text-fg-faint">{record.category}</span>
+                    <span class="min-w-0 break-all text-fg-body">
+                        {#each pieces(record.message) as piece, index (index)}<span>{piece}</span>{/each}
+                    </span>
+                </div>
+            {/snippet}
+        </VList>
+    </div>
 {/if}

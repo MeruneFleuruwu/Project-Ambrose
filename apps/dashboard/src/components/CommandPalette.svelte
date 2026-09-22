@@ -55,11 +55,19 @@
         <Command.Separator />
         <Command.Group heading="Servers">
             {#each apps as app (app.name)}
-                <Command.Item value={`${app.name} console`} keywords={[app.role, "terminal", "command"]} onSelect={() => run(() => openFor(app.name, "console"))}>
+                <Command.Item
+                    value={`${app.name} console`}
+                    keywords={[app.role, "terminal", "command"]}
+                    onSelect={() => run(() => openFor(app.name, "console"))}
+                >
                     <SquareTerminalIcon />
                     <span>Open the {app.name} console</span>
                 </Command.Item>
-                <Command.Item value={`${app.name} logs`} keywords={[app.role, "log", "records"]} onSelect={() => run(() => openFor(app.name, "logs"))}>
+                <Command.Item
+                    value={`${app.name} logs`}
+                    keywords={[app.role, "log", "records"]}
+                    onSelect={() => run(() => openFor(app.name, "logs"))}
+                >
                     <FileTextIcon />
                     <span>Follow the {app.name} logs</span>
                 </Command.Item>
@@ -79,7 +87,11 @@
         <Command.Separator />
         <Command.Group heading="Appearance">
             {#each looks as look (look.choice)}
-                <Command.Item value={`theme ${look.label}`} keywords={["theme", "mode", "appearance"]} onSelect={() => run(() => chooseTheme(look.choice))}>
+                <Command.Item
+                    value={`theme ${look.label}`}
+                    keywords={["theme", "mode", "appearance"]}
+                    onSelect={() => run(() => chooseTheme(look.choice))}
+                >
                     <look.icon />
                     <span>{look.label}</span>
                 </Command.Item>

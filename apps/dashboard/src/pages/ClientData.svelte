@@ -19,8 +19,14 @@
         </Card.Header>
         <Card.Content>
             <dl class="space-y-3 text-sm">
-                <div><dt class="text-xs text-muted-foreground">Folder</dt><dd class="font-mono text-xs break-all">C:\ProgramData\KingsIsle Entertainment\Wizard101</dd></div>
-                <div><dt class="text-xs text-muted-foreground">Revision</dt><dd class="font-mono">r806919 · Wizard 1.610</dd></div>
+                <div>
+                    <dt class="text-xs text-muted-foreground">Folder</dt>
+                    <dd class="font-mono text-xs break-all">C:\ProgramData\KingsIsle Entertainment\Wizard101</dd>
+                </div>
+                <div>
+                    <dt class="text-xs text-muted-foreground">Revision</dt>
+                    <dd class="font-mono">r806919 · Wizard 1.610</dd>
+                </div>
             </dl>
         </Card.Content>
         <Card.Footer><Button variant="outline" size="sm"><FolderOpenIcon />Choose another install</Button></Card.Footer>
@@ -33,8 +39,14 @@
         </Card.Header>
         <Card.Content>
             <dl class="space-y-3 text-sm">
-                <div><dt class="text-xs text-muted-foreground">Built from</dt><dd class="font-mono">r801440</dd></div>
-                <div><dt class="text-xs text-muted-foreground">Why it matters</dt><dd>The install is newer, so some game data may not decode until the dump is rebuilt.</dd></div>
+                <div>
+                    <dt class="text-xs text-muted-foreground">Built from</dt>
+                    <dd class="font-mono">r801440</dd>
+                </div>
+                <div>
+                    <dt class="text-xs text-muted-foreground">Why it matters</dt>
+                    <dd>The install is newer, so some game data may not decode until the dump is rebuilt.</dd>
+                </div>
             </dl>
         </Card.Content>
         <Card.Footer><Button size="sm"><RefreshCwIcon />Rebuild from the install</Button></Card.Footer>

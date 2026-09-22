@@ -17,7 +17,9 @@
 
 <PageHeader title="Servers" description="Start, stop and restart the apps this panel runs.">
     {#snippet actions()}
-        <Button variant="outline" class="text-destructive hover:text-destructive" onclick={() => requestPower("stop", "every app")}><PowerIcon />Stop all</Button>
+        <Button variant="outline" class="text-destructive hover:text-destructive" onclick={() => requestPower("stop", "every app")}
+            ><PowerIcon />Stop all</Button
+        >
         <Button variant="outline" onclick={() => requestPower("restart", "every app")}><RotateCcwIcon />Restart all</Button>
         <Button onclick={() => requestPower("start", "every app")}><PlayIcon />Start all</Button>
     {/snippet}
@@ -50,7 +52,9 @@
                         <DropdownMenu.Root>
                             <DropdownMenu.Trigger>
                                 {#snippet child({ props })}
-                                    <Button variant="ghost" size="icon" class="size-8" aria-label={`Actions for ${app.name}`} {...props}><EllipsisIcon /></Button>
+                                    <Button variant="ghost" size="icon" class="size-8" aria-label={`Actions for ${app.name}`} {...props}
+                                        ><EllipsisIcon /></Button
+                                    >
                                 {/snippet}
                             </DropdownMenu.Trigger>
                             <DropdownMenu.Content align="end">
@@ -63,7 +67,9 @@
                                 <DropdownMenu.Item onSelect={() => openFor(app.name, "console")}>Open console</DropdownMenu.Item>
                                 {#if app.state !== "unknown"}
                                     <DropdownMenu.Separator />
-                                    <DropdownMenu.Item variant="destructive" onSelect={() => requestPower("stop", app.name)}>Stop</DropdownMenu.Item>
+                                    <DropdownMenu.Item variant="destructive" onSelect={() => requestPower("stop", app.name)}
+                                        >Stop</DropdownMenu.Item
+                                    >
                                 {/if}
                             </DropdownMenu.Content>
                         </DropdownMenu.Root>

@@ -10,7 +10,10 @@
 
 <Story name="An icon with no label">
     {#snippet template()}
-        <button type="button" class="inline-flex min-h-44 min-w-44 items-center justify-center rounded-input bg-surface-sunken text-fg-body">
+        <button
+            type="button"
+            class="inline-flex min-h-44 min-w-44 items-center justify-center rounded-input bg-surface-sunken text-fg-body"
+        >
             <Icon name="trash-2" />
         </button>
     {/snippet}

@@ -49,7 +49,8 @@
         regular: "px-14 rounded-input",
         wide: "px-28 text-17 rounded-action",
     };
-    const shared = "ambrose-hover inline-flex min-h-44 items-center justify-center gap-8 text-15 select-none disabled:opacity-50 disabled:pointer-events-none [&_svg]:size-16 [&_svg]:shrink-0";
+    const shared =
+        "ambrose-hover inline-flex min-h-44 items-center justify-center gap-8 text-15 select-none disabled:opacity-50 disabled:pointer-events-none [&_svg]:size-16 [&_svg]:shrink-0";
     const all = $derived(classes(shared, looks[variant], shapes[size], extra));
 </script>
 
@@ -59,16 +60,7 @@
         {@render children()}
     </a>
 {:else}
-    <button
-        {...rest}
-        {id}
-        {type}
-        {title}
-        {onclick}
-        class={all}
-        disabled={disabled || busy}
-        aria-busy={busy ? "true" : undefined}
-    >
+    <button {...rest} {id} {type} {title} {onclick} class={all} disabled={disabled || busy} aria-busy={busy ? "true" : undefined}>
         {#if icon}<Icon name={icon} />{/if}
         {#if busy}{busyLabel}{:else}{@render children()}{/if}
     </button>

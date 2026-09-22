@@ -19,7 +19,10 @@
             <Button variant="quiet" onclick={() => toast.success("Backup finished", { description: "Also in the notification centre." })}>
                 Finish a backup
             </Button>
-            <Button variant="quiet" onclick={() => toast.error("Backup refused", { description: "Also in the audit log.", duration: Number.POSITIVE_INFINITY })}>
+            <Button
+                variant="quiet"
+                onclick={() => toast.error("Backup refused", { description: "Also in the audit log.", duration: Number.POSITIVE_INFINITY })}
+            >
                 Refuse a backup
             </Button>
         </div>

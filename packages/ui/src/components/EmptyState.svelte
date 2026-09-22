@@ -16,7 +16,12 @@
     let { title, detail, icon, class: extra, action }: Props = $props();
 </script>
 
-<div class={classes("flex flex-col items-center gap-10 rounded-card border border-edge-quiet bg-surface-sunken px-20 py-40 text-center", extra)}>
+<div
+    class={classes(
+        "flex flex-col items-center gap-10 rounded-card border border-edge-quiet bg-surface-sunken px-20 py-40 text-center",
+        extra,
+    )}
+>
     {#if icon}
         <Icon name={icon} size="26" class="text-fg-faint" />
     {/if}

@@ -36,13 +36,7 @@
     };
 
     let title = $derived(
-        status === "loading"
-            ? `Loading ${label}`
-            : status === "empty"
-              ? empty
-              : status === "no-results"
-                ? noResults
-                : error,
+        status === "loading" ? `Loading ${label}` : status === "empty" ? empty : status === "no-results" ? noResults : error,
     );
 
     let hint = $derived(
@@ -50,12 +44,6 @@
     );
 </script>
 
-<div
-    role="status"
-    aria-live="polite"
-    aria-busy={status === "loading"}
-    data-collection-state={status}
-    class={extra}
->
-    <EmptyState title={title} detail={hint} icon={icons[status]} {action} />
+<div role="status" aria-live="polite" aria-busy={status === "loading"} data-collection-state={status} class={extra}>
+    <EmptyState {title} detail={hint} icon={icons[status]} {action} />
 </div>

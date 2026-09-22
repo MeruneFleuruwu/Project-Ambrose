@@ -32,7 +32,11 @@
             { kind: "reply", text: "account create <name> <password>\naccount set password <name> <password>" },
         ],
     });
-    const output = $derived(outputs[app.name] ?? [{ kind: "status" as const, text: app.state === "unknown" ? `${app.name} is not running` : `Connected to ${app.name}` }]);
+    const output = $derived(
+        outputs[app.name] ?? [
+            { kind: "status" as const, text: app.state === "unknown" ? `${app.name} is not running` : `Connected to ${app.name}` },
+        ],
+    );
 
     let line = $state("");
     let recall = -1;
@@ -71,8 +75,10 @@
     }
 
     function answer(command: string): string {
-        if (command === "status") return `${app.name} ${app.revision}, ${app.uptime ? `up ${app.uptime}, running` : "stopped"}, ${app.sessions ?? 0} sessions`;
-        if (command === "help") return "status, help, account, server, reload\nThis is a sample console: commands run for real once 17.05 lands.";
+        if (command === "status")
+            return `${app.name} ${app.revision}, ${app.uptime ? `up ${app.uptime}, running` : "stopped"}, ${app.sessions ?? 0} sessions`;
+        if (command === "help")
+            return "status, help, account, server, reload\nThis is a sample console: commands run for real once 17.05 lands.";
         return "This is a sample console: commands run for real once 17.05 lands.";
     }
 
@@ -121,7 +127,9 @@
             <Button onclick={() => requestPower("start", app.name)}><PlayIcon />Start</Button>
         {:else}
             <Button variant="outline" onclick={() => requestPower("restart", app.name)}><RotateCcwIcon />Restart</Button>
-            <Button variant="outline" class="text-destructive hover:text-destructive" onclick={() => requestPower("stop", app.name)}><SquareIcon />Stop</Button>
+            <Button variant="outline" class="text-destructive hover:text-destructive" onclick={() => requestPower("stop", app.name)}
+                ><SquareIcon />Stop</Button
+            >
         {/if}
     {/snippet}
 </PageHeader>
@@ -131,12 +139,21 @@
         <div class="flex items-center gap-3 border-b bg-sidebar px-4 py-2">
             <span class="font-mono text-xs text-muted-foreground">{app.name}</span>
             <StatusBadge tone={app.state} pulse={app.state === "healthy"}>{app.word}</StatusBadge>
-            <Button variant="ghost" size="sm" class="ml-auto h-7 text-muted-foreground" onclick={() => (outputs[app.name] = [])}><EraserIcon />Clear</Button>
+            <Button variant="ghost" size="sm" class="ml-auto h-7 text-muted-foreground" onclick={() => (outputs[app.name] = [])}
+                ><EraserIcon />Clear</Button
+            >
         </div>
-        <div bind:this={screen} class="h-[52vh] overflow-y-auto bg-sidebar/60 p-4 font-mono text-sm leading-6" role="log" aria-label={`Output from ${app.name}`}>
+        <div
+            bind:this={screen}
+            class="h-[52vh] overflow-y-auto bg-sidebar/60 p-4 font-mono text-sm leading-6"
+            role="log"
+            aria-label={`Output from ${app.name}`}
+        >
             {#each output as entry, index (index)}
                 {#if entry.kind === "command"}
-                    <div class="flex gap-2 text-foreground"><span class="text-primary select-none">›</span><span class="break-all">{entry.text}</span></div>
+                    <div class="flex gap-2 text-foreground">
+                        <span class="text-primary select-none">›</span><span class="break-all">{entry.text}</span>
+                    </div>
                 {:else if entry.kind === "status"}
                     <div class="text-xs text-muted-foreground italic">{entry.text}</div>
                 {:else}
@@ -151,7 +168,9 @@
             <input
                 bind:value={line}
                 onkeydown={browse}
-                placeholder={app.state === "unknown" ? `${app.name} is not running` : "Type a command, like status. Up and down recall earlier ones."}
+                placeholder={app.state === "unknown"
+                    ? `${app.name} is not running`
+                    : "Type a command, like status. Up and down recall earlier ones."}
                 disabled={app.state === "unknown"}
                 class="h-9 min-w-0 flex-1 bg-transparent font-mono text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
                 aria-label="Command"
@@ -166,13 +185,20 @@
         {#each stats as stat (stat.title)}
             <Card.Root class="gap-0 py-0 shadow-xs">
                 <div class="flex items-center gap-3 p-3">
-                    <div class={`flex size-10 shrink-0 items-center justify-center rounded-lg ${stat.tone || "bg-muted text-muted-foreground"}`}>
+                    <div
+                        class={`flex size-10 shrink-0 items-center justify-center rounded-lg ${stat.tone || "bg-muted text-muted-foreground"}`}
+                    >
                         <stat.icon class="size-5" />
                     </div>
                     <div class="min-w-0 flex-1">
                         <div class="text-xs text-muted-foreground">{stat.title}</div>
                         {#if stat.copy}
-                            <button type="button" class="truncate font-mono text-sm font-medium hover:underline" title="Copy" onclick={() => copy(stat.value)}>{stat.value}</button>
+                            <button
+                                type="button"
+                                class="truncate font-mono text-sm font-medium hover:underline"
+                                title="Copy"
+                                onclick={() => copy(stat.value)}>{stat.value}</button
+                            >
                         {:else}
                             <div class="truncate text-sm font-medium tabular-nums">{stat.value}</div>
                         {/if}

@@ -19,45 +19,91 @@
 
     type Row = Record<string, string>;
     type Column = { id: string; header: string; mono?: boolean; status?: boolean; hideBelow?: "sm" | "md" | "lg" };
-    type Page = { description: string; rows: Row[]; columns: Column[]; actions: { label: string; icon: Component; primary?: boolean }[]; search?: string };
+    type Page = {
+        description: string;
+        rows: Row[];
+        columns: Column[];
+        actions: { label: string; icon: Component; primary?: boolean }[];
+        search?: string;
+    };
 
     const pages: Record<string, Page> = {
         players: {
             description: "Wizards in the world right now.",
             rows: players,
-            columns: [{ id: "name", header: "Wizard" }, { id: "level", header: "Level" }, { id: "school", header: "School", hideBelow: "sm" }, { id: "zone", header: "Zone", hideBelow: "md" }, { id: "session", header: "Online for", hideBelow: "lg" }],
+            columns: [
+                { id: "name", header: "Wizard" },
+                { id: "level", header: "Level" },
+                { id: "school", header: "School", hideBelow: "sm" },
+                { id: "zone", header: "Zone", hideBelow: "md" },
+                { id: "session", header: "Online for", hideBelow: "lg" },
+            ],
             actions: [{ label: "Message everyone", icon: PlusIcon, primary: true }],
             search: "Find a wizard",
         },
         accounts: {
             description: "Game accounts, their security level and any ban.",
             rows: accounts,
-            columns: [{ id: "username", header: "Account" }, { id: "level", header: "Security level", hideBelow: "sm" }, { id: "created", header: "Created", hideBelow: "md" }, { id: "lastSeen", header: "Last seen", hideBelow: "lg" }, { id: "state", header: "State", status: true }],
-            actions: [{ label: "Ban", icon: ShieldBanIcon }, { label: "New account", icon: PlusIcon, primary: true }],
+            columns: [
+                { id: "username", header: "Account" },
+                { id: "level", header: "Security level", hideBelow: "sm" },
+                { id: "created", header: "Created", hideBelow: "md" },
+                { id: "lastSeen", header: "Last seen", hideBelow: "lg" },
+                { id: "state", header: "State", status: true },
+            ],
+            actions: [
+                { label: "Ban", icon: ShieldBanIcon },
+                { label: "New account", icon: PlusIcon, primary: true },
+            ],
             search: "Find an account by name, address or machine",
         },
         realms: {
             description: "Every realm in the realm list and how full it is.",
             rows: realms,
-            columns: [{ id: "name", header: "Realm" }, { id: "address", header: "Address", mono: true, hideBelow: "md" }, { id: "flags", header: "Flags", hideBelow: "sm" }, { id: "population", header: "Population" }, { id: "heartbeat", header: "Heartbeat", hideBelow: "lg" }],
+            columns: [
+                { id: "name", header: "Realm" },
+                { id: "address", header: "Address", mono: true, hideBelow: "md" },
+                { id: "flags", header: "Flags", hideBelow: "sm" },
+                { id: "population", header: "Population" },
+                { id: "heartbeat", header: "Heartbeat", hideBelow: "lg" },
+            ],
             actions: [{ label: "Refresh", icon: RefreshCwIcon }],
         },
         backups: {
             description: "Backups kept on this machine, checked after they are taken.",
             rows: backups,
-            columns: [{ id: "name", header: "Backup", mono: true }, { id: "taken", header: "Taken", hideBelow: "sm" }, { id: "size", header: "Size", hideBelow: "md" }, { id: "verified", header: "Check", status: true }, { id: "kept", header: "Kept for", hideBelow: "lg" }],
-            actions: [{ label: "Download", icon: DownloadIcon }, { label: "Back up now", icon: PlusIcon, primary: true }],
+            columns: [
+                { id: "name", header: "Backup", mono: true },
+                { id: "taken", header: "Taken", hideBelow: "sm" },
+                { id: "size", header: "Size", hideBelow: "md" },
+                { id: "verified", header: "Check", status: true },
+                { id: "kept", header: "Kept for", hideBelow: "lg" },
+            ],
+            actions: [
+                { label: "Download", icon: DownloadIcon },
+                { label: "Back up now", icon: PlusIcon, primary: true },
+            ],
         },
         users: {
             description: "People who can sign in to this panel and what they may do.",
             rows: panelUsers,
-            columns: [{ id: "name", header: "User" }, { id: "role", header: "Role" }, { id: "twoFactor", header: "Two-factor", status: true, hideBelow: "sm" }, { id: "lastSignIn", header: "Last sign-in", hideBelow: "md" }],
+            columns: [
+                { id: "name", header: "User" },
+                { id: "role", header: "Role" },
+                { id: "twoFactor", header: "Two-factor", status: true, hideBelow: "sm" },
+                { id: "lastSignIn", header: "Last sign-in", hideBelow: "md" },
+            ],
             actions: [{ label: "Invite", icon: PlusIcon, primary: true }],
         },
         activity: {
             description: "What people did in the panel, newest first.",
             rows: activity,
-            columns: [{ id: "when", header: "When", mono: true }, { id: "who", header: "Who" }, { id: "what", header: "What" }, { id: "where", header: "Where", hideBelow: "md" }],
+            columns: [
+                { id: "when", header: "When", mono: true },
+                { id: "who", header: "Who" },
+                { id: "what", header: "What" },
+                { id: "where", header: "Where", hideBelow: "md" },
+            ],
             actions: [{ label: "Export", icon: DownloadIcon }],
         },
     };
@@ -91,7 +137,9 @@
             <Table.Header>
                 <Table.Row class="hover:bg-transparent">
                     {#each page.columns as column, index (column.id)}
-                        <Table.Head class={`${index === 0 ? "pl-6" : ""} ${column.hideBelow ? hide[column.hideBelow] : ""}`}>{column.header}</Table.Head>
+                        <Table.Head class={`${index === 0 ? "pl-6" : ""} ${column.hideBelow ? hide[column.hideBelow] : ""}`}
+                            >{column.header}</Table.Head
+                        >
                     {/each}
                 </Table.Row>
             </Table.Header>
@@ -99,7 +147,9 @@
                 {#each page.rows as row, rowIndex (rowIndex)}
                     <Table.Row>
                         {#each page.columns as column, index (column.id)}
-                            <Table.Cell class={`${index === 0 ? "pl-6 font-medium" : ""} ${column.mono ? "font-mono text-xs" : ""} ${column.hideBelow ? hide[column.hideBelow] : ""}`}>
+                            <Table.Cell
+                                class={`${index === 0 ? "pl-6 font-medium" : ""} ${column.mono ? "font-mono text-xs" : ""} ${column.hideBelow ? hide[column.hideBelow] : ""}`}
+                            >
                                 {#if column.status}
                                     <StatusBadge tone={tone(row[column.id] ?? "")}>{row[column.id]}</StatusBadge>
                                 {:else}

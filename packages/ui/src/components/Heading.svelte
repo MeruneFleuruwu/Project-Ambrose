@@ -15,9 +15,7 @@
 
     const defaults: Record<number, "34" | "26" | "21" | "17"> = { 1: "34", 2: "26", 3: "21", 4: "17" };
     const step = $derived(size ?? defaults[level]);
-    const sizeClass = $derived(
-        step === "34" ? "text-34" : step === "26" ? "text-26" : step === "21" ? "text-21" : "text-17",
-    );
+    const sizeClass = $derived(step === "34" ? "text-34" : step === "26" ? "text-26" : step === "21" ? "text-21" : "text-17");
 </script>
 
 <svelte:element this={`h${level}`} {id} class={classes("font-display font-semibold text-fg-body", sizeClass, extra)}>

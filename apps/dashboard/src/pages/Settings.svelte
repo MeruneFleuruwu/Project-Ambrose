@@ -29,14 +29,19 @@
                 <Card.Description>What players see in the realm list.</Card.Description>
             </Card.Header>
             <Card.Content class="grid gap-6 md:grid-cols-2">
-                <div class="grid content-start gap-2"><Label for="realm-name">Realm name</Label><Input id="realm-name" value="Ambrose" /></div>
+                <div class="grid content-start gap-2">
+                    <Label for="realm-name">Realm name</Label><Input id="realm-name" value="Ambrose" />
+                </div>
                 <div class="grid content-start gap-2">
                     <Label for="realm-limit">Player limit</Label>
                     <Input id="realm-limit" type="number" value="500" />
                     <p class="text-xs text-muted-foreground">Applies from the next realm list refresh.</p>
                 </div>
                 <div class="flex items-center justify-between rounded-lg border p-4 md:col-span-2">
-                    <div class="space-y-0.5"><Label for="realm-recommended">Recommended</Label><p class="text-xs text-muted-foreground">Show this realm first to new players.</p></div>
+                    <div class="space-y-0.5">
+                        <Label for="realm-recommended">Recommended</Label>
+                        <p class="text-xs text-muted-foreground">Show this realm first to new players.</p>
+                    </div>
                     <Switch id="realm-recommended" checked />
                 </div>
             </Card.Content>
@@ -49,14 +54,19 @@
                 <Card.Description>The listener this panel talks to.</Card.Description>
             </Card.Header>
             <Card.Content class="grid gap-6 md:grid-cols-2">
-                <div class="grid content-start gap-2"><Label for="admin-bind">Listen address</Label><Input id="admin-bind" value="127.0.0.1" class="font-mono" /></div>
+                <div class="grid content-start gap-2">
+                    <Label for="admin-bind">Listen address</Label><Input id="admin-bind" value="127.0.0.1" class="font-mono" />
+                </div>
                 <div class="grid content-start gap-2">
                     <Label for="admin-token">Token</Label>
                     <Input id="admin-token" type="password" value="hidden-token" class="font-mono" />
                     <p class="text-xs text-muted-foreground">A secret: never shown or logged.</p>
                 </div>
                 <div class="flex items-center justify-between rounded-lg border p-4 md:col-span-2">
-                    <div class="space-y-0.5"><Label for="admin-enable">Serve the admin API</Label><p class="text-xs text-muted-foreground">Turning this off closes the listener at once.</p></div>
+                    <div class="space-y-0.5">
+                        <Label for="admin-enable">Serve the admin API</Label>
+                        <p class="text-xs text-muted-foreground">Turning this off closes the listener at once.</p>
+                    </div>
                     <Switch id="admin-enable" checked />
                 </div>
             </Card.Content>
@@ -69,8 +79,12 @@
                 <Card.Description>How much each server writes and keeps.</Card.Description>
             </Card.Header>
             <Card.Content class="grid gap-6 md:grid-cols-2">
-                <div class="grid content-start gap-2"><Label for="log-backlog">Live backlog</Label><Input id="log-backlog" type="number" value="1000" /></div>
-                <div class="grid content-start gap-2"><Label for="log-days">Keep log files for (days)</Label><Input id="log-days" type="number" value="14" /></div>
+                <div class="grid content-start gap-2">
+                    <Label for="log-backlog">Live backlog</Label><Input id="log-backlog" type="number" value="1000" />
+                </div>
+                <div class="grid content-start gap-2">
+                    <Label for="log-days">Keep log files for (days)</Label><Input id="log-days" type="number" value="14" />
+                </div>
             </Card.Content>
         </Card.Root>
     </Tabs.Content>

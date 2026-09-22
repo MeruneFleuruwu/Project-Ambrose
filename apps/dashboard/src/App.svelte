@@ -60,7 +60,11 @@
                     <Sidebar.MenuButton size="lg">
                         {#snippet child({ props })}
                             <a href="#overview" {...props}>
-                                <div class="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary font-serif text-lg font-bold text-primary-foreground">A</div>
+                                <div
+                                    class="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary font-serif text-lg font-bold text-primary-foreground"
+                                >
+                                    A
+                                </div>
                                 <div class="grid flex-1 text-left leading-tight">
                                     <span class="truncate font-serif text-base font-semibold">Ambrose</span>
                                     <span class="truncate text-xs text-muted-foreground">Server panel</span>
@@ -137,7 +141,9 @@
         <Sidebar.Rail />
     </Sidebar.Root>
     <Sidebar.Inset>
-        <header class="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background/90 px-4 backdrop-blur md:rounded-t-xl">
+        <header
+            class="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background/90 px-4 backdrop-blur md:rounded-t-xl"
+        >
             <Sidebar.Trigger class="-ml-1" />
             <Separator orientation="vertical" class="mr-2 data-vertical:h-4 data-vertical:self-auto" />
             <Breadcrumb.Root>
@@ -174,7 +180,10 @@
             {#if !route}
                 <Denied title="No such page" detail={`Nothing in the panel lives at #${path}.`} />
             {:else if !allowed}
-                <Denied title="Access denied" detail={`${route.title} needs the ${route.permission} permission, which your role does not grant.`} />
+                <Denied
+                    title="Access denied"
+                    detail={`${route.title} needs the ${route.permission} permission, which your role does not grant.`}
+                />
             {:else if route.path === "overview"}
                 <Overview />
             {:else if route.path === "servers"}

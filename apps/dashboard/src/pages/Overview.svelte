@@ -62,7 +62,8 @@
             tone: problems.length > 0 ? ("wrong" as const) : ("healthy" as const),
             badge: problems.length > 0 ? "Needs a look" : "None",
             headline: problems.length > 0 ? problems[0].message : "Nothing needs fixing",
-            detail: problems.length > 0 ? `The fix is on ${problems[0].fixLabel.replace(/^Open /, "")}` : "Problems show here as they appear",
+            detail:
+                problems.length > 0 ? `The fix is on ${problems[0].fixLabel.replace(/^Open /, "")}` : "Problems show here as they appear",
         },
     ];
 
@@ -136,7 +137,9 @@
                     {#if app.tickAverage !== null}
                         <div>
                             <dt class="text-xs text-muted-foreground">Tick</dt>
-                            <dd class="font-medium tabular-nums">{app.tickAverage} ms <span class="text-muted-foreground">/ {app.tickMax} worst</span></dd>
+                            <dd class="font-medium tabular-nums">
+                                {app.tickAverage} ms <span class="text-muted-foreground">/ {app.tickMax} worst</span>
+                            </dd>
                         </div>
                     {/if}
                 </dl>
@@ -168,12 +171,19 @@
                     <Button size="sm" onclick={() => requestPower("start", app.name)}><PlayIcon />Start</Button>
                 {:else}
                     <Button size="sm" variant="outline" onclick={() => requestPower("restart", app.name)}><RotateCcwIcon />Restart</Button>
-                    <Button size="sm" variant="outline" class="text-destructive hover:text-destructive" onclick={() => requestPower("stop", app.name)}>
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        class="text-destructive hover:text-destructive"
+                        onclick={() => requestPower("stop", app.name)}
+                    >
                         <SquareIcon />Stop
                     </Button>
                 {/if}
                 <Button size="sm" variant="ghost" onclick={() => openFor(app.name, "logs")}><FileTextIcon />Logs</Button>
-                <span class={`ml-auto text-xs ${app.stale ? "text-waiting" : "text-muted-foreground"}`}>{app.stale ? `Last seen ${app.age}` : `Updated ${app.age}`}</span>
+                <span class={`ml-auto text-xs ${app.stale ? "text-waiting" : "text-muted-foreground"}`}
+                    >{app.stale ? `Last seen ${app.age}` : `Updated ${app.age}`}</span
+                >
             </Card.Footer>
         </Card.Root>
     {/each}
@@ -193,7 +203,8 @@
                     value={span}
                     onValueChange={(value) => value && (span = value as typeof span)}
                 >
-                    {#each spans as entry (entry.value)}<ToggleGroup.Item value={entry.value} class="px-3">{entry.label}</ToggleGroup.Item>{/each}
+                    {#each spans as entry (entry.value)}<ToggleGroup.Item value={entry.value} class="px-3">{entry.label}</ToggleGroup.Item
+                        >{/each}
                 </ToggleGroup.Root>
                 <Select.Root type="single" value={span} onValueChange={(value) => value && (span = value as typeof span)}>
                     <Select.Trigger size="sm" class="w-36 @[560px]/card:hidden" aria-label="Span of the chart">{spanLabel}</Select.Trigger>
@@ -221,8 +232,12 @@
                             <Avatar.Fallback class="rounded-lg text-xs">{initials(entry.who)}</Avatar.Fallback>
                         </Avatar.Root>
                         <div class="min-w-0 flex-1 text-sm">
-                            <p class="leading-snug"><span class="font-medium">{entry.who}</span> <span class="text-muted-foreground">{entry.what}</span></p>
-                            <p class="mt-0.5 text-xs text-muted-foreground"><span class="font-mono tabular-nums">{entry.when}</span> · {entry.where}</p>
+                            <p class="leading-snug">
+                                <span class="font-medium">{entry.who}</span> <span class="text-muted-foreground">{entry.what}</span>
+                            </p>
+                            <p class="mt-0.5 text-xs text-muted-foreground">
+                                <span class="font-mono tabular-nums">{entry.when}</span> · {entry.where}
+                            </p>
                         </div>
                     </li>
                 {/each}

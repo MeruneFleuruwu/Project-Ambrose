@@ -29,32 +29,91 @@ export type SampleApp = {
 
 export const apps: SampleApp[] = [
     {
-        name: "loginserver", role: "login", realm: "", address: "127.0.0.1", port: 12000,
-        state: "healthy", word: "Online", uptime: "2 d 4 h", revision: "573f769",
-        sessions: 14, players: null, limit: null, tickAverage: null, tickMax: null,
-        age: "1 s ago", stale: false, badges: [], problems: [], ticks: [],
+        name: "loginserver",
+        role: "login",
+        realm: "",
+        address: "127.0.0.1",
+        port: 12000,
+        state: "healthy",
+        word: "Online",
+        uptime: "2 d 4 h",
+        revision: "573f769",
+        sessions: 14,
+        players: null,
+        limit: null,
+        tickAverage: null,
+        tickMax: null,
+        age: "1 s ago",
+        stale: false,
+        badges: [],
+        problems: [],
+        ticks: [],
     },
     {
-        name: "gameserver", role: "game", realm: "Ambrose", address: "127.0.0.1", port: 12001,
-        state: "waiting", word: "Needs attention", uptime: "6 h 12 min", revision: "573f769",
-        sessions: 9, players: 9, limit: 500, tickAverage: 3.4, tickMax: 11.8,
-        age: "2 s ago", stale: false,
-        badges: [{ tone: "waiting", text: "Pending SQL updates" }, { tone: "wrong", text: "1 problem" }],
-        problems: [{ code: "type_dump_stale", message: "The type dump was built from an older client revision.", fix: "client", fixLabel: "Open client data" }],
+        name: "gameserver",
+        role: "game",
+        realm: "Ambrose",
+        address: "127.0.0.1",
+        port: 12001,
+        state: "waiting",
+        word: "Needs attention",
+        uptime: "6 h 12 min",
+        revision: "573f769",
+        sessions: 9,
+        players: 9,
+        limit: 500,
+        tickAverage: 3.4,
+        tickMax: 11.8,
+        age: "2 s ago",
+        stale: false,
+        badges: [
+            { tone: "waiting", text: "Pending SQL updates" },
+            { tone: "wrong", text: "1 problem" },
+        ],
+        problems: [
+            {
+                code: "type_dump_stale",
+                message: "The type dump was built from an older client revision.",
+                fix: "client",
+                fixLabel: "Open client data",
+            },
+        ],
         ticks: [3.1, 3.3, 3.0, 3.8, 4.2, 3.4, 3.2, 11.8, 3.5, 3.3, 3.1, 3.4],
     },
     {
-        name: "patchserver", role: "patch", realm: "", address: "127.0.0.1", port: 12500,
-        state: "unknown", word: "Offline", uptime: "", revision: "573f769",
-        sessions: null, players: null, limit: null, tickAverage: null, tickMax: null,
-        age: "4 min ago", stale: true, badges: [{ tone: "unknown", text: "Stopped" }], problems: [], ticks: [],
+        name: "patchserver",
+        role: "patch",
+        realm: "",
+        address: "127.0.0.1",
+        port: 12500,
+        state: "unknown",
+        word: "Offline",
+        uptime: "",
+        revision: "573f769",
+        sessions: null,
+        players: null,
+        limit: null,
+        tickAverage: null,
+        tickMax: null,
+        age: "4 min ago",
+        stale: true,
+        badges: [{ tone: "unknown", text: "Stopped" }],
+        problems: [],
+        ticks: [],
     },
 ];
 
 export const players = [
     { name: "Ember Stormweaver", level: "34", school: "Fire", zone: "Wizard City: Ravenwood", session: "1 h 12 min", realm: "Ambrose" },
     { name: "Talon Frostblade", level: "12", school: "Ice", zone: "Wizard City: Unicorn Way", session: "22 min", realm: "Ambrose" },
-    { name: "Nova Lifespring", level: "50", school: "Life", zone: "Krokotopia: Pyramid of the Sun", session: "3 h 4 min", realm: "Ambrose" },
+    {
+        name: "Nova Lifespring",
+        level: "50",
+        school: "Life",
+        zone: "Krokotopia: Pyramid of the Sun",
+        session: "3 h 4 min",
+        realm: "Ambrose",
+    },
     { name: "Quinn Deathwhisper", level: "7", school: "Death", zone: "Wizard City: Golem Court", session: "9 min", realm: "Ambrose" },
 ];
 
@@ -99,7 +158,10 @@ const clock = (minutes: number) => `${String(Math.floor(minutes / 60) % 24).padS
 export const playerHistory = {
     hour: lastHour.map((value, index) => ({ label: clock(8 * 60 + 12 + index * 5), value })),
     day: lastDay.map((value, index) => ({ label: clock((10 + index) * 60), value })),
-    week: lastWeek.map((value, index) => ({ label: `${weekDays[Math.floor((index * 6 + 12) / 24)]} ${clock(((index * 6 + 12) % 24) * 60)}`, value })),
+    week: lastWeek.map((value, index) => ({
+        label: `${weekDays[Math.floor((index * 6 + 12) / 24)]} ${clock(((index * 6 + 12) % 24) * 60)}`,
+        value,
+    })),
 };
 
 const lines = [
@@ -125,7 +187,14 @@ export type LogRecord = { sequence: number; seconds: number; time: string; level
 export function logRecord(index: number): LogRecord {
     const [level, category, message] = index >= 150 && index < 168 ? burst[index % burst.length] : lines[index % lines.length];
     const seconds = 9 * 3600 + index * 3;
-    return { sequence: 1000 + index, seconds, time: `2026-09-22 ${clock(Math.floor(seconds / 60))}:${String(seconds % 60).padStart(2, "0")}`, level, category, message };
+    return {
+        sequence: 1000 + index,
+        seconds,
+        time: `2026-09-22 ${clock(Math.floor(seconds / 60))}:${String(seconds % 60).padStart(2, "0")}`,
+        level,
+        category,
+        message,
+    };
 }
 
 export const logRecords = Array.from({ length: 240 }, (_, index) => logRecord(index));

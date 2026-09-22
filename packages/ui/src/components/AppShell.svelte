@@ -37,10 +37,7 @@
     </header>
     <div class="flex min-h-0 flex-1">
         {#if side}
-            <div
-                style="width: var(--ambrose-size-side-bar)"
-                class="hidden shrink-0 border-r border-edge-quiet bg-surface-chrome md:block"
-            >
+            <div style="width: var(--ambrose-size-side-bar)" class="hidden shrink-0 border-r border-edge-quiet bg-surface-chrome md:block">
                 {@render side()}
             </div>
         {/if}

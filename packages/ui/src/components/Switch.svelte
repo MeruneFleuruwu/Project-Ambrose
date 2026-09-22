@@ -26,7 +26,9 @@
             {disabled}
             class="ambrose-flip inline-flex h-22 w-40 shrink-0 items-center rounded-pill border border-edge-strong bg-surface-sunken px-4 data-[state=checked]:bg-fill-action disabled:opacity-50"
         >
-            <Switch.Thumb class="ambrose-flip block h-14 w-14 rounded-pill bg-fg-muted data-[state=checked]:translate-x-16 data-[state=checked]:bg-on-fill" />
+            <Switch.Thumb
+                class="ambrose-flip block h-14 w-14 rounded-pill bg-fg-muted data-[state=checked]:translate-x-16 data-[state=checked]:bg-on-fill"
+            />
         </Switch.Root>
     </div>
 </div>

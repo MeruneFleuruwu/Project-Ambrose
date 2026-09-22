@@ -30,15 +30,14 @@
         {/snippet}
     </DropdownMenu.Trigger>
     <DropdownMenu.Portal>
-        <DropdownMenu.Content
-            sideOffset={6}
-            class="ambrose-panel z-50 min-w-44 rounded-card border border-edge-strong bg-surface-card p-6"
-        >
+        <DropdownMenu.Content sideOffset={6} class="ambrose-panel z-50 min-w-44 rounded-card border border-edge-strong bg-surface-card p-6">
             {#each items as item (item.id)}
                 <DropdownMenu.Item
                     disabled={item.disabled}
                     onSelect={() => onchoose?.(item.id)}
-                    class="ambrose-flip flex min-h-44 cursor-default items-center gap-10 rounded-control px-12 text-15 data-highlighted:bg-surface-sunken data-disabled:opacity-50 {item.danger ? 'text-state-wrong' : 'text-fg-body'}"
+                    class="ambrose-flip flex min-h-44 cursor-default items-center gap-10 rounded-control px-12 text-15 data-highlighted:bg-surface-sunken data-disabled:opacity-50 {item.danger
+                        ? 'text-state-wrong'
+                        : 'text-fg-body'}"
                 >
                     {#if item.icon}
                         <Icon name={item.icon} size="15" />
