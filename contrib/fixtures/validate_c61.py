@@ -81,7 +81,14 @@ def main() -> int:
             expected_seconds = entry.get("seconds")
             if expected_seconds is not None and not isinstance(expected_seconds, int):
                 fail(f"{entry_id}: seconds must be an integer or null")
+            permanent = text.lower() in ("perm", "permanent")
+            if entry.get("special") is not None and entry.get("special") != "permanent":
+                fail(f"{entry_id}: special must be absent or 'permanent'")
+            if permanent != (entry.get("special") == "permanent"):
+                fail(f"{entry_id}: only perm and permanent carry special 'permanent'")
             if accepted:
+                if not isinstance(expected_seconds, int):
+                    fail(f"{entry_id}: an accepted entry must say how many seconds it yields")
                 actual = parse_duration(text)
                 if actual != expected_seconds:
                     fail(f"{entry_id}: expected {expected_seconds!r} for {text!r}, got {actual!r}")
