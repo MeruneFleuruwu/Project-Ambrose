@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Reads include paths with $ as the source folder, refuses missing released folders, badly named released files and duplicates, hashes files with CRLF normalized to LF, and applies pending updates released first, then by name.
+ * Reads include paths with $ as the source folder, refuses missing released folders, badly named released files and duplicates, hashes files with CRLF normalized to LF, and applies pending updates released first, then by name, passing again after any pass that applied something, so the files of a folder an update adds are applied in the same run.
  */
 
 #include "UpdateFetcher.h"
@@ -218,6 +218,34 @@ bool UpdateFetcher::CollectFiles(std::vector<UpdateFile>& files, std::string& er
 UpdateSummary UpdateFetcher::Update(std::string_view databaseLabel)
 {
     UpdateSummary summary;
+    std::set<std::string, std::less<>> warned;
+    for (std::size_t pass = 0; pass < MaxPasses; ++pass)
+    {
+        UpdateSummary const ran = Pass(databaseLabel, warned);
+        summary.Applied += ran.Applied;
+        if (!ran.Succeeded)
+        {
+            summary.Succeeded = false;
+            return summary;
+        }
+        if (ran.Applied != 0)
+            continue;
+        summary.AlreadyApplied = ran.AlreadyApplied;
+        summary.Changed = ran.Changed;
+        if (summary.Applied == 0)
+            LOG_INFO("sql.updates", "The {} database is up to date", databaseLabel);
+        else
+            LOG_INFO("sql.updates", "Applied {} update(s) to the {} database", summary.Applied, databaseLabel);
+        return summary;
+    }
+    LOG_ERROR("sql.updates", "The {} database still had updates to apply after {} passes, each finding files the last one did not", databaseLabel, MaxPasses);
+    summary.Succeeded = false;
+    return summary;
+}
+
+UpdateSummary UpdateFetcher::Pass(std::string_view databaseLabel, std::set<std::string, std::less<>>& warned)
+{
+    UpdateSummary summary;
     std::vector<UpdateFile> files;
     std::string error;
     if (!CollectFiles(files, error))
@@ -266,7 +294,8 @@ UpdateSummary UpdateFetcher::Update(std::string_view databaseLabel)
             if (!found->second.empty() && found->second != hash)
             {
                 ++summary.Changed;
-                LOG_WARN("sql.updates", "{} changed after it was applied to the {} database; the recorded hash is {}, the file's is {}", file.Name, databaseLabel, found->second, hash);
+                if (warned.insert(file.Name).second)
+                    LOG_WARN("sql.updates", "{} changed after it was applied to the {} database; the recorded hash is {}, the file's is {}", file.Name, databaseLabel, found->second, hash);
             }
             continue;
         }
@@ -306,10 +335,5 @@ UpdateSummary UpdateFetcher::Update(std::string_view databaseLabel)
         ++summary.Applied;
         LOG_INFO("sql.updates", "Applied {} {} to the {} database in {} ms", ToString(file.State), file.Name, databaseLabel, elapsed);
     }
-
-    if (summary.Applied == 0)
-        LOG_INFO("sql.updates", "The {} database is up to date", databaseLabel);
-    else
-        LOG_INFO("sql.updates", "Applied {} update(s) to the {} database", summary.Applied, databaseLabel);
     return summary;
 }

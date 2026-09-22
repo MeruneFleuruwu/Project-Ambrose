@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Tests SQL splitting, update names and LF-normalized hashes offline, and with AMBROSE_TEST_DB set runs the updater on fresh databases: base import, ordered and custom updates, bad names, failing files, and the repository's own login schema.
+ * Tests SQL splitting, update names and LF-normalized hashes offline, and with AMBROSE_TEST_DB set runs the updater on fresh databases: base import, ordered and custom updates, a folder an update adds applied in the same run, bad names, failing files, and the repository's own login schema.
  */
 
 #include "DBUpdater.h"
@@ -256,4 +256,31 @@ TEST(DBUpdaterTest, RepositoryLoginSchemaInstallsFromScratch)
     EXPECT_EQ(Count(*info, "SELECT COUNT(*) FROM `updates_include` WHERE `path` = '$/data/sql/updates/pending_db_login' AND `state` = 'PENDING'"), 1u);
     ASSERT_TRUE(DBUpdater::Run(*info, "login", UpdaterSettings{}));
     EXPECT_TRUE(log.Contains("The login database is up to date"));
+}
+
+TEST(DBUpdaterTest, AnUpdateThatAddsAFolderHasItsFilesAppliedInTheSameRun)
+{
+    std::optional<MySQLConnectionInfo> const info = TestDatabase("ambrose_updater_include");
+    if (!info)
+        GTEST_SKIP() << "AMBROSE_TEST_DB is not set";
+    DropDatabase(*info);
+    ScopeExit const drop([&info] { DropDatabase(*info); });
+    UpdaterSource source;
+    WriteFile(source.Updates() / "2026_01_01_00.sql",
+        "INSERT INTO `updates_include` (`path`, `state`) VALUES ('$/data/sql/updates/pending_db_test', 'PENDING');\n"
+        "CREATE TABLE `sequence` (`id` INT AUTO_INCREMENT PRIMARY KEY, `step` INT NOT NULL);\n");
+    WriteFile(source.Root() / "data" / "sql" / "updates" / "pending_db_test" / "2026_02_01_00.sql", "INSERT INTO `sequence` (`step`) VALUES (7);\n");
+
+    CapturedLog log;
+    UpdaterSettings settings;
+    settings.SourceDirectory = source.Root();
+    ASSERT_TRUE(DBUpdater::Run(*info, "test", settings));
+    EXPECT_EQ(Count(*info, "SELECT COUNT(*) FROM `updates` WHERE `name` = '2026_02_01_00.sql' AND `state` = 'PENDING'"), 1u);
+    EXPECT_EQ(Count(*info, "SELECT COUNT(*) FROM `sequence`"), 1u);
+    EXPECT_TRUE(log.Contains("Applied 2 update(s) to the test database"));
+    EXPECT_FALSE(log.Contains("The test database is up to date"));
+
+    ASSERT_TRUE(DBUpdater::Run(*info, "test", settings));
+    EXPECT_TRUE(log.Contains("The test database is up to date"));
+    EXPECT_EQ(Count(*info, "SELECT COUNT(*) FROM `sequence`"), 1u);
 }

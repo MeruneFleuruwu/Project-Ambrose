@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <functional>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -62,7 +63,11 @@ public:
     bool CollectFiles(std::vector<UpdateFile>& files, std::string& error) const;
     UpdateSummary Update(std::string_view databaseLabel);
 
+    static constexpr std::size_t MaxPasses = 8;
+
 private:
+    UpdateSummary Pass(std::string_view databaseLabel, std::set<std::string, std::less<>>& warned);
+
     MySQLConnection& _bookkeeping;
     std::filesystem::path _sourceDirectory;
     ApplyFunction _apply;
