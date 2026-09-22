@@ -1,10 +1,10 @@
 <!-- Project Ambrose by Imjustchico: JSON schemas, fixtures and compatibility checks for contributor-track API contracts. -->
 
-# C-56: Status API schema
+# Admin API schemas
 
-This directory contains the version-one `GET /api/status` contract from
-milestone 17.03, copied from `src/server/shared/Admin/AdminStatus.cpp` and the
-status API review in `doc/PANEL.md`.
+This directory holds the version-one JSON contracts for the admin API routes that milestone 17.03 shipped. Each one is copied from the encoder in `src/server/shared/Admin/AdminStatus.cpp` and the "Status API" section of `doc/PANEL.md`. Each has one fixture per app, a v2 file that shows an additive change, and a standard-library checker that validates the fixtures and refuses a v2 which drops or renames a v1 property.
+
+## C-56: `GET /api/status`
 
 The status response has these top-level fields:
 
@@ -19,10 +19,6 @@ The status response has these top-level fields:
 - `problems`: an array of `{code, message, subject}` objects.
 
 `address` and `port` are not status fields; they belong to `GET /api/apps`.
-The v2 schema is an additive compatibility example and the checker refuses
-removed or renamed v1 properties.
-
-Run from the repository root:
 
 ```powershell
 python contrib\schemas\check_status_schema.py
@@ -33,3 +29,22 @@ with `Admin.Enable = 1` and no client install, and saved what `GET /api/status`
 returned, which is why it carries the `install_missing` problem and a null
 `sessions`. `status-loginserver.json` is still a shape-faithful synthetic
 response derived from the encoder.
+
+## C-57: `GET /api/apps` and `GET /api/capabilities`
+
+`GET /api/apps` returns an array with one object per app, each holding `name`,
+`role`, `realm`, `address`, `port` and `revision`.
+
+`GET /api/capabilities` returns an object with:
+
+- `schema`
+- `reload_targets`
+- `schedule_actions`
+- `announcement_channels`
+- `problem_codes`, where each item is `{ "code": string, "description": string }`
+
+```powershell
+python contrib\schemas\check_c57_schemas.py
+```
+
+The fixtures are synthetic values built from the encoder contract.

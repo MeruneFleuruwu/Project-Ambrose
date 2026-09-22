@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "reload_targets": ["world", "config"],
+  "schedule_actions": ["restart", "backup"],
+  "announcement_channels": ["players", "admins"],
+  "problem_codes": [
+    { "code": "install_missing", "description": "The install is not ready for this revision." },
+    { "code": "type_dump_missing", "description": "A type dump has not been built for this revision." }
+  ]
+}
