@@ -34,6 +34,8 @@ The C-61 corpus is a deterministic list of duration strings for the server's ban
 parser and the helper in `src/common/Utilities/Duration.cpp`. It covers plain
 seconds, compound units, permanent bans, and malformed inputs the parser must
 reject.
+seconds, compound units, permanent bans, and the malformed inputs the parser
+must reject.
 
 Run its validator from the repository root:
 
