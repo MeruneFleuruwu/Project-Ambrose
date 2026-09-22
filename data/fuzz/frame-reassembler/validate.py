@@ -1,5 +1,5 @@
 # Project Ambrose by Imjustchico
-# Validates synthetic frame-reassembler seeds against the repository's length and boundary contract.
+# Validates synthetic frame-reassembler seeds against the repository's length and boundary contract, reading a long frame's declared length as the body alone, which is the FrameLimits default.
 
 import json
 import sys
@@ -37,11 +37,9 @@ def classify(data: bytes) -> str:
         payload = data[header_offset + 4:4 + length - 1]
     else:
         declared = int.from_bytes(data[4:8], "little")
-        if declared + 1 < minimum:
-            return "bad length"
         if declared > 0x100000:
             return "too large"
-        total = 8 + declared + 1
+        total = 8 + minimum + declared
         if len(data) < total:
             return "incomplete"
         payload = data[header_offset + 4:total - 1]

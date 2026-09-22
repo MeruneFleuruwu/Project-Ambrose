@@ -21,3 +21,5 @@ python data\fuzz\frame-reassembler\validate.py
 
 The validator checks every seed's provenance-free binary shape and confirms the
 expected result against the frame-length rules implemented in `src/server/shared/Network/Frame.cpp`.
+
+A long frame's declared length is the body alone, which is what `FrameLimits::LongLength` defaults to (`LongFrameLength::BodyOnly`). Under the other setting, `HeaderAndBody`, the same bytes give different answers, so a seed's expected result is only meaningful beside that setting.
