@@ -10,7 +10,7 @@
       "service": 7,
       "order": 27,
       "fields": {
-        "fixture": "empty-body-shape"
+        "fixture": "empty-body-request"
       }
     },
     {
@@ -21,6 +21,14 @@
       "order": 14,
       "fields": {
         "Error": 0
+        ,"UserID": 0
+        ,"Rec1": ""
+        ,"Reason": ""
+        ,"TimeStamp": ""
+        ,"PayingUser": 0
+        ,"Flags": 0
+        ,"SupportID": ""
+        ,"PublicPlayerName": ""
       }
     },
     {
@@ -32,14 +40,36 @@
       "fields": {
         "Status": 1
       }
+    },
+    {
+      "name": "character-list-end",
+      "direction": "server-to-client",
+      "message": "MSG_CHARACTERLIST",
+      "service": 7,
+      "order": 4,
+      "fields": {
+        "Error": 0
+      }
     }
   ],
   "exchanges": [
     {
       "name": "auth-response",
       "request_hex": "0df0090000000000071b040000",
-      "expected_response_hex": "0df0090000000000070e040000",
-      "response_bytes": 13
+      "expected_response_hex": "0df0270000000000070e220000000000000000000000000000000000000000000000000000000000000000",
+      "response_bytes": 43
+    },
+    {
+      "name": "admit-indication",
+      "request_hex": "0df0090000000000071b040000",
+      "expected_response_hex": "0df011000000000007140c00010000000000000000",
+      "response_bytes": 21
+    },
+    {
+      "name": "character-list-end",
+      "request_hex": "0df00900000000000708040000",
+      "expected_response_hex": "0df00d0000000000070408000000000000",
+      "response_bytes": 17
     }
   ]
 }

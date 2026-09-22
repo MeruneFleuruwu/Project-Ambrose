@@ -75,8 +75,11 @@ The validator renders each case using the documented short timestamp and
 
 `c74-login-replay.json`, `c74-wrong-password-replay.json`, and
 `c74-keepalive-replay.json` are capture-free version-1 manifests for the
-`contrib/tools/ambrose-capture-replayer/replay.py` tool. They contain only
-Ambrose-authored frame headers and message-definition metadata; they contain
-no client capture, credential, address, or payload bytes.
+`contrib/tools/ambrose-capture-replayer/replay.py` tool. The login vectors
+encode the message-definition bodies: success and refusal use distinct
+`MSG_USER_AUTHEN_RSP.Error` values, the successful sequence carries
+`MSG_USER_ADMIT_IND.Status=1`, and its character-list completion carries
+`MSG_CHARACTERLIST.Error=0`. They contain no client capture, credential,
+address, or client-derived payload bytes.
 
 Run `python contrib\fixtures\validate_c74.py` to validate the three manifests.
