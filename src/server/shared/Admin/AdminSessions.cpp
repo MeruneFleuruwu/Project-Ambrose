@@ -102,3 +102,11 @@ void AdminSessions::DropExpired(Clock::time_point now)
 {
     std::erase_if(_sessions, [this, now](auto const& entry) { return Expired(entry.second, now); });
 }
+
+std::optional<SessionHolder> AdminSessions::Hold(std::string_view secret)
+{
+    std::optional<std::string> csrf = Find(secret);
+    if (!csrf)
+        return std::nullopt;
+    return SessionHolder{ std::move(*csrf), std::string() };
+}

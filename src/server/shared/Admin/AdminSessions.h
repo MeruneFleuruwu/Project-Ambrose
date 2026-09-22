@@ -24,7 +24,21 @@ struct AdminSession
     std::string Csrf;
 };
 
-class AdminSessions
+struct SessionHolder
+{
+    std::string Csrf;
+    std::string Principal;
+};
+
+class SessionSource
+{
+public:
+    virtual ~SessionSource() = default;
+
+    virtual std::optional<SessionHolder> Hold(std::string_view secret) = 0;
+};
+
+class AdminSessions : public SessionSource
 {
 public:
     using Clock = std::chrono::steady_clock;
@@ -45,6 +59,7 @@ public:
 
     AdminSession Open();
     std::optional<std::string> Find(std::string_view secret);
+    std::optional<SessionHolder> Hold(std::string_view secret) override;
     bool Close(std::string_view secret);
     void CloseAll();
     std::size_t Count() const;

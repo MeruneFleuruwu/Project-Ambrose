@@ -277,16 +277,19 @@ AdminAuthResult AdminRouter::Authenticate(AdminRequest& request) const
     {
         if (std::optional<std::string> const secret = SessionSecret(request))
         {
-            if (std::optional<std::string> const csrf = browser.Sessions->Find(*secret))
+            if (std::optional<SessionHolder> const held = browser.Sessions->Hold(*secret))
             {
+                std::string const& csrf = held->Csrf;
                 std::string const method = Ambrose::ToUpper(request.Method);
                 bool const changes = Unsafe(method);
                 if ((changes || request.Upgrade) && !Ambrose::EqualsIgnoreCase(request.Origin, ExpectedOrigin(request)))
                     return AdminAuthResult::Forbidden;
-                if (changes && !request.Upgrade && !Ambrose::Crypto::ConstantTimeEquals(request.Csrf, *csrf))
+                if (changes && !request.Upgrade && !Ambrose::Crypto::ConstantTimeEquals(request.Csrf, csrf))
                     return AdminAuthResult::Forbidden;
-                request.SessionCsrf = *csrf;
-                request.Principal = "session:" + Base64::Encode(SHA256::GetDigestOf(*secret), Base64::Alphabet::UrlSafe, Base64::Padding::Omitted).substr(0, 16);
+                request.SessionCsrf = csrf;
+                request.Principal = held->Principal.empty()
+                    ? "session:" + Base64::Encode(SHA256::GetDigestOf(*secret), Base64::Alphabet::UrlSafe, Base64::Padding::Omitted).substr(0, 16)
+                    : held->Principal;
                 return AdminAuthResult::Ok;
             }
         }

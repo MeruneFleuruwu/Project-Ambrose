@@ -7,6 +7,7 @@
 #define AMBROSE_ADMINROUTER_H
 
 #include "AdminAuth.h"
+#include "AdminSessions.h"
 #include "TrustedProxies.h"
 
 #include <atomic>
@@ -19,7 +20,6 @@
 #include <utility>
 #include <vector>
 
-class AdminSessions;
 
 struct AdminRequest
 {
@@ -52,7 +52,7 @@ struct AdminResponse
 
 struct AdminBrowserAccess
 {
-    AdminSessions* Sessions = nullptr;
+    SessionSource* Sessions = nullptr;
     std::string CookieName;
     bool Secure = false;
 };

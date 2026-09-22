@@ -1,34 +1,41 @@
 /*
  * Project Ambrose by Imjustchico
- * Hashes with libsodium's Argon2id at its interactive cost, which is what a sign-in can afford to wait for, and keeps only the hash string it produces, which carries its own parameters so an older row still opens after the cost is raised; a sign-in that names nobody, or a disabled account, still spends one verify against a hash made at start, so an attacker cannot tell the three refusals apart by how long they took, and every refusal answers the same way.
+ * Hashes with Botan's Argon2id at a cost a sign-in can afford to wait for, keeping only the PHC string it produces, which carries its own parameters so a row hashed at an older cost still opens after the cost is raised; a sign-in that names nobody, or a disabled account, still spends one verify against a hash made at start, so an attacker cannot tell the three refusals apart by how long they took, and every refusal answers the same way.
  */
 
 #include "PanelUsers.h"
 #include "StringUtil.h"
 
-#include <sodium.h>
+#include <botan/argon2fmt.h>
+#include <botan/system_rng.h>
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <mutex>
 #include <utility>
 
 namespace
 {
-    std::once_flag SodiumReady;
+    constexpr std::size_t Lanes = 1;
+    constexpr std::size_t MemoryKiB = 64 * 1024;
+    constexpr std::size_t Passes = 3;
+    constexpr uint8 Argon2idFamily = 2;
+
+    std::once_flag DecoyReady;
     std::string DecoyHash;
 
-    void StartSodium()
+    std::string MakeHash(std::string_view password)
     {
-        std::call_once(SodiumReady, []
+        return Botan::argon2_generate_pwhash(password.data(), password.size(), Botan::system_rng(), Lanes, MemoryKiB, Passes, Argon2idFamily);
+    }
+
+    void StartDecoy()
+    {
+        std::call_once(DecoyReady, []
         {
-            if (sodium_init() < 0)
-                return;
-            char hash[crypto_pwhash_STRBYTES] = {};
-            constexpr char const* Nothing = "there is no such user";
-            if (crypto_pwhash_str(hash, Nothing, std::char_traits<char>::length(Nothing),
-                    crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE) == 0)
-                DecoyHash.assign(hash);
+            constexpr std::string_view Nothing = "there is no such user";
+            DecoyHash = MakeHash(Nothing);
         });
     }
 }
@@ -49,7 +56,7 @@ PanelUserResult PanelPasswordPolicy::Check(std::string_view username, std::strin
 
 PanelUsers::PanelUsers(PanelStore& store) : _store(store)
 {
-    StartSodium();
+    StartDecoy();
 }
 
 void PanelUsers::SetPolicy(PanelPasswordPolicy policy)
@@ -87,23 +94,30 @@ std::string_view PanelUsers::Explain(PanelUserResult result) noexcept
 
 bool PanelUsers::HashPassword(std::string_view password, std::string& hash, std::string& error)
 {
-    StartSodium();
-    char made[crypto_pwhash_STRBYTES] = {};
-    if (crypto_pwhash_str(made, password.data(), password.size(), crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0)
+    try
     {
-        error = "the password could not be hashed; the machine may be out of memory";
+        hash = MakeHash(password);
+    }
+    catch (std::exception const& failure)
+    {
+        error = fmt::format("the password could not be hashed: {}", failure.what());
         return false;
     }
-    hash.assign(made);
-    return true;
+    return !hash.empty();
 }
 
 bool PanelUsers::PasswordMatches(std::string const& hash, std::string_view password)
 {
-    StartSodium();
-    if (hash.empty() || hash.size() >= crypto_pwhash_STRBYTES)
+    if (hash.empty())
         return false;
-    return crypto_pwhash_str_verify(hash.c_str(), password.data(), password.size()) == 0;
+    try
+    {
+        return Botan::argon2_check_pwhash(password.data(), password.size(), hash);
+    }
+    catch (std::exception const&)
+    {
+        return false;
+    }
 }
 
 PanelUser PanelUsers::Read(PanelStore::Statement const& row)
@@ -218,6 +232,7 @@ PanelUserResult PanelUsers::Authenticate(std::string_view username, std::string_
     {
         if (!error.empty())
             return PanelUserResult::StoreFailed;
+        StartDecoy();
         PasswordMatches(DecoyHash, password);
         return PanelUserResult::UnknownUser;
     }
