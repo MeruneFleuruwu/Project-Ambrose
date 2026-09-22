@@ -25,6 +25,8 @@ A change on this track touches only these paths:
 | `data/fuzz/` | Seed inputs for the fuzzers that already exist |
 | `doc/guides/` | Guides: running on a distribution, a graphics card, a language, a setup that needed a workaround |
 | `contrib/locale/` | Translations of Ambrose's own text, never the game's |
+| `contrib/fixtures/` | Sample data in the shapes the panel and the servers exchange, hand-written or generated and never captured: status responses, app lists, log records, metric series |
+| `contrib/schemas/` | JSON Schemas for those shapes, and the corpora with expected answers a loader or parser is tested against |
 
 Nothing else. Not `src/`, not `apps/` beyond the scenarios folder, not `doc/` beyond guides, not the phase files, not doc/ARCHITECTURE.md, doc/DESIGN.md, doc/PANEL.md, doc/UI-STACK.md, doc/ROADMAP.md, CMake files, CI files or the vcpkg manifest. A pull request that touches anything else is closed with a pointer to this document, because it cannot be merged without stopping a milestone in flight.
 
