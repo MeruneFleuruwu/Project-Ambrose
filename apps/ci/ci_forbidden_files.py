@@ -1,5 +1,5 @@
 # Project Ambrose by Imjustchico
-# Fails when the tree contains client game files, captures, protocol definitions, type dumps, local config, or oversized files.
+# Fails when the tree contains client game files, captures, protocol definitions, type dumps, local config, private keys, a panel or game store, a log, or oversized files.
 import argparse
 import json
 import os
@@ -15,7 +15,16 @@ FORBIDDEN_EXTENSIONS = {
     ".kfm": "client animation",
     ".pcap": "packet capture",
     ".pcapng": "packet capture",
+    ".key": "private key",
+    ".pem": "private key or certificate",
+    ".pfx": "private key bundle",
+    ".p12": "private key bundle",
+    ".sqlite3": "store holding operators and sessions",
+    ".sqlite": "store holding operators and sessions",
+    ".log": "log",
+    ".token": "token",
 }
+PRIVATE_KEY = re.compile(rb"-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----")
 PROTOCOL_XML = re.compile(r"\s*(<\?xml[^>]*\?>\s*)?<[A-Za-z0-9_]*Messages>\s*<_ProtocolInfo>")
 
 
@@ -28,6 +37,12 @@ def check_file(relpath, raw):
         problems.append(f"{FORBIDDEN_EXTENSIONS[extension]} files must never be committed")
     if name.endswith(".conf"):
         problems.append("local config must not be committed; commit a .conf.dist template instead")
+    if name.endswith(".secret"):
+        problems.append("secret files must never be committed; an app makes its own beside its config")
+    if PRIVATE_KEY.search(raw[:8192]):
+        problems.append("content holds a private key; a listener reads its key from a path the operator names")
+    if raw.startswith(b"SQLite format 3" + bytes([0])):
+        problems.append("content is a SQLite store; the panel keeps its operators and sessions in the data folder, not the repository")
     if raw.startswith(b"KIWAD"):
         problems.append("content is a KIWAD client archive")
     if raw.startswith(b"BINd"):

@@ -1,5 +1,5 @@
 # Project Ambrose by Imjustchico
-# Self-tests for the forbidden file scan, the contributor track path check, the commit trailer check, the build stages, the vcpkg cache key, the usage count, and the build leg selection against fakes, a real git repository and a fake Actions API.
+# Self-tests for the forbidden file scan, including the key, store, log and token material it keeps out, the contributor track path check, the commit trailer check, the build stages, the vcpkg cache key, the usage count, and the build leg selection against fakes, a real git repository and a fake Actions API.
 import argparse
 import datetime
 import json
@@ -54,6 +54,23 @@ class ForbiddenFileTests(unittest.TestCase):
 
     def test_type_dump_json_is_forbidden(self):
         self.assertForbidden("data/dump.json", b'{"version": 1, "classes": {}}', "type dump")
+
+    def test_secret_material_is_forbidden_by_name(self):
+        self.assertForbidden("build/panel.key", b"", "private key")
+        self.assertForbidden("certs/panel.pem", b"", "private key")
+        self.assertForbidden("data/panel.sqlite3", b"", "store holding operators")
+        self.assertForbidden("logs/Supervisor.log", b"", "log")
+        self.assertForbidden("run/admin.token", b"", "token")
+        self.assertForbidden("run/panel.secret", b"", "secret")
+
+    def test_private_key_content_is_forbidden_under_any_name(self):
+        opening = b"-----BEGIN " + b"PRIVATE KEY-----"
+        self.assertForbidden("doc/notes.txt", opening + b"\nMIIsomething\n", "holds a private key")
+        self.assertForbidden("README.md", b"-----BEGIN RSA " + b"PRIVATE KEY-----\n", "holds a private key")
+
+    def test_sqlite_store_content_is_forbidden_under_any_name(self):
+        self.assertForbidden("data/notes.dat", b"SQLite format 3" + bytes([0]) + b"rest", "SQLite store")
+        self.assertAllowed("doc/PANEL.md", b"The panel keeps a SQLite format 3 store in the data folder.\n")
 
     def test_local_config_is_forbidden_but_template_is_allowed(self):
         self.assertForbidden("conf/gameserver.conf", b"# Project Ambrose by Imjustchico\n", "local config")
