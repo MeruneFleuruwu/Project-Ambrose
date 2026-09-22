@@ -1,5 +1,5 @@
 # Project Ambrose by Imjustchico
-# Keeps one Discord message showing the project's progress: when a push to main changes the generated numbers it renders the card, edits that message in place rather than posting another, and remembers its id on the progress-state branch, skipping quietly when the repository has no webhook secret.
+# Keeps one Discord message showing the project's progress: when a push to main changes the generated numbers it renders the card, edits that message in place rather than posting another, and remembers its id on the progress-state branch, doing nothing at all when the repository has no webhook secret.
 name: progress
 
 on:
@@ -18,36 +18,54 @@ permissions:
 jobs:
   announce:
     name: announce
+    if: ${{ github.repository == 'Justchicoo/Project-Ambrose' }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 2
+      - name: Look for the webhook
+        id: webhook
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_PROGRESS_WEBHOOK }}
+        run: |
+          if [ -n "$WEBHOOK" ]; then
+            echo "present=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=no" >> "$GITHUB_OUTPUT"
+            echo "No DISCORD_PROGRESS_WEBHOOK secret, so there is nothing to update." >> "$GITHUB_STEP_SUMMARY"
+          fi
       - uses: actions/setup-node@v6
+        if: steps.webhook.outputs.present == 'yes'
         with:
           node-version: "24"
       - name: Render the card
+        if: steps.webhook.outputs.present == 'yes'
         run: |
           npm install --no-save --no-audit --no-fund playwright@1.63.0
           npx playwright install --with-deps chromium
           node apps/progress/render.mjs doc/progress/progress.svg progress.png
       - name: Read the remembered message
+        if: steps.webhook.outputs.present == 'yes'
         run: |
-          git fetch origin progress-state:progress-state 2>/dev/null || echo "no state branch yet"
-          git show progress-state:discord-message.json > discord-message.json 2>/dev/null || echo "no remembered message yet"
+          if git fetch origin progress-state:progress-state 2>/dev/null; then
+            git show progress-state:discord-message.json > remembered.json 2>/dev/null || rm -f remembered.json
+          fi
+          test -s remembered.json && echo "the message to edit is remembered" || echo "no message remembered yet, one will be posted"
       - name: Update the Discord message
+        if: steps.webhook.outputs.present == 'yes'
         env:
           WEBHOOK: ${{ secrets.DISCORD_PROGRESS_WEBHOOK }}
-        run: python apps/progress/announce.py --webhook-env WEBHOOK --attach progress.png --state discord-message.json
+        run: python apps/progress/announce.py --webhook-env WEBHOOK --attach progress.png --state remembered.json
       - name: Remember the message
-        if: ${{ hashFiles('discord-message.json') != '' }}
+        if: steps.webhook.outputs.present == 'yes'
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          rm -rf state && mkdir state && cp discord-message.json state/
+          test -s remembered.json || exit 0
+          python -c "import json,sys; sys.exit(0 if json.load(open('remembered.json')).get('message_id') else 1)"
+          rm -rf state && mkdir state && cp remembered.json state/discord-message.json
           cd state
           git init -q -b progress-state
           git add discord-message.json
-          git commit -q -m "Progress: the Discord message this repository keeps updating"
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -q -m "Progress: the Discord message this repository keeps updating"
           git push -q --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" progress-state

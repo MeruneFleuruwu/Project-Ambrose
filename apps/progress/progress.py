@@ -1,11 +1,10 @@
 # Project Ambrose by Imjustchico
-# Reads the roadmap phases and the contributor track and writes the project's progress as a card anyone can read at a glance, the numbers behind it, and a badge endpoint, with a check mode that fails when any of them is out of date.
+# Reads the roadmap phases and the contributor track and writes the project's progress as a card anyone can read at a glance, the numbers behind it, and a badge endpoint, with a check mode that fails when any of them is out of date. None of them carries a commit or a date, because a generated file that names the commit it came from is stale the moment it is committed.
 
 import argparse
 import json
 import os
 import re
-import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -16,9 +15,6 @@ OUT_DIR = os.path.join("doc", "progress")
 CARD = os.path.join(OUT_DIR, "progress.svg")
 DATA = os.path.join(OUT_DIR, "progress.json")
 BADGE = os.path.join(OUT_DIR, "badge.json")
-
-PHASE_TITLES = {}
-
 
 def read(root, relative):
     with open(os.path.join(root, relative), "r", encoding="utf-8") as handle:
@@ -94,15 +90,6 @@ def measure(root):
     }
 
 
-def revision(root):
-    try:
-        out = subprocess.run(["git", "-C", root, "log", "-1", "--format=%h %cs"], capture_output=True, text=True, check=True)
-        commit, date = out.stdout.strip().split()
-        return commit, date
-    except (OSError, subprocess.CalledProcessError, ValueError):
-        return "unknown", "unknown"
-
-
 def bar(x, y, width, height, fraction, track_colour, fill_colour, radius=None):
     radius = height / 2 if radius is None else radius
     filled = max(0.0, min(1.0, fraction)) * width
@@ -116,7 +103,7 @@ def escape(text):
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def card(data, palette, commit, date):
+def card(data, palette):
     page = palette.get("surface-page", "#0B1020")
     panel = palette.get("surface-card", "#131B31")
     sunken = palette.get("surface-sunken", "#0E1527")
@@ -176,7 +163,7 @@ def card(data, palette, commit, date):
     out.append(f'<text x="40" y="{footer}" font-family="{sans}" font-size="12" fill="{muted}">'
                f'Contributors: <tspan font-family="{mono}" fill="{teal}">{track["merged"]}</tspan> items merged, '
                f'<tspan font-family="{mono}">{track["open"]}</tspan> open</text>')
-    out.append(f'<text x="{width - 40}" y="{footer}" text-anchor="end" font-family="{mono}" font-size="12" fill="{muted}">{date} · {commit}</text>')
+    out.append(f'<text x="{width - 40}" y="{footer}" text-anchor="end" font-family="{sans}" font-size="12" fill="{muted}">Counted from the roadmap itself</text>')
     out.append('</svg>')
     return "\n".join(out) + "\n"
 
@@ -195,12 +182,9 @@ def badge(data):
 
 def outputs(root):
     data = measure(root)
-    commit, date = revision(root)
-    stamped = dict(data)
-    stamped["updated"] = {"commit": commit, "date": date}
     return {
-        DATA: json.dumps(stamped, indent=2) + "\n",
-        CARD: card(data, colours(root), commit, date),
+        DATA: json.dumps(data, indent=2) + "\n",
+        CARD: card(data, colours(root)),
         BADGE: badge(data),
     }
 
