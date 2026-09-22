@@ -277,7 +277,7 @@ than as zero.
 What it does not ship, we write: a crosshair tooltip plugin of about eighty lines, a legend built from real
 buttons, and no stacked series. None of that is waste, because the legend and the table view have to be our own
 markup to meet the accessibility rule anyway. Its npm release is eighteen months old while its repository is
-active, so pin 1.6.32, keep the wrapper as the only place that touches its API, and expect a version 2 with
+active, so pin 1.6.32, keep the wrapper, `packages/ui/src/internal/plot.ts`, as the only place that touches its API, and expect a version 2 with
 breaking changes eventually. It is essentially one author, which MIT and about 50 kB of vendorable source makes
 a survivable risk rather than a frightening one.
 

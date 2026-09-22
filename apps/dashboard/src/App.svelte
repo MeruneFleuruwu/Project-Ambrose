@@ -1,4 +1,4 @@
-<!-- Project Ambrose by Imjustchico: The panel frame on the shadcn-svelte sidebar: the sections built from the route table, collapsible to icons on a desktop and a drawer on a phone, a top bar with the breadcrumb and the signed-in user's menu, a search button that opens the command palette, the light and dark choice in the user's menu, toasts in the corner, the page the address names after its hash, and the access-denied page for a route the viewer may not use. -->
+<!-- Project Ambrose by Imjustchico: The panel frame on the shadcn-svelte sidebar: the sections built from the route table, collapsible to icons on a desktop and a drawer on a phone, a top bar with the breadcrumb and the signed-in user's menu, a search button that opens the command palette, the light and dark choice in the user's menu, toasts in the corner, the page the address names after its hash with its code fetched on first visit, and the access-denied page for a route the viewer may not use. -->
 <script lang="ts">
     import * as Avatar from "$lib/components/ui/avatar/index.js";
     import * as Breadcrumb from "$lib/components/ui/breadcrumb/index.js";
@@ -8,22 +8,18 @@
     import { Badge } from "$lib/components/ui/badge/index.js";
     import { Button } from "$lib/components/ui/button/index.js";
     import { Separator } from "$lib/components/ui/separator/index.js";
+    import { Skeleton } from "$lib/components/ui/skeleton/index.js";
     import { Toaster } from "$lib/components/ui/sonner/index.js";
     import { chooseTheme, theme, type ThemeChoice } from "$lib/theme.svelte.js";
     import ChevronsUpDownIcon from "@lucide/svelte/icons/chevrons-up-down";
     import LogOutIcon from "@lucide/svelte/icons/log-out";
+    import RotateCcwIcon from "@lucide/svelte/icons/rotate-ccw";
     import SearchIcon from "@lucide/svelte/icons/search";
     import SparklesIcon from "@lucide/svelte/icons/sparkles";
     import UserCogIcon from "@lucide/svelte/icons/user-cog";
     import CommandPalette from "./components/CommandPalette.svelte";
     import { findRoute, routes } from "./routes";
-    import Overview from "./pages/Overview.svelte";
-    import Servers from "./pages/Servers.svelte";
-    import Logs from "./pages/Logs.svelte";
-    import Console from "./pages/Console.svelte";
     import Lists from "./pages/Lists.svelte";
-    import ClientData from "./pages/ClientData.svelte";
-    import Settings from "./pages/Settings.svelte";
     import Denied from "./pages/Denied.svelte";
 
     const granted = new Set(routes.map((route) => route.permission));
@@ -184,22 +180,32 @@
                     title="Access denied"
                     detail={`${route.title} needs the ${route.permission} permission, which your role does not grant.`}
                 />
-            {:else if route.path === "overview"}
-                <Overview />
-            {:else if route.path === "servers"}
-                <Servers />
-            {:else if route.path === "logs"}
-                <Logs />
-            {:else if route.path === "console"}
-                <Console />
-            {:else if route.path === "client"}
-                <ClientData />
-            {:else if route.path === "settings"}
-                <Settings />
-            {:else if route.path === "denied"}
+            {:else if route.page === "denied"}
                 <Denied title="Access denied" detail="This page is where a link you may not follow lands." />
-            {:else}
+            {:else if route.page === "list"}
                 <Lists which={route.path} title={route.title} />
+            {:else}
+                {#await route.page()}
+                    <div class="space-y-3" aria-busy="true" aria-label={`Loading ${route.title}`}>
+                        <Skeleton class="h-9 w-56" />
+                        <Skeleton class="h-4 w-80 max-w-full" />
+                        <Skeleton class="h-48 w-full" />
+                    </div>
+                {:then loaded}
+                    <loaded.default />
+                {:catch}
+                    <div
+                        role="alert"
+                        class="flex flex-1 flex-col items-center justify-center gap-4 rounded-xl border border-destructive/30 bg-destructive/5 p-12 text-center"
+                    >
+                        <h1 class="font-serif text-2xl font-semibold">{route.title} did not load</h1>
+                        <p class="max-w-md text-sm text-muted-foreground">
+                            The panel could not fetch this page's code, usually because a newer build replaced the one this tab started
+                            with, or the connection dropped.
+                        </p>
+                        <Button variant="outline" onclick={() => window.location.reload()}><RotateCcwIcon />Reload the panel</Button>
+                    </div>
+                {/await}
             {/if}
         </main>
     </Sidebar.Inset>

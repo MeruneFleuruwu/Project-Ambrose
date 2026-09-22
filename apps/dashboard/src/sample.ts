@@ -152,16 +152,17 @@ export const activity = [
 const lastHour = [7, 7, 8, 7, 8, 8, 9, 10, 9, 9, 8, 9, 9];
 const lastDay = [6, 8, 11, 12, 14, 17, 20, 23, 26, 29, 31, 28, 22, 15, 10, 6, 4, 3, 2, 2, 3, 5, 7, 9];
 const lastWeek = [14, 27, 9, 3, 13, 25, 8, 3, 15, 29, 10, 4, 16, 33, 12, 5, 19, 38, 15, 6, 18, 36, 13, 4, 14, 31, 10, 7];
-const weekDays = ["Tue 15", "Wed 16", "Thu 17", "Fri 18", "Sat 19", "Sun 20", "Mon 21", "Tue 22"];
 const clock = (minutes: number) => `${String(Math.floor(minutes / 60) % 24).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+const now = Date.UTC(2026, 8, 22, 13, 12) / 1000;
+const history = (values: number[], step: number, last: number) => ({
+    times: values.map((_value, index) => last - (values.length - 1 - index) * step),
+    values,
+});
 
 export const playerHistory = {
-    hour: lastHour.map((value, index) => ({ label: clock(8 * 60 + 12 + index * 5), value })),
-    day: lastDay.map((value, index) => ({ label: clock((10 + index) * 60), value })),
-    week: lastWeek.map((value, index) => ({
-        label: `${weekDays[Math.floor((index * 6 + 12) / 24)]} ${clock(((index * 6 + 12) % 24) * 60)}`,
-        value,
-    })),
+    hour: history(lastHour, 300, now),
+    day: history(lastDay, 3600, now - 12 * 60),
+    week: history(lastWeek, 6 * 3600, Date.UTC(2026, 8, 22, 10, 0) / 1000),
 };
 
 const lines = [

@@ -64,9 +64,9 @@
 }
 
 @theme inline {
-    --font-sans: Karla, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-    --font-serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
-    --font-mono: "JetBrains Mono", "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
+    --font-sans: var(--ambrose-font-interface);
+    --font-serif: var(--ambrose-font-display);
+    --font-mono: var(--ambrose-font-mono);
     --radius-sm: calc(var(--radius) - 4px);
     --radius-md: calc(var(--radius) - 2px);
     --radius-lg: var(--radius);

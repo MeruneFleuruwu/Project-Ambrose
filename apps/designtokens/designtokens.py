@@ -292,7 +292,7 @@ def generate_variables(tokens):
     lines = [
         "/*",
         f" * {BRAND}",
-        " * Generated from design/tokens.json: the semantic colours, sizes and durations as plain custom properties with the light remap, and no Tailwind theme, for a surface that keeps Tailwind's own scales.",
+        " * Generated from design/tokens.json: the semantic colours, sizes, durations and font families as plain custom properties with the light remap, and no Tailwind theme, for a surface that keeps Tailwind's own scales.",
         " */",
         "",
     ]
@@ -329,6 +329,8 @@ def variable_lines(tokens):
         lines.append(f"    --ambrose-size-{name}: {tokens.resolve('component.size.' + name)};")
     for name in tokens.leaf_names("primitive.duration"):
         lines.append(f"    --ambrose-duration-{name}: {tokens.resolve('primitive.duration.' + name)};")
+    for name in tokens.leaf_names("primitive.family"):
+        lines.append(f"    --ambrose-font-{name}: {css_font(tokens.resolve('primitive.family.' + name))};")
     lines.append("}")
     lines.append("")
     lines.append(f':root[data-density="compact"] {{')

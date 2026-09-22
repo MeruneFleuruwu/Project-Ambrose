@@ -1,7 +1,8 @@
-<!-- Project Ambrose by Imjustchico: One series drawn small with no axes and no animation, always beside a table of the same numbers, because a canvas is not something a screen reader can read. -->
+<!-- Project Ambrose by Imjustchico: One series drawn small with no axes and no animation, refilled in place as readings arrive, always beside a table of the same numbers, because a canvas is not something a screen reader can read. -->
 <script lang="ts">
-    import uPlot from "uplot";
+    import { untrack } from "svelte";
     import { classes } from "../internal/classes";
+    import { mountPlot, type Plot } from "../internal/plot";
     import { seriesColors } from "../tokens/tokens";
 
     type Props = {
@@ -18,7 +19,7 @@
 
     let holder = $state<HTMLDivElement | undefined>(undefined);
     let width = $state(160);
-    let chart: uPlot | undefined;
+    let plot = $state.raw<Plot | undefined>(undefined);
 
     const stroke = $derived(seriesColors[theme][0]);
 
@@ -45,32 +46,40 @@
         if (!holder) {
             return;
         }
-        const data: uPlot.AlignedData = [times, values];
-        chart?.destroy();
-        chart = new uPlot(
-            {
+        const target = holder;
+        const color = stroke;
+        const created = untrack(() =>
+            mountPlot(target, {
                 width,
                 height,
-                cursor: { show: false },
-                legend: { show: false },
-                axes: [{ show: false }, { show: false }],
-                scales: { x: { time: false } },
-                series: [{}, { stroke, width: 1.5, spanGaps: false, points: { show: false } }],
-            },
-            data,
-            holder,
+                times,
+                series: [{ values, color, fill: false, shown: true }],
+                top: null,
+                time: false,
+                cursor: null,
+                drawn: null,
+            }),
         );
+        plot = created;
         return () => {
-            chart?.destroy();
-            chart = undefined;
+            created.destroy();
+            plot = undefined;
         };
+    });
+
+    $effect(() => {
+        plot?.update(times, [{ values, color: stroke, fill: false, shown: true }], null);
+    });
+
+    $effect(() => {
+        plot?.resize(width, height);
     });
 </script>
 
-<figure class={classes("flex flex-col gap-6", extra)}>
-    <figcaption class="sr-only">{label}</figcaption>
-    <div bind:this={holder} aria-hidden="true" class="w-full"></div>
-    <table class="sr-only">
+<figure class={classes("sparkline", extra)}>
+    <figcaption class="hidden-text">{label}</figcaption>
+    <div bind:this={holder} aria-hidden="true" class="holder"></div>
+    <table class="hidden-text">
         <caption>{label}</caption>
         <thead>
             <tr><th scope="col">Point</th><th scope="col">{unit ?? "Value"}</th></tr>
@@ -82,3 +91,24 @@
         </tbody>
     </table>
 </figure>
+
+<style>
+    .sparkline {
+        display: flex;
+        flex-direction: column;
+        margin: 0;
+    }
+
+    .holder {
+        width: 100%;
+    }
+
+    .hidden-text {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+</style>

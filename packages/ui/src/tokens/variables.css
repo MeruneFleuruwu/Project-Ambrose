@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Generated from design/tokens.json: the semantic colours, sizes and durations as plain custom properties with the light remap, and no Tailwind theme, for a surface that keeps Tailwind's own scales.
+ * Generated from design/tokens.json: the semantic colours, sizes, durations and font families as plain custom properties with the light remap, and no Tailwind theme, for a surface that keeps Tailwind's own scales.
  */
 
 :root {
@@ -132,6 +132,9 @@
     --ambrose-duration-hover: 120ms;
     --ambrose-duration-panel: 200ms;
     --ambrose-duration-screen: 320ms;
+    --ambrose-font-display: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+    --ambrose-font-interface: Karla, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    --ambrose-font-mono: "JetBrains Mono", "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
 }
 
 :root[data-density="compact"] {

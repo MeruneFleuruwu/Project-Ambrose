@@ -1,5 +1,6 @@
 <!-- Project Ambrose by Imjustchico: The overview: four headline figures with a line on what each means, one card per app with its state, place, uptime, build, sessions, players against the limit, tick times and their chart, badges, problems with the button that fixes each, the age of the sample and its power buttons, then players online over a chosen span beside the panel's latest activity. -->
 <script lang="ts">
+    import { Sparkline, TimeSeries } from "@ambrose/ui";
     import * as Avatar from "$lib/components/ui/avatar/index.js";
     import * as Card from "$lib/components/ui/card/index.js";
     import * as Select from "$lib/components/ui/select/index.js";
@@ -13,10 +14,9 @@
     import PlayIcon from "@lucide/svelte/icons/play";
     import RotateCcwIcon from "@lucide/svelte/icons/rotate-ccw";
     import SquareIcon from "@lucide/svelte/icons/square";
-    import AreaChart from "../components/AreaChart.svelte";
     import PageHeader from "../components/PageHeader.svelte";
-    import Sparkline from "../components/Sparkline.svelte";
     import StatusBadge from "../components/StatusBadge.svelte";
+    import { theme } from "$lib/theme.svelte.js";
     import { openFor } from "../focus.svelte";
     import { requestPower } from "../power";
     import { activity, apps, playerHistory } from "../sample";
@@ -26,7 +26,13 @@
     const players = apps.reduce((total, app) => total + (app.players ?? 0), 0);
     const sessions = apps.reduce((total, app) => total + (app.sessions ?? 0), 0);
     const problems = apps.flatMap((app) => app.problems);
-    const peak = playerHistory.day.reduce((best, point) => (point.value > best.value ? point : best));
+    const peakAt = playerHistory.day.values.indexOf(Math.max(...playerHistory.day.values));
+    const peak = {
+        value: playerHistory.day.values[peakAt],
+        label: new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(
+            new Date(playerHistory.day.times[peakAt] * 1000),
+        ),
+    };
 
     const figures = [
         {
@@ -153,7 +159,15 @@
                     </div>
                 {/if}
                 {#if app.ticks.length > 0}
-                    <Sparkline label="Tick time over the last minute" values={app.ticks} unit="ms" />
+                    <Sparkline
+                        label="Tick time over the last minute"
+                        times={app.ticks.map((_value, index) => index)}
+                        values={app.ticks}
+                        unit="ms"
+                        theme={theme.resolved}
+                        height={56}
+                    />
+                    <p class="text-xs text-muted-foreground">Tick time over the last minute</p>
                 {/if}
                 {#each app.problems as problem (problem.code)}
                     <div class="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
@@ -215,7 +229,15 @@
             </Card.Action>
         </Card.Header>
         <Card.Content class="flex flex-1 flex-col">
-            <AreaChart label={`Players online, ${spanLabel.toLowerCase()}`} points={playerHistory[span]} unit="players" class="flex-1" />
+            <TimeSeries
+                label={`Players online, ${spanLabel.toLowerCase()}`}
+                unit="players"
+                times={playerHistory[span].times}
+                series={[{ label: "Players", values: playerHistory[span].values }]}
+                theme={theme.resolved}
+                height={200}
+                fill
+            />
         </Card.Content>
     </Card.Root>
 

@@ -156,6 +156,7 @@ class GeneratedFileTests(unittest.TestCase):
         self.assertNotIn("@theme", variables)
         self.assertNotIn("initial;", variables)
         self.assertIn("--ambrose-color-surface-page:", variables)
+        self.assertIn("--ambrose-font-mono:", variables)
         self.assertIn(':root[data-theme="light"]', variables)
         self.assertIn(variables[variables.index(":root {"):], self.outputs[designtokens.CSS_PATH])
 

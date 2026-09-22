@@ -6,7 +6,6 @@
 @import "tailwindcss";
 @import "../tokens/tokens.css";
 @import "../fonts/fonts.css";
-@import "uplot/dist/uPlot.min.css";
 @import "./base.css";
 
 @source "../components";

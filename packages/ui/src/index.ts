@@ -38,6 +38,7 @@ export { default as DataTable } from "./components/DataTable.svelte";
 export { default as StatTile } from "./components/StatTile.svelte";
 export { default as LogList } from "./components/LogList.svelte";
 export { default as Sparkline } from "./components/Sparkline.svelte";
+export { default as TimeSeries } from "./components/TimeSeries.svelte";
 
 export { classes } from "./internal/classes";
 export { motion, motionSettings, durationMs, easing } from "./motion/motion.svelte";
