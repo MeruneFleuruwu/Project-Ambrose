@@ -265,9 +265,28 @@ bool ServerApp::StartAdminApi()
     });
     sAdminCapabilities.RegisterStandardProblems();
     sAdminCapabilities.AddReloadTarget("admin");
-    AdminStatus::Register(_admin->Routes(), [this] { return BuildStatus(); });
-    AdminConfigView::Register(_admin->Routes(), _config, GetRestartRequiredOptions());
-    _admin->Routes().Add("POST", "/api/shutdown", [this](AdminRequest const& request)
+    RegisterStandardRoutes(_admin->Routes());
+    _logStream = std::make_unique<LogStreamService>(_log.GetStreamHub());
+    _logStream->Start();
+    _admin->AddSocket(_logStream->MakeSocketRoute("/api/logs"));
+
+    OnAdminApiReady(*_admin);
+
+    std::string error;
+    if (_admin->Start(settings, error))
+        return true;
+    AMBROSE_LOG(_log, LogLevel::Error, "server.admin", "{}", error);
+    _err << _info.Name << ": " << error << "\n";
+    _admin.reset();
+    _logStream.reset();
+    return false;
+}
+
+void ServerApp::RegisterStandardRoutes(AdminRouter& routes)
+{
+    AdminStatus::Register(routes, [this] { return BuildStatus(); });
+    AdminConfigView::Register(routes, _config, GetRestartRequiredOptions());
+    routes.Add("POST", "/api/shutdown", [this](AdminRequest const& request)
     {
         nlohmann::json const body = request.Body.empty() ? nlohmann::json::object() : nlohmann::json::parse(request.Body, nullptr, false);
         if (!body.is_object())
@@ -316,20 +335,6 @@ bool ServerApp::StartAdminApi()
         answer["stopping_in"] = delay;
         return AdminResponse::Json(202, answer.dump());
     });
-    _logStream = std::make_unique<LogStreamService>(_log.GetStreamHub());
-    _logStream->Start();
-    _admin->AddSocket(_logStream->MakeSocketRoute("/api/logs"));
-
-    OnAdminApiReady(*_admin);
-
-    std::string error;
-    if (_admin->Start(settings, error))
-        return true;
-    AMBROSE_LOG(_log, LogLevel::Error, "server.admin", "{}", error);
-    _err << _info.Name << ": " << error << "\n";
-    _admin.reset();
-    _logStream.reset();
-    return false;
 }
 
 bool ServerApp::ReloadAdminApi()

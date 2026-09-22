@@ -161,6 +161,8 @@ namespace
             if (apps.empty())
                 LOG_WARN("server.supervisor", "Supervisor.Apps names no app, so the supervisor has nothing to run");
             LOG_INFO("server.supervisor", "Watching {} app(s), with their state in {} and their output in {}", apps.size(), ConfigMgr::PathToUtf8(settings.StateFile), ConfigMgr::PathToUtf8(settings.OutputFolder));
+            _supervisor.Register(_panel.Routes(), [this] { return BuildStatus(); });
+            RegisterStandardRoutes(_panel.Routes());
             if (!_panel.Start(Config(), error))
             {
                 LOG_ERROR("server.panel", "{}", error);

@@ -1,10 +1,11 @@
 /*
  * Project Ambrose by Imjustchico
- * Tests the panel's own listener and what it holds: it serves nothing until Panel.Enable is set, it opens its store with the panel tables before it listens, it answers its own routes on a loopback port with its own token, a bind beyond this machine with no certificate is refused with the Panel option names in the message, the plain-HTTP opt-in lifts that refusal, a certificate and key are served over TLS with the fingerprint the files hold, a route that declares a cost is held back with a retry hint while an uncosted route from the same caller still answers, one audit row records the throttling however many requests are refused in that minute, and a change whose audit row cannot be written is not applied.
+ * Tests the panel's own listener and what it holds: it serves nothing until Panel.Enable is set, it opens its store with the panel tables before it listens, it answers its own routes on a loopback port with its own token, a bind beyond this machine with no certificate is refused with the Panel option names in the message, the plain-HTTP opt-in lifts that refusal, a certificate and key are served over TLS with the fingerprint the files hold, a route that declares a cost is held back with a retry hint while an uncosted route from the same caller still answers, one audit row records the throttling however many requests are refused in that minute, and a change whose audit row cannot be written is not applied, the plain-HTTP opt-in lets it reach beyond this machine with the risk said out loud, a reload that would leave the bind unsafe is refused while the old listener goes on serving, and a replaced certificate is served after a reload on the same port.
  */
 
 #include "AdminClient.h"
 #include "ConfigMgr.h"
+#include "Environment.h"
 #include "LogTestDirectory.h"
 #include "LogTestHarness.h"
 #include "Panel.h"
@@ -15,6 +16,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <chrono>
 #include <memory>
 #include <optional>
@@ -144,7 +146,7 @@ TEST_F(PanelTest, HoldsBackACostlyRouteAndRecordsItOnceAMinute)
 {
     Panel panel = Make();
     AddPing(panel);
-    panel.Routes().AddCosting("POST", "/api/panel/work", 50, [](AdminRequest const&)
+    panel.Routes().AddCosting("POST", "/api/panel/work", 1, [](AdminRequest const&)
     {
         return AdminResponse::Json(200, "{\"done\":true}");
     });
@@ -153,17 +155,31 @@ TEST_F(PanelTest, HoldsBackACostlyRouteAndRecordsItOnceAMinute)
     ASSERT_TRUE(panel.Start(Configured("Panel.Enable = 1\nPanel.Port = 0\nPanel.RateLimitBurst = 120\nPanel.RateLimitPerSecond = 0\n"), error)) << error;
 
     AdminClient const client("127.0.0.1", panel.GetPort(), panel.GetToken());
-    auto const work = [&] { return client.Send({ "POST", "/api/panel/work", "{}", "application/json", "" }, std::chrono::seconds(10)); };
-    EXPECT_EQ(work().Status, 200);
-    EXPECT_EQ(work().Status, 200);
-
-    AdminClientResponse const held = work();
-    EXPECT_EQ(held.Status, 429) << held.Body;
-    EXPECT_NE(held.Head.find("Retry-After:"), std::string::npos) << held.Head;
-    EXPECT_NE(held.Body.find("too_many_requests"), std::string::npos) << held.Body;
-
-    for (int again = 0; again < 4; ++again)
-        EXPECT_EQ(work().Status, 429);
+    int answered = 0;
+    int held = 0;
+    std::string retryHint;
+    for (int attempt = 0; attempt < 200; ++attempt)
+    {
+        AdminClientResponse const answer = client.Send({ "POST", "/api/panel/work", "{}", "application/json", "" }, std::chrono::seconds(10));
+        ASSERT_TRUE(answer.Answered) << answer.Error;
+        if (answer.Status == 200)
+        {
+            ++answered;
+            continue;
+        }
+        ASSERT_EQ(answer.Status, 429) << answer.Body;
+        ++held;
+        if (retryHint.empty())
+        {
+            std::size_t const at = answer.Head.find("Retry-After: ");
+            ASSERT_NE(at, std::string::npos) << answer.Head;
+            retryHint = answer.Head.substr(at + 13, answer.Head.find('\n', at) - at - 13);
+            EXPECT_NE(answer.Body.find("too_many_requests"), std::string::npos) << answer.Body;
+        }
+    }
+    EXPECT_EQ(answered, 120);
+    EXPECT_EQ(held, 80);
+    EXPECT_FALSE(retryHint.empty());
 
     AdminClientResponse const uncosted = client.Send({ "GET", "/api/panel/ping", "", "application/json", "" }, std::chrono::seconds(10));
     EXPECT_EQ(uncosted.Status, 200) << uncosted.Body;
@@ -232,4 +248,78 @@ TEST_F(PanelTest, AForwardedHeaderChangesNothingWithNoTrustedProxies)
     EXPECT_EQ(rows->Text(0), "127.0.0.1");
     EXPECT_FALSE(rows->Step(error));
     EXPECT_TRUE(error.empty()) << error;
+}
+
+TEST_F(PanelTest, StartsBeyondThisMachineWithThePlainHttpOptIn)
+{
+    std::optional<std::string> const address = Ambrose::GetEnv("AMBROSE_TEST_ADMIN_REMOTE_BIND");
+    if (!address || address->empty())
+        GTEST_SKIP() << "AMBROSE_TEST_ADMIN_REMOTE_BIND names no address to bind";
+
+    _harness.ApplyOrFail("Appender.Capture = 200,1,0\nLogger.root = 1,Capture\n");
+    Panel panel = Make();
+    std::string error;
+    ASSERT_TRUE(panel.Start(Configured(fmt::format("Panel.Enable = 1\nPanel.Port = 0\nPanel.BindIP = {}\nPanel.AllowPlainHttpRemote = 1\n", *address)), error)) << error;
+    EXPECT_TRUE(panel.IsRunning());
+
+    std::vector<std::string> const lines = _harness.Store().Texts("Capture");
+    EXPECT_TRUE(std::any_of(lines.begin(), lines.end(), [](std::string const& line)
+    {
+        return line.find("Panel.AllowPlainHttpRemote = 1") != std::string::npos && line.find("unencrypted") != std::string::npos;
+    })) << lines.size() << " lines captured";
+}
+
+TEST_F(PanelTest, ARefusedReloadLeavesTheOldListenerServing)
+{
+    Panel panel = Make();
+    AddPing(panel);
+    std::string error;
+    ASSERT_TRUE(panel.Start(Configured("Panel.Enable = 1\nPanel.Port = 0\n"), error)) << error;
+    uint16 const port = panel.GetPort();
+    ASSERT_NE(port, 0);
+
+    EXPECT_FALSE(panel.Reload(Configured(fmt::format("Panel.Enable = 1\nPanel.Port = {}\nPanel.BindIP = 0.0.0.0\n", port))));
+    EXPECT_TRUE(panel.IsRunning());
+    EXPECT_EQ(panel.GetPort(), port);
+    EXPECT_EQ(panel.GetBindIp(), "127.0.0.1");
+
+    AdminClient const client("127.0.0.1", port, panel.GetToken());
+    EXPECT_EQ(client.Send({ "GET", "/api/panel/ping", "", "application/json", "" }, std::chrono::seconds(10)).Status, 200);
+}
+
+TEST_F(PanelTest, AReloadSwapsTheCertificateWithNoRestart)
+{
+    std::filesystem::path const certificate = _directory.Path() / "panel.crt";
+    std::filesystem::path const key = _directory.Path() / "panel.key";
+    std::string error;
+    ASSERT_TRUE(TlsCertificate::CreateSelfSigned(certificate, key, "Ambrose first", { "127.0.0.1" }, 60, error)) << error;
+
+    Panel panel = Make();
+    AddPing(panel);
+    std::string const text = fmt::format("Panel.Enable = 1\nPanel.Port = 0\nPanel.CertificateFile = \"{}\"\nPanel.PrivateKeyFile = \"{}\"\n",
+        certificate.generic_string(), key.generic_string());
+    ASSERT_TRUE(panel.Start(Configured(text), error)) << error;
+    uint16 const port = panel.GetPort();
+
+    auto const fingerprintNow = [&]
+    {
+        AdminClient const client("127.0.0.1", port, panel.GetToken(), true);
+        AdminClientResponse const answer = client.Send({ "GET", "/api/panel/ping", "", "application/json", "" }, std::chrono::seconds(10));
+        EXPECT_EQ(answer.Status, 200) << answer.Error;
+        return answer.PeerFingerprint;
+    };
+
+    std::filesystem::path const second = _directory.Path() / "second.crt";
+    std::filesystem::path const secondKey = _directory.Path() / "second.key";
+    ASSERT_TRUE(TlsCertificate::CreateSelfSigned(second, secondKey, "Ambrose second", { "127.0.0.1" }, 60, error)) << error;
+    TlsCertificate replacement;
+    ASSERT_TRUE(replacement.Load(second, secondKey, error)) << error;
+    std::filesystem::copy_file(second, certificate, std::filesystem::copy_options::overwrite_existing);
+    std::filesystem::copy_file(secondKey, key, std::filesystem::copy_options::overwrite_existing);
+
+    std::string const again = fmt::format("Panel.Enable = 1\nPanel.Port = {}\nPanel.CertificateFile = \"{}\"\nPanel.PrivateKeyFile = \"{}\"\n",
+        port, certificate.generic_string(), key.generic_string());
+    ASSERT_TRUE(panel.Reload(Configured(again)));
+    EXPECT_EQ(panel.GetPort(), port);
+    EXPECT_EQ(fingerprintNow(), replacement.GetInfo().Fingerprint);
 }

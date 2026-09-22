@@ -30,6 +30,7 @@
 #include <utility>
 #include <vector>
 
+class AdminRouter;
 class AdminServer;
 class ConsoleInput;
 class ConsoleReader;
@@ -78,6 +79,7 @@ public:
     AppLifecycle GetLifecycleState() const noexcept { return _lifecycle.load(); }
     AdminServer* GetAdminApi() const noexcept { return _admin.get(); }
     bool ReloadAdminApi();
+    void RegisterStandardRoutes(AdminRouter& routes);
 
     void SetListener(std::string address, uint16 port);
     void SetClientSetup(bool installFound, bool typeDumpInUse, bool typeDumpStale, std::string typeDumpError);

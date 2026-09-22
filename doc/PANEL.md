@@ -38,9 +38,9 @@ The supervisor is a fourth executable in `src/server/apps/`, beside loginserver,
 
 ### Listener, TLS and the bind rule
 
-The panel listener (17.14) is the one entry point that carries session cookies, passwords and two-factor codes, so it is held to the admin API's rule and then some. Extending the settled Remote access rule under Decisions, Operations to the panel's own listener is a proposal listed under Decisions needed in doc/ROADMAP.md; what this design proposes is:
+The panel listener (17.14) is the one entry point that carries session cookies, passwords and two-factor codes, so it is held to the admin API's rule and then some. Extending the Remote access rule under Decisions, Operations to the panel's own listener was settled on 2026-09-22 and built in 17.14; what it comes to is:
 
-- `Panel.Enable` is off by default and `Panel.BindIP` is 127.0.0.1. A non-loopback bind is refused at startup unless `Panel.TlsCertificate` and `Panel.TlsKey` name a certificate and key, and a reload that would leave the bind unsafe is refused with an error naming the option while the old listener keeps serving.
+- `Panel.Enable` is off by default and `Panel.BindIP` is 127.0.0.1. A non-loopback bind is refused at startup unless `Panel.CertificateFile` and `Panel.PrivateKeyFile` name a certificate and key, the same names the admin API uses under its own prefix, and a reload that would leave the bind unsafe is refused with an error naming the option while the old listener keeps serving.
 - `Panel.AllowPlainHttpRemote`, off by default and documented with its risk, is the only way to serve the panel beyond localhost without TLS. It logs a warning naming the option and states plainly that sign-in secrets then cross the network unencrypted.
 - The certificate and key are PEM files, checked at load for a matching key, validity dates and chain order, swapped live on a reload with the old pair kept and every error reported when the new pair fails, with the fingerprint printed to the console and the log and a warning as expiry approaches. `supervisor --panel-self-signed` writes a certificate for a machine-local panel and prints its fingerprint.
 - HSTS is sent under TLS only, beside the strict Content-Security-Policy and the other response headers below.

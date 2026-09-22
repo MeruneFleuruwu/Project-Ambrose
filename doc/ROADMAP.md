@@ -80,7 +80,6 @@ These block specific milestones. The maintainer decides each one, then this list
 - Whether the tutorial moves earlier, since new characters see it first. Affects where 14.02/14.03 sit and 3.16's playercreateinfo start zone.
 - Whether the loginserver enforces Revision/DataRevision against the patch manifest. Blocks 16.07.
 - Operations: the panel scope tree (panel, node, cluster, realm and app) and the default role bundles, including the owner-only set. Blocks 17.22, 17.31, 17.48, 17.50, 17.56.
-- Operations: whether the admin API's remote-access rule extends to the panel's own listener, with its certificate handling, and whether plain HTTP beyond localhost is offered there at all. Blocks 17.14, 17.70.
 - Operations: the command security level cap on console.write grants and how a linked game account's level applies; this ties to the open decision on how account security levels map to LOGINCOMPLETE IsCSR and Permissions. Blocks 17.38, 17.48, 17.49.
 - Operations: whether the supervisor store's secrets use a keyring file separate from the store, and where it lives on each platform. Blocks 17.28, 17.30, 17.47, 17.65, 17.72.
 - Operations: which library provides the panel's cipher and keyed hash. The Stack row names Botan 3 for SHA-2, Twofish and the random number generator, and AES-256-GCM is already settled for login.account.verifier, so either Botan's entry grows to name a cipher and a keyed hash while libsodium stays at Argon2id, or libsodium grows to cover both. Blocks 17.28, 17.47, 17.72.

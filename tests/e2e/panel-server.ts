@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Starts a real Ambrose app whose admin API serves the built panel, for the end-to-end and screenshot runs: the patchserver the C++ build made, or the one AMBROSE_PANEL_APP names, on a port the caller picks with a known token and its logs in a folder of its own, waits until it answers, and stops it again; or the supervisor from the same build, given a folder of its own holding its config and one patchserver to run, so the panel it serves carries another app's state and power buttons that reach it.
+ * Starts a real Ambrose app whose admin API serves the built panel, for the end-to-end and screenshot runs: the patchserver the C++ build made, or the one AMBROSE_PANEL_APP names, on a port the caller picks with a known token and its logs in a folder of its own, waits until it answers, and stops it again; or the supervisor from the same build, given a folder of its own holding its config and one patchserver to run, so the panel it serves carries another app's state and power buttons that reach it; or the supervisor with its own panel listener on, watching no app, so the built page can be loaded from the door it will really be opened through.
  */
 
 import { spawn, type ChildProcess } from "node:child_process";
@@ -143,6 +143,52 @@ export async function startSupervisor(port: number, appPort: number): Promise<Pa
                 headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
                 body: JSON.stringify({ action: "kill" }),
             }).catch(() => undefined);
+            child.kill();
+            await exited(child);
+            rmSync(folder, { recursive: true, force: true });
+        },
+    };
+}
+
+export async function startPanelListener(adminPort: number, panelPort: number): Promise<Panel> {
+    if (!supervisor) throw new Error("no built supervisor; build the C++ tree");
+    const folder = mkdtempSync(path.join(tmpdir(), "ambrose-panel-listener-"));
+    const forward = (file: string) => path.resolve(file).split("\\").join("/");
+    copyFileSync(path.resolve("src/server/apps/supervisor/supervisor.conf.dist"), path.join(folder, "supervisor.conf.dist"));
+    writeFileSync(
+        path.join(folder, "supervisor.conf"),
+        [
+            "Supervisor.Apps =",
+            "Supervisor.StateFile = state.json",
+            "Supervisor.OutputDir = output",
+            "Console.Enable = 0",
+            "Admin.Enable = 1",
+            "Admin.BindIP = 127.0.0.1",
+            `Admin.Port = ${adminPort}`,
+            `Admin.Token = ${token}`,
+            "Panel.Enable = 1",
+            "Panel.BindIP = 127.0.0.1",
+            `Panel.Port = ${panelPort}`,
+            `Panel.Token = ${token}`,
+            `Panel.DashboardDir = "${forward("apps/dashboard/dist")}"`,
+            `Panel.StoreFile = "${forward(path.join(folder, "panel.sqlite3"))}"`,
+            `LogsDir = "${forward(path.join(folder, "logs"))}"`,
+            "",
+        ].join("\n"),
+    );
+    const child = spawn(supervisor, ["-c", path.join(folder, "supervisor.conf")], { cwd: folder, stdio: "ignore" });
+    const url = `http://127.0.0.1:${panelPort}`;
+    const deadline = Date.now() + 20000;
+    while (!(await answers(url))) {
+        if (Date.now() > deadline || child.exitCode !== null) {
+            child.kill();
+            throw new Error(`the supervisor did not start its panel listener on port ${panelPort}`);
+        }
+        await new Promise((done) => setTimeout(done, 200));
+    }
+    return {
+        url,
+        stop: async () => {
             child.kill();
             await exited(child);
             rmSync(folder, { recursive: true, force: true });
