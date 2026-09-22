@@ -1,0 +1,17 @@
+{
+  "app": "gameserver",
+  "role": "gameserver",
+  "realm": "Ambrose",
+  "address": "127.0.0.1",
+  "port": 12001,
+  "revision": "r806919.Wizard_1_610",
+  "uptime_seconds": 42.5,
+  "process_memory_bytes": 73400320,
+  "thread_count": 8,
+  "sessions": 2,
+  "tick_time_ms": {
+    "average": 1.8,
+    "maximum": 6.4
+  },
+  "problems": []
+}

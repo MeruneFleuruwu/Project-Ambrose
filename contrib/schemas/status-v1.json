@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ambrose.invalid/schema/status-v1.json",
+  "title": "Project Ambrose status response v1",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "app",
+    "role",
+    "realm",
+    "address",
+    "port",
+    "revision",
+    "uptime_seconds",
+    "process_memory_bytes",
+    "thread_count",
+    "sessions",
+    "tick_time_ms",
+    "problems"
+  ],
+  "properties": {
+    "app": { "type": "string", "minLength": 1 },
+    "role": { "type": "string", "minLength": 1 },
+    "realm": { "type": "string" },
+    "address": { "type": "string", "minLength": 1 },
+    "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+    "revision": { "type": "string", "minLength": 1 },
+    "uptime_seconds": { "type": "number", "minimum": 0 },
+    "process_memory_bytes": { "type": "integer", "minimum": 0 },
+    "thread_count": { "type": "integer", "minimum": 0 },
+    "sessions": { "type": "integer", "minimum": 0 },
+    "tick_time_ms": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["average", "maximum"],
+      "properties": {
+        "average": { "type": "number", "minimum": 0 },
+        "maximum": { "type": "number", "minimum": 0 }
+      }
+    },
+    "problems": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "message", "subject"],
+        "properties": {
+          "code": { "type": "string", "minLength": 1 },
+          "message": { "type": "string", "minLength": 1 },
+          "subject": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "app": "loginserver",
+  "role": "loginserver",
+  "realm": "Ambrose",
+  "address": "127.0.0.1",
+  "port": 12000,
+  "revision": "r806919.Wizard_1_610",
+  "uptime_seconds": 38,
+  "process_memory_bytes": 52428800,
+  "thread_count": 6,
+  "sessions": 1,
+  "tick_time_ms": {
+    "average": 0,
+    "maximum": 0
+  },
+  "problems": [
+    {
+      "code": "type_dump_missing",
+      "message": "type dump is not loaded",
+      "subject": "client-data"
+    }
+  ]
+}
