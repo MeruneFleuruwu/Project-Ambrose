@@ -15,6 +15,9 @@ Project Ambrose itself is MIT licensed, in LICENSE. It uses the libraries below.
 | nlohmann/json | Reading and writing the type dump and JSON files | MIT | Keep the notice |
 | pugixml | Reading the client's XML: message definitions, configurations, name tables | MIT | Keep the notice |
 | zlib | Inflating the archives and blobs the client stores | Zlib | Keep the notice |
+| Crow | The admin API's HTTP and WebSocket listener in every app and the supervisor | BSD-3-Clause | Keep the notice |
+| OpenSSL | TLS on the panel listener, through Crow | Apache-2.0 | Keep the notice |
+| SQLite | The panel's own store: sessions, audit rows and settings | blessing | A public-domain dedication: nothing beyond keeping it with the source |
 | Zydis and Zycore | Decoding x86 instructions in the type extractor | MIT | Keep the notice |
 | Unicorn 2 | Running the user's own client program in a sandbox to rebuild its type data | GPL-2.0-or-later | Only `typeextract` links it, and only as a shared library. That one program is therefore distributed under GPL-2.0-or-later; every other program here stays MIT. A build without the tools has no GPL code in it |
 
@@ -34,10 +37,23 @@ Installed with milestone 17.73 at the versions doc/UI-STACK.md settled. Every on
 | partysocket | 1.3.0 | Reconnecting the live socket | MIT | Keep the notice |
 | Valibot | 1.5.0 | Checking what a form sends before it leaves the page | MIT | Keep the notice |
 | svelte-sonner | 1.2.1 | Toasts | MIT | Keep the notice |
+| clsx | Joining class names in the copied shadcn-svelte components | MIT | Keep the notice |
+| tailwind-merge | Resolving conflicting Tailwind classes in those components | MIT | Keep the notice |
+| tailwind-variants | The variant shapes those components are written against | MIT | Keep the notice |
+| tw-animate-css | The enter and leave keyframes their menus, dialogs and drawers use | MIT | Keep the notice |
+| @internationalized/date | The calendar maths Bits UI's date parts take | Apache-2.0 | Keep the notice |
 | Lucide icons | 1.2.134 of the Iconify set | The icon set, vendored into `design/icons` and subset to what is used | ISC | Keep the notice |
 | Cormorant Garamond, Karla and JetBrains Mono | Fontsource 5.3.0 | The three typefaces, vendored as latin variable files | OFL-1.1 | Ship the licence text beside the fonts, which `packages/ui/src/fonts/LICENSE` does, and never sell the fonts on their own. It places nothing on Ambrose's own code |
 
 shadcn-svelte is not installed and never will be: it is a scaffold whose source is copied in once per component and owned from then on, under MIT.
+
+## What builds and tests the servers, and never ships
+
+A development dependency. It is linked into the test programs only, and no server or tool carries it.
+
+| Library | Used for | Licence | What it asks |
+|---|---|---|---|
+| GoogleTest and GoogleMock | Every C++ unit test | BSD-3-Clause | Keep the notice |
 
 ## What builds and tests the front end, and never ships
 

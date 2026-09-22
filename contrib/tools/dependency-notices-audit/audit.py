@@ -19,6 +19,10 @@ VCPKG_ALIASES = {
     "unicorn": "Unicorn 2",
     "zlib": "zlib",
     "zydis": "Zydis and Zycore",
+    "crow": "Crow",
+    "openssl": "OpenSSL",
+    "sqlite3": "SQLite",
+    "gtest": "GoogleTest and GoogleMock",
 }
 NOTICE_ALIASES = {
     "@eslint/js": "ESLint, typescript-eslint, eslint-plugin-svelte, @eslint/js, globals",
@@ -47,7 +51,8 @@ NOTICE_ALIASES = {
     "@tanstack/svelte-table": "TanStack Table, Svelte adapter",
 }
 LICENSE_NAMES = {"MIT", "ISC", "OFL-1.1", "Apache-2.0", "MPL-2.0", "BSD-2-Clause",
-                 "BSL-1.0", "LGPL-2.1-or-later", "GPL-2.0-or-later", "Zlib"}
+                 "BSD-3-Clause", "BSL-1.0", "LGPL-2.1-or-later", "GPL-2.0-or-later",
+                 "Zlib", "blessing"}
 NON_DIRECT_NOTICE_NAMES = {
     "@fontsource-variable/*",
     "@iconify-json/lucide",
