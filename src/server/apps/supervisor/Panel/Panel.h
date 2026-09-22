@@ -32,7 +32,7 @@ class Log;
 class Panel
 {
 public:
-    static constexpr uint16 DefaultPort = 12000;
+    static constexpr uint16 DefaultPort = 12080;
     static constexpr std::string_view Prefix = "/api/panel";
     static constexpr std::chrono::minutes ClaimLifetime{ 30 };
 
