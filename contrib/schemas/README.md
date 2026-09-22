@@ -47,4 +47,8 @@ response derived from the encoder.
 python contrib\schemas\check_c57_schemas.py
 ```
 
-The fixtures are synthetic values built from the encoder contract.
+`apps-gameserver.json` and `capabilities-gameserver.json` are live answers from
+the same gameserver as the status fixture. A gameserver does not register a
+listener yet, so its `address` is empty and its `port` is 0, and the schema
+allows both, as it allows an empty `realm`. The loginserver fixtures are
+synthetic values built from the encoder contract.

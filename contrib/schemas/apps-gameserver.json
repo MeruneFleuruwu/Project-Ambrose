@@ -1,10 +1,10 @@
 [
   {
+    "address": "",
     "name": "gameserver",
-    "role": "gameserver",
-    "realm": "Ambrose",
-    "address": "127.0.0.1",
-    "port": 12000,
-    "revision": "r806919.Wizard_1_610"
+    "port": 0,
+    "realm": "",
+    "revision": "ba79e90",
+    "role": "gameserver"
   }
 ]
