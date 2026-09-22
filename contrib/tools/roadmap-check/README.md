@@ -48,3 +48,5 @@ published size or acceptance claim should be corrected.
 
 The checker reads roadmap Markdown only. It does not edit roadmap files,
 change milestone sizes, or decide whether an evidence claim is true.
+
+The size rule is judged only where a milestone lists deliverables of its own, before any `###` subsection: a milestone whose body is a goal, a size and acceptance checks, with an appended detailed spec, has no deliverables to count and is left alone. `--require-evidence` adds the rule that a ticked acceptance box carries its evidence, which the phases written before that convention do not.

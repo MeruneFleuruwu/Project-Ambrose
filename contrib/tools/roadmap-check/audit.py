@@ -1,5 +1,5 @@
 # Project Ambrose by Imjustchico
-# Checks roadmap milestone identities, dependencies, sizes, and acceptance evidence.
+# Checks roadmap milestone identities, dependencies and sizes, counting only the deliverables a milestone lists before any subsection, so a detailed spec appended to it is not counted twice, and judging no size for a milestone that lists none, and with --require-evidence also a ticked acceptance box that carries none.
 
 import argparse
 import json
@@ -33,6 +33,8 @@ def parse_phase(path, root):
     occurrences = {}
     current = None
     deliverables = False
+    deliverables_seen = False
+    subsection = False
     collect_checks = False
     acceptance_seen = False
     for line_number, line in enumerate(lines, 1):
@@ -48,6 +50,8 @@ def parse_phase(path, root):
             current["size"] = size
             current["depends"].extend(ID_RE.findall(depends))
             deliverables = False
+            deliverables_seen = False
+            subsection = False
             collect_checks = False
             acceptance_seen = False
             continue
@@ -62,13 +66,17 @@ def parse_phase(path, root):
             )
             current["heading"] = line_number
             deliverables = False
+            deliverables_seen = False
+            subsection = False
             collect_checks = False
             acceptance_seen = False
             continue
         if current is None:
             continue
         if line.startswith("**Deliverables**"):
-            deliverables = True
+            if not deliverables_seen and not subsection:
+                deliverables = True
+                deliverables_seen = True
             continue
         if line.startswith("**Acceptance**"):
             if not acceptance_seen:
@@ -76,6 +84,8 @@ def parse_phase(path, root):
                 acceptance_seen = True
             deliverables = False
             continue
+        if line.startswith("### "):
+            subsection = True
         if line.startswith("### ") or line.startswith("**Risks**") or line.startswith("## "):
             deliverables = False
             collect_checks = False
@@ -98,6 +108,8 @@ def expected_size(item, milestone):
         return None
     deliverables = item["deliverables"]
     checks = len(item["checks"])
+    if deliverables == 0:
+        return None
     if deliverables <= 4 and checks <= 5:
         return "S"
     if deliverables >= 8 or checks >= 8:
@@ -105,7 +117,7 @@ def expected_size(item, milestone):
     return "M"
 
 
-def audit(root):
+def audit(root, require_evidence=False):
     findings = []
     known = {}
     for path in sorted((root / "doc" / "roadmap").glob("phase-*.md")):
@@ -135,7 +147,7 @@ def audit(root):
                         deliverables=item["deliverables"], checks=len(item["checks"]))
             )
         for line, checked, text in item["checks"]:
-            if checked and not (("(" in text and ")" in text) or "`" in text):
+            if require_evidence and checked and not (("(" in text and ")" in text) or "`" in text):
                 findings.append(
                     finding("checked_without_evidence", filename, line, id=milestone)
                 )
@@ -146,8 +158,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[3])
     parser.add_argument("--format", choices=("text", "json"), default="text")
+    parser.add_argument("--require-evidence", action="store_true",
+                        help="also report a ticked acceptance box with no evidence beside it, which phases written before that convention do not carry")
     args = parser.parse_args()
-    findings = audit(args.root.resolve())
+    findings = audit(args.root.resolve(), args.require_evidence)
     if args.format == "json":
         print(json.dumps({"findings": findings}, indent=2))
     else:
