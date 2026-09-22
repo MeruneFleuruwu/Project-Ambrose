@@ -123,8 +123,6 @@ Each item is worth doing, needs nothing from the phases, and lands inside the tr
 | F-53 | Which classes the type dump marks as having no reflected properties, grouped by base class, with counts | `contrib/findings/objects/` | The static, countable half of F-38 |
 | F-54 | The sizes and counts of every archive in the install: files per archive, compressed and uncompressed totals, as a table | `contrib/findings/data/` | The patch server plans transfers against this |
 | F-55 | What a name table row holds: the fields the extractor reads from each name table, checked against the dump | `contrib/findings/data/` | The world database's name columns are shaped by it |
-| C-63 | A corpus of console lines that stress the column layout: a category wider than the column, a multi-line message, a value at the very end, a line with no category | `contrib/fixtures/` | 17.74's layout is held by a few tests; a corpus holds it by many |
-| C-64 | Synthetic frame corpora for the fuzzers: hand-made frames whose lengths, opcodes and boundaries are wrong in every way the reassembler has to survive, never captured bytes | `data/fuzz/` | The fuzzers exist; seeds built to hurt beat seeds found by luck |
 | C-65 | A locale catalog for a language your client ships that `es` does not cover, one language per pull request, in the `es` catalog's shape | `contrib/locale/` | C-16 set the shape; each language is one evening |
 | C-66 | A guide to building on Windows from nothing, walked, with the installer prerequisites and the pitfalls | `doc/guides/` | The Linux guide exists; the platform the project is built on does not have one |
 | C-67 | A guide to reading a capture with the metadata decoder: what a healthy login looks like as frames, frame by frame | `doc/guides/` | C-02 built the tool; a guide makes its output legible |
@@ -208,6 +206,8 @@ The first list is mostly taken, and what remains of it waits on servers that do 
 | C-60 | The problem code catalog, with severity, operator action and the fixing page for each code the admin API registers, checked against the server's own list | `contrib/schemas/` | MeruneFleuruwu, in #105 |
 | C-61 | Twenty duration strings with the seconds each yields or the refusal it gets, matching the parser's own answers | `contrib/fixtures/` | MeruneFleuruwu, in #106 |
 | C-62 | Ten configuration layering cases, from the shipped default to the command line, each matching what ConfigMgr itself answers | `contrib/fixtures/` | MeruneFleuruwu, in #107 |
+| C-63 | Five console lines that stress the column layout, each matching the bytes the formatter writes | `contrib/fixtures/` | MeruneFleuruwu, in #108 |
+| C-64 | Nine hand-made frames whose lengths, opcodes and boundaries are wrong in every way the reassembler must survive | `data/fuzz/frame-reassembler/` | MeruneFleuruwu, in #109 |
 
 An item stays listed until its pull request is merged. Ask before starting something not on the list: the answer is usually yes if it lands in the paths above.
 
