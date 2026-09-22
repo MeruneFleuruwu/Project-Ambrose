@@ -17,7 +17,7 @@ all six severity levels, the documented logging categories, every expected
 C-29 value-class span, UTF-8 byte offsets, and the required C-58 count.
 
 The C-59 fixture is a deterministic sixty-second metric ring for the dashboard's
-live status view. It contains a null gap and a restart so the chart can show a
+live status view. It contains a two-second gap where samples were missed but the process kept running, and a five-second gap followed by a restart, listed in `restarts` by the time the process came back, so the chart can show a
 process stop and a clean relaunch without inventing a bogus zero-value sample.
 
 Run its validator from the repository root:

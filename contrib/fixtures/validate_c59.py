@@ -20,7 +20,7 @@ def is_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
-def validate_series(name: str, series: Any) -> None:
+def validate_series(name: str, series: Any, restarts: list) -> None:
     if not isinstance(series, dict):
         fail(f"{name}: expected a dict")
     times = series.get("times")
@@ -45,28 +45,29 @@ def validate_series(name: str, series: Any) -> None:
             fail(f"{name}: sessions must be non-negative")
         if name == "memory_resident_bytes" and value <= 0:
             fail(f"{name}: memory resident bytes must be positive")
-    null_run = 0
-    seen_gap = False
-    restart_seen = False
+    runs = []
+    start = None
     for index, value in enumerate(values):
-        if value is None:
-            null_run += 1
-            continue
-        if null_run > 0:
-            seen_gap = True
-            if index > 0 and index < len(values):
-                restart_seen = True
-            null_run = 0
-    if not seen_gap:
-        fail(f"{name}: expected one gap created by null values")
-    if name in {"tick_average_ms", "tick_max_ms", "sessions", "memory_resident_bytes"}:
-        before_gap = [v for v in values if v is not None]
-        if not before_gap:
-            fail(f"{name}: no non-null values before the restart")
-        if not any(value is None for value in values):
-            fail(f"{name}: the fixture must include a null gap")
-    if not restart_seen:
-        fail(f"{name}: expected a restart after the gap")
+        if value is None and start is None:
+            start = index
+        elif value is not None and start is not None:
+            runs.append((start, index))
+            start = None
+    if start is not None:
+        fail(f"{name}: the window must not end inside a gap")
+    if not runs or runs[0][0] == 0:
+        fail(f"{name}: expected null gaps with samples on both sides")
+    restarts_after = [end for _, end in runs if times[end] in restarts]
+    plain_gaps = [(begin, end) for begin, end in runs if times[end] not in restarts]
+    if len(restarts_after) != len(restarts):
+        fail(f"{name}: every restart time must be the first sample after a null gap")
+    if not plain_gaps:
+        fail(f"{name}: expected a gap that is not followed by a restart")
+    if name == "memory_resident_bytes":
+        for end in restarts_after:
+            before = [v for v in values[:end] if v is not None][-1]
+            if values[end] >= before:
+                fail(f"{name}: memory must start lower after a restart than before it")
 
 
 def main() -> int:
@@ -78,13 +79,16 @@ def main() -> int:
             fail("window_seconds must be 60")
         if payload.get("interval_seconds") != 1:
             fail("interval_seconds must be 1")
+        restarts = payload.get("restarts")
+        if not isinstance(restarts, list) or not restarts or not all(isinstance(time, int) for time in restarts):
+            fail("restarts must list the sample time each restart came back at")
         series = payload.get("series")
         if not isinstance(series, dict):
             fail("series must be a dict of metric rings")
         if set(series) != REQUIRED_SERIES:
             fail(f"series keys mismatch: expected {sorted(REQUIRED_SERIES)}")
         for name in sorted(REQUIRED_SERIES):
-            validate_series(name, series[name])
+            validate_series(name, series[name], restarts)
         print(f"C-59 metric series valid: {len(REQUIRED_SERIES)} rings over {payload['window_seconds']} seconds")
         return 0
     except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
