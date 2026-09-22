@@ -71,6 +71,13 @@ def require_environment(value: Any, name: str) -> list[dict[str, str]]:
         if variable_name != to_environment_name(key):
             fail(f"{name}[{index}].name does not match the ConfigMgr name for {key}")
         result.append({"name": variable_name, "key": key, "value": item})
+        applies = variable.get("applies", True)
+        if not isinstance(applies, bool):
+            fail(f"{name}[{index}].applies must be a boolean")
+        if applies != (variable_name == to_environment_name(key)):
+            fail(f"{name}[{index}].name {variable_name} is {'not ' if applies else ''}the ConfigMgr name for {key}, so applies must be {not applies}")
+        if applies:
+            result.append({"name": variable_name, "key": key, "value": item})
     return result
 
 
