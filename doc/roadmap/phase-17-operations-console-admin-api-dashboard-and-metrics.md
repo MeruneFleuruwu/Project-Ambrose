@@ -110,6 +110,7 @@
 | 17.102 | Outbound event webhooks | S | 17.26, 17.67 |
 | 17.103 | Item and currency ledger with anomaly rules | M | 17.25, 17.69, 8.08 |
 | 17.104 | Compensation grants and mass mail | M | 17.21, 17.33, 17.69, 8.08 |
+| 17.105 | Releases: the launcher and the panel as downloadable builds | M | 3.27, 17.24, 17.14 |
 
 ## Review notes for this phase
 
@@ -2529,3 +2530,28 @@ Added on 2026-09-18 at the maintainer's direction. 17.01 shipped a console where
 - [ ] Running the same grant twice is refused without an override, and the override names both operators
 - [ ] A user without the permission is refused and the attempt is audited
 - [ ] While the mail milestone has not landed the page says so and offers only what exists
+
+## 17.105 Releases: the launcher and the panel as downloadable builds
+
+**Goal:** Somebody who does not build from source downloads the launcher and the panel from the repository's releases page, runs them, and plays with the game as it stands, and each release is rebuilt by CI rather than by hand.
+
+**Size:** M. **Depends on:** 3.27, 17.24, 17.14
+
+Added on 2026-09-22 at the maintainer's direction: the panel and the launcher are the two programs a player or an operator touches, and both have to be handed to people who will never open a compiler. A release is a tag, and the tag is what builds it, so the page never carries a build a human assembled.
+
+**Deliverables**
+
+- A release workflow that runs on a version tag: it builds the launcher (3.27) and the desktop control app carrying the panel (17.24) for Windows and Linux with the release presets, runs the same checks the pull request job runs, and publishes the artefacts to a GitHub release under the tag, with a SHA-256 beside each file
+- Each artefact standalone: the launcher as one executable beside its `launcher.conf.dist`, and the panel as one installable program that carries the dashboard, the supervisor and everything they load, so nothing is fetched at first run from anywhere but the user's own installation
+- A version the programs report and the panel shows, read from the tag, so an operator can say which release they run and the panel can tell them a newer one exists without checking on its own
+- Release notes generated from the merged milestones and merged contributor items since the previous tag, in the roadmap's own words, with a hand-written line at the top for what a player will notice
+- A pre-release mark until the game reaches the milestone the maintainer names as the first playable one, so nobody mistakes a build for a finished game, and the README's front page linking the latest release beside the Discord and the Reddit
+
+**Acceptance**
+
+- [ ] Pushing a tag produces a release carrying the launcher and the panel for Windows and Linux, each with a SHA-256, and a tag that fails a check produces no release
+- [ ] A downloaded launcher on a clean machine with a client installed starts the client against a named server without anything else installed
+- [ ] A downloaded panel on a clean machine starts, opens the dashboard, and reaches a running server, with no Node, Python or compiler present
+- [ ] `--version` on both programs and the panel's about page report the tag that built them
+- [ ] The release notes name every milestone and contributor item merged since the previous tag and nothing else
+- [ ] Dev-gated: the maintainer downloads a release on a machine that has never built Ambrose and records the run

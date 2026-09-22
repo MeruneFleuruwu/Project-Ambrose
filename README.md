@@ -36,7 +36,7 @@ The experiment is simple: see how far AI-driven development can take a complete 
 | Ambrose's own launcher starting the client | The operations panel |
 | Type extraction from your own installation | Patch serving |
 
-[doc/ROADMAP.md](doc/ROADMAP.md)'s **Where we are** says exactly which milestones are done. The full plan is **17 phases and 386 milestones**, each ending in something visible in the real client.
+[doc/ROADMAP.md](doc/ROADMAP.md)'s **Where we are** says exactly which milestones are done. The full plan is **17 phases and 387 milestones**, each ending in something visible in the real client.
 
 ## Building
 
