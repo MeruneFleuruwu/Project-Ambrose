@@ -1,13 +1,15 @@
 # Project Ambrose by Imjustchico
-# Validates the C-60 standard problem code catalog used by the dashboard and operator docs.
+# Validates the C-60 standard problem code catalog used by the dashboard and operator docs, and that it lists exactly the codes the admin API registers.
 
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parent
 CATALOG = ROOT / "problem-codes-v1.json"
+REGISTRY = ROOT.parent.parent / "src" / "server" / "shared" / "Admin" / "AdminCapabilities.h"
 
 EXPECTED = {
     "install_missing": {
@@ -53,6 +55,14 @@ def fail(message: str) -> None:
     raise ValueError(message)
 
 
+def registered_codes() -> set[str]:
+    text = REGISTRY.read_text(encoding="utf-8")
+    block = re.search(r"namespace AdminProblemCodes\s*\{(.*?)\}", text, re.S)
+    if not block:
+        fail(f"{REGISTRY}: no AdminProblemCodes namespace")
+    return set(re.findall(r'std::string_view\s+\w+\s*=\s*"([a-z_]+)"', block.group(1)))
+
+
 def main() -> int:
     try:
         payload = json.loads(CATALOG.read_text(encoding="utf-8"))
@@ -63,6 +73,9 @@ def main() -> int:
         problems = payload.get("problems")
         if not isinstance(problems, list):
             fail("problems must be a list")
+        registered = registered_codes()
+        if registered != set(EXPECTED):
+            fail(f"the server registers {sorted(registered - set(EXPECTED))} that the catalog lacks, and the catalog lists {sorted(set(EXPECTED) - registered)} that the server does not register")
         if len(problems) != len(EXPECTED):
             fail(f"expected {len(EXPECTED)} problem entries, got {len(problems)}")
         seen: set[str] = set()
