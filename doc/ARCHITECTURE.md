@@ -15,6 +15,7 @@ data/sql/
   updates/db_<name>/      Dated, ordered updates per database
   updates/pending_db_*/   Updates from open pull requests
   custom/db_<name>/       Local-only SQL, never upstreamed
+  panel/                  Dated updates for the supervisor's own store
 deps/                     vcpkg overlay ports and triplets, when needed
 doc/                      Project documentation
 modules/                  Drop-in modules, discovered by CMake
@@ -60,6 +61,8 @@ Templates, spawns, quests, quest givers, loot, and vendor lists live in the worl
 ### Databases and updates
 
 There are three databases: `login`, `characters`, and `world`. Every change is a new file in `data/sql/updates/db_<name>/` named `YYYY_MM_DD_NN.sql`. At startup the updater applies unapplied files in order and records each one in an `updates` table. The `db update` command and the admin API apply data-only updates live and then reload the affected managers; an update that changes a schema the running binary reads applies at the next binary upgrade for now, and applying such an update live, when the running binary's statements still work against the new schema, is planned, not yet scheduled. Open pull requests put their files in `pending_db_<name>/`, and they move into `updates/` when merged. `base/` is regenerated periodically by squashing old updates.
+
+The supervisor keeps its own store, one SQLite file in the Ambrose data folder holding the panel's sessions, its audit rows and its users, so the panel runs before any game database is configured and survives one being wiped. It follows the same rules with the same code: dated files in `data/sql/panel/` named `YYYY_MM_DD_NN.sql`, applied in order inside one transaction each and recorded with their hash in its own `updates` table, and a file that changed after it was applied is reported rather than applied again. Nothing a game server reads belongs there, and the store holds no game state.
 
 ### Message handlers
 

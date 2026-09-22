@@ -8,6 +8,7 @@
 #include "Environment.h"
 #include "Log.h"
 #include "QueryResult.h"
+#include "SourceFolder.h"
 #include "SqlScript.h"
 #include "UpdateFetcher.h"
 
@@ -30,14 +31,7 @@ namespace
 
 std::filesystem::path DBUpdater::GetBuiltInSourceDirectory()
 {
-    std::error_code error;
-    std::filesystem::path const built = ConfigMgr::PathFromUtf8(AMBROSE_SOURCE_DIRECTORY);
-    if (std::filesystem::is_directory(built / "data" / "sql", error))
-        return built;
-    std::filesystem::path const installed = Ambrose::GetExecutableDirectory().parent_path() / "share" / "ambrose";
-    if (std::filesystem::is_directory(installed / "data" / "sql", error))
-        return installed;
-    return built;
+    return Ambrose::FindSourceFolder();
 }
 
 std::string DBUpdater::QuoteIdentifier(std::string_view identifier)

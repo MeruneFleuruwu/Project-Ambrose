@@ -10,6 +10,7 @@
     "libmariadb",
     "nlohmann-json",
     "pugixml",
+    "sqlite3",
     "unicorn",
     "zlib",
     "zydis"
