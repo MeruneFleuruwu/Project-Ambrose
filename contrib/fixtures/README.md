@@ -71,3 +71,12 @@ python contrib\fixtures\validate_c63.py
 
 The validator renders each case using the documented short timestamp and
 18-character category column, then compares every expected line byte-for-byte.
+## C-74 replay manifests
+
+`c74-login-replay.json`, `c74-wrong-password-replay.json`, and
+`c74-keepalive-replay.json` are capture-free version-1 manifests for the
+`contrib/tools/ambrose-capture-replayer/replay.py` tool. They contain only
+Ambrose-authored frame headers and message-definition metadata; they contain
+no client capture, credential, address, or payload bytes.
+
+Run `python contrib\fixtures\validate_c74.py` to validate the three manifests.
