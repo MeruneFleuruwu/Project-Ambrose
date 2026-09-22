@@ -91,10 +91,16 @@ def match_documented(key, options):
     return [option for option in options if re.fullmatch(placeholder_pattern(option["key"]), key)]
 
 
+def shipped_source(path):
+    parts = path.parts
+    if any(part.startswith(".") for part in parts):
+        return False
+    return not any(part == "build" or part.startswith("cmake-build") or part in ("out", "node_modules") for part in parts)
+
+
 def audit(root):
     docs_dir = root / "doc" / "config"
-    dist_files = sorted(path for path in root.rglob("*.conf.dist")
-                        if "build" not in path.parts and ".git" not in path.parts)
+    dist_files = sorted(path for path in (root / "src").rglob("*.conf.dist") if shipped_source(path))
     findings = []
     errors = []
     all_documented = []

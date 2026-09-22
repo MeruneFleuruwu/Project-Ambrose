@@ -56,3 +56,5 @@ The tool was run against the repository on 2026-09-22. It is intended to be
 rerun after changing a `.conf.dist` file or its corresponding configuration
 guide. No client installation, capture, type dump, credential, or generated
 client data is required.
+
+The audit reads only the shipped files under `src/`. A build folder, a worktree or any other copy of a `.conf.dist` holds whatever the commit it came from said, so counting those reports drift that the source does not have.
