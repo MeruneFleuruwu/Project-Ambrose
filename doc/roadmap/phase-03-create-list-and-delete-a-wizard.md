@@ -39,7 +39,7 @@
 The roadmap critic flagged these. Resolve each one before or while implementing the milestones it names.
 
 - **Ordering.** 3.16 creates a 'level-1 wizard', but no milestone ever grants the starting kit (spells, deck item, starter gear, potions, start zone/quest). Spellbook (8.05), decks (8.11) and equip (8.10) never go back to creation, and 14.02 only mentions 'playercreateinfo' in passing. A new character reaching the first duel in 9.07 would have no deck.
-- **Oversized.** 3.11 BINd files, bindecode CLI and 134k-entry corpus sweep (M). Split the decoder/CLI from the sweep and its unknown-class triage.
+- **Oversized.** 3.11 BINd files, bindecode CLI and 134k-entry corpus sweep (M). Split the decoder/CLI from the sweep and its unknown-class triage. 3.25 the Ambrose client launcher carries L on its eight deliverables; it was built in one stretch, so no split was needed.
 - **Correction.** 3.12 cites 'CharacterCreationConfig.xml'. The Root.wad path is CharacterCreation/CharacterCreationConfig.xml (plain XML, root class 'class WizCharacterCreationConfig').
 
 ## 3.01 KI string hash and property hash (OBJ-2, absorbs LOG-7 StringId)
@@ -1022,7 +1022,7 @@ Added on 2026-09-17 at the maintainer's direction, and placed before 3.15 so eve
 
 **Goal:** One Ambrose program starts the retail client against an Ambrose server, on any machine that has a client, without ever running KingsIsle's launcher or writing inside the install.
 
-**Size:** M. **Depends on:** 3.22, 1.21
+**Size:** L. **Depends on:** 3.22, 1.21
 
 Added on 2026-09-17 at the maintainer's direction: the client must be driven by a launcher of Ambrose's own, not by a script and never by the retail launcher. It replaces the development scripts from 1.21 and is what 3.24 and the desktop app in 17.24 start the client with.
 
