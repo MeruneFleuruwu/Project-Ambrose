@@ -27,6 +27,14 @@ Unverified assumptions behind some tools:
 
 Sources: the actools, anatomy, patchmod and renderers research results in the brief, and doc\ARCHITECTURE.md.
 
+## How this list is used
+
+Read this file before starting a milestone, then look at what is actually built under src/tools and apps, because a tool marked here as planned may already exist and one marked built may do more than its line says. The point is not bookkeeping: a milestone that needs to read something the suite already reads should call the tool rather than write the same decoder again beside it.
+
+When a tool cannot do what a milestone needs, the answer is to teach it, not to work around it. A one-off script, a hard-coded offset or a hand-written parser inside a milestone is the suite failing to learn something, and the next milestone that needs the same thing will pay for it again. Add the function to the tool, note it against the tool's entry here, and the milestone ends with the suite able to decode more than it could at the start.
+
+This applies to contributors as well, and their prompts say so. Before writing anything, look through src/tools, apps, doc/TOOLS.md and the libraries under src for the thing you are about to build. Upgrading one of ours is a welcome part of a milestone; duplicating one is what makes a pull request hard to merge.
+
 ## Early
 
 ### launcher (built in 3.25)
