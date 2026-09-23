@@ -172,6 +172,22 @@ cannot be read or decoded, and 2 on bad usage.
         return SqlText(PropertyJson::Dump(value->AsObject(), -1));
     }
 
+    std::string ValueJson(PropertyValue const* value)
+    {
+        if (!value)
+            return "NULL";
+        if (auto const vector = value->GetIf<PropertyTypes::Vector3D>())
+            return SqlText(fmt::format("[{:.9g},{:.9g},{:.9g}]", vector->X, vector->Y, vector->Z));
+        if (auto const quaternion = value->GetIf<PropertyTypes::Quaternion>())
+            return SqlText(fmt::format("[{:.9g},{:.9g},{:.9g},{:.9g}]", quaternion->X, quaternion->Y, quaternion->Z, quaternion->W));
+        if (auto const euler = value->GetIf<PropertyTypes::Euler>())
+            return SqlText(fmt::format("[{:.9g},{:.9g},{:.9g}]", euler->Pitch, euler->Yaw, euler->Roll));
+        if (value->GetIf<int32>() || value->GetIf<uint32>() || value->GetIf<int64>() || value->GetIf<uint64>() ||
+            value->GetIf<float>() || value->GetIf<double>() || value->GetIf<bool>())
+            return SqlNumber(value);
+        return ObjectJson(value);
+    }
+
     bool NumberEquals(PropertyValue const* value, uint32 expected)
     {
         if (!value)
@@ -237,11 +253,11 @@ cannot be read or decoded, and 2 on bad usage.
     {
         output << fmt::format("INSERT INTO zone_template (zone_path, display_name_key, far_clip, healing_per_minute, soft_limit, hard_limit, no_mounts) VALUES ({}, {}, {}, {}, {}, {}, {});\n",
             SqlText(zone),
-            SqlString(Find(root, { "m_displayName", "m_displayNameKey", "m_name" })),
+            SqlString(Find(root, { "m_zoneDisplayName", "m_displayName", "m_displayNameKey", "m_name" })),
             SqlNumber(Find(root, { "m_farClip", "m_farClipDistance" })),
             SqlNumber(Find(root, { "m_healingPerMinute", "m_healRate" })),
-            SqlNumber(Find(root, { "m_softLimit", "m_softPlayerLimit" })),
-            SqlNumber(Find(root, { "m_hardLimit", "m_hardPlayerLimit" })),
+            SqlNumber(Find(root, { "m_nSoftLimit", "m_softLimit", "m_softPlayerLimit" })),
+            SqlNumber(Find(root, { "m_nHardLimit", "m_hardLimit", "m_hardPlayerLimit" })),
             SqlNumber(Find(root, { "m_noMounts", "m_mountsDisabled" })));
 
         PropertyValue const* locationsValue = Find(root, { "m_locationList", "m_locations", "m_locationTemplates" });
@@ -255,8 +271,8 @@ cannot be read or decoded, and 2 on bad usage.
                 output << fmt::format("INSERT INTO zone_location (zone_path, name, location, direction) VALUES ({}, {}, {}, {});\n",
                     SqlText(zone),
                     SqlString(Find(*location, { "m_locName", "m_name", "m_locationName", "m_key" })),
-                    ObjectJson(Find(*location, { "m_location", "m_position" })),
-                    ObjectJson(Find(*location, { "m_direction", "m_orientation" })));
+                    ValueJson(Find(*location, { "m_location", "m_position" })),
+                    ValueJson(Find(*location, { "m_direction", "m_orientation" })));
             }
 
         PropertyValue const* objectsValue = Find(root, { "m_objectList", "m_objects" });
@@ -272,8 +288,8 @@ cannot be read or decoded, and 2 on bad usage.
                 SqlText(zone),
                 SqlNumber(Find(*object, { "m_templateID.m_full", "m_templateID", "m_templateId", "m_templateIDHash" })),
                 SqlNumber(Find(*object, { "m_nObjectID", "m_objectID", "m_objectId", "nObjectID" })),
-                ObjectJson(Find(*object, { "m_location", "m_position" })),
-                ObjectJson(Find(*object, { "m_orientation", "m_direction" })),
+                ValueJson(Find(*object, { "m_location", "m_position" })),
+                ValueJson(Find(*object, { "m_orientation", "m_direction" })),
                 SqlNumber(Find(*object, { "m_fScale", "m_scale" })),
                 SqlString(Find(*object, { "m_zoneTag" })),
                 SqlNumber(Find(*object, { "m_startState", "m_initialState" })),
