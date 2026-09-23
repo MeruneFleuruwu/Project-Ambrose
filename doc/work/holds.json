@@ -8,12 +8,6 @@
       "since": "2026-09-18"
     },
     {
-      "scope": "milestone:4.01",
-      "who": "the maintainer's panel session",
-      "what": "the world tick, ScriptMgr and the script and module loader, which the whole game layer sits on",
-      "since": "2026-09-22"
-    },
-    {
       "scope": "milestone:4.02",
       "who": "the maintainer's panel session",
       "what": "CommandMgr and security levels, which open 17.05 and the panel's roles straight after",
