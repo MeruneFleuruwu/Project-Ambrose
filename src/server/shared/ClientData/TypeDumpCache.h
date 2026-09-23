@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * The type dumps Ambrose builds itself, one per client revision, in the Ambrose data folder's types folder: a dump is current when the revision and executable SHA-256 recorded in its header match the install, and Ensure returns a current dump, running typeextract as a child process that ends with its parent when it is missing or stale, while an operating system lock on a lock file, released however its holder ends, keeps processes started together from extracting the same revision twice.
+ * The type dumps Ambrose builds itself, one per client revision, in the Ambrose data folder's types folder: a dump is current when the revision and executable SHA-256 recorded in its header match the install, and Ensure returns a current dump, running typeextract as a child process that ends with its parent when it is missing or stale, while an operating system lock on a lock file, released however its holder ends, keeps processes started together from extracting the same revision twice. Beside each dump lives the fast copy every server and tool actually reads, the same data in the binary form that loads in a fraction of the time; EnsureFastCopy writes it once from the JSON, so the cost of parsing seventeen megabytes of text is paid on the first run after an extraction and by nobody afterwards.
  */
 
 #ifndef AMBROSE_TYPEDUMPCACHE_H
@@ -50,6 +50,8 @@ public:
     static bool IsCurrent(ClientInstall const& install, std::filesystem::path const& dump, std::string_view executableSha256);
     static std::optional<std::filesystem::path> Ensure(ClientInstall const& install, TypeDumpCacheOptions const& options, std::string& error);
     static std::filesystem::path DefaultExtractor(std::filesystem::path const& executableDirectory);
+    static std::filesystem::path FastCopyOf(std::filesystem::path const& dump);
+    static bool EnsureFastCopy(std::filesystem::path const& dump, std::string& error);
 };
 
 #endif

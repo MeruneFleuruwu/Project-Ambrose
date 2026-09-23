@@ -512,9 +512,13 @@ TEST(ClientSetupTest, AskOffersTheFindsAndABuildOnlyWhenThereIsSomethingToOffer)
 
     SetupHarness nothing("ClientDir =\nTypeDumpPath =\nSetup.Mode = ask\n", {}, false);
     ClientSetupResult const none = nothing.Run({ "", "" });
-    EXPECT_EQ(nothing.Counters->Reads.load(), 0);
-    EXPECT_EQ(nothing.Out.str(), "");
-    EXPECT_FALSE(none.Install);
+    EXPECT_GT(nothing.Counters->Reads.load(), 0) << "a machine with no install is asked to get one, which is the one thing left to offer";
+    EXPECT_NE(nothing.Out.str().find("none was found on this machine"), std::string::npos) << nothing.Out.str();
+    EXPECT_NE(nothing.Out.str().find("Ambrose never downloads it for you"), std::string::npos) << nothing.Out.str();
+    EXPECT_NE(nothing.Out.str().find("Look again, now that Wizard101 is installed"), std::string::npos) << nothing.Out.str();
+    EXPECT_NE(nothing.Out.str().find("Still no Wizard101 install on this machine"), std::string::npos)
+        << "looking again and finding nothing says so and offers to look once more, rather than giving up on the first try: " << nothing.Out.str();
+    EXPECT_FALSE(none.Install) << "no amount of looking invents an install that is not there";
     EXPECT_TRUE(nothing.Reported(true, "ClientDir is not set, and no Wizard101 install was found on this machine; set ClientDir in conf.d/client-data.conf to the folder that holds Data and Bin")) << nothing.AllReports();
 
     SetupHarness quiet("ClientDir =\nTypeDumpPath =\nSetup.Mode = ask\n");

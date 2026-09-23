@@ -176,6 +176,39 @@ namespace
         return std::nullopt;
     }
 
+    std::optional<ClientInstall> AskToInstallAndRetry(SetupPrompt& prompt, ClientSystem const& system, std::string_view app,
+        std::vector<ClientCandidate>& found, std::function<void()> const& search)
+    {
+        prompt.Say(fmt::format("{} needs your own Wizard101 install, and none was found on this machine.", app));
+        prompt.Say("Install Wizard101 from KingsIsle, or copy an install onto this machine. Ambrose never downloads it for you.");
+
+        std::vector<std::string> const options{ "Look again, now that Wizard101 is installed", "Start without client data for now" };
+        while (prompt.IsInteractive())
+        {
+            SetupPrompt::Choice const choice = prompt.Choose("When it is installed, choose the first option, or type the folder that holds Data and Bin.", options);
+            if (choice.Kind == SetupPrompt::Answer::Skipped || (choice.Kind == SetupPrompt::Answer::Picked && choice.Index == 1))
+                return std::nullopt;
+
+            if (choice.Kind == SetupPrompt::Answer::Path)
+            {
+                if (std::optional<ClientInstall> install = ClientInstall::Inspect(system, ClientSetup::TypedPath(system, choice.Path)))
+                    return install;
+                prompt.Say(fmt::format("{} holds no Wizard101 install: there is no Data/GameData/Root.wad in it.", Ambrose::ForLog(choice.Path, 512)));
+                continue;
+            }
+
+            found.clear();
+            search();
+            if (!found.empty())
+            {
+                prompt.Say(fmt::format("Found {}.", ListInstalls(found)));
+                return found.front().Install;
+            }
+            prompt.Say("Still no Wizard101 install on this machine. Install it and choose the first option again, or type its folder.");
+        }
+        return std::nullopt;
+    }
+
     std::optional<std::filesystem::path> AskTypeDump(SetupPrompt& prompt, ClientSystem const& system, std::vector<TypeDumpCandidate> const& dumps, std::string const& question)
     {
         std::vector<std::string> options;
@@ -653,6 +686,18 @@ ClientSetupResult ClientSetup::ForServer(ConfigMgr& config, SetupPrompt& prompt,
                     say(true, fmt::format("{}, so {} uses the newest Wizard101 install on this machine for this run only: {}. ClientDir is not replaced in case its folder is only unavailable for now; point ClientDir in {} at the install to keep, or empty it to save the newest", clientReason, app,
                         DescribeInstall(*newest), SourceOf(config.Resolve(std::string(ClientDirKey)))));
             }
+            else if (prompt.IsInteractive())
+            {
+                if (std::optional<ClientInstall> const answer = AskToInstallAndRetry(prompt, system, app, result.Installs, [&] { searched = false; search(); }))
+                {
+                    install = answer;
+                    inspected = true;
+                    picked = true;
+                    keep(ClientDirKey, install->Root);
+                }
+                else
+                    say(true, fmt::format("{}, and no Wizard101 install was found on this machine, so {} runs without client data; install Wizard101, or set ClientDir in conf.d/{} to the folder that holds Data and Bin", clientReason, app, SavedFileName));
+            }
             else
                 say(true, fmt::format("{}, and no Wizard101 install was found on this machine, so {} runs without client data; install Wizard101, or set ClientDir in conf.d/{} to the folder that holds Data and Bin", clientReason, app, SavedFileName));
         }
@@ -660,7 +705,20 @@ ClientSetupResult ClientSetup::ForServer(ConfigMgr& config, SetupPrompt& prompt,
         {
             search();
             if (result.Installs.empty())
-                say(true, fmt::format("{}, and no Wizard101 install was found on this machine; set ClientDir in conf.d/{} to the folder that holds Data and Bin", clientReason, SavedFileName));
+            {
+                std::optional<ClientInstall> const answer = prompt.IsInteractive()
+                    ? AskToInstallAndRetry(prompt, system, app, result.Installs, [&] { searched = false; search(); })
+                    : std::nullopt;
+                if (answer)
+                {
+                    install = answer;
+                    inspected = true;
+                    picked = true;
+                    keep(ClientDirKey, install->Root);
+                }
+                else
+                    say(true, fmt::format("{}, and no Wizard101 install was found on this machine; set ClientDir in conf.d/{} to the folder that holds Data and Bin", clientReason, SavedFileName));
+            }
             else
             {
                 if (prompt.IsInteractive())

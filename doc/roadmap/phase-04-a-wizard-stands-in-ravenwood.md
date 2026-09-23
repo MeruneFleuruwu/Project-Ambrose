@@ -106,8 +106,8 @@ An account's security level decides which chat-prefixed GM commands it may run, 
 
 **Acceptance**
 
-- [ ] A realm with last_heartbeat older than Realm.OfflineAfterIntervals (default 3) is excluded; policy picks the named, else least-full realm
-- [ ] Starting a gameserver refreshes its heartbeat; stopping it goes offline
+- [x] A realm with last_heartbeat older than Realm.OfflineAfterIntervals (default 3) is excluded; policy picks the named, else least-full realm
+- [x] Starting a gameserver refreshes its heartbeat; stopping it goes offline
 
 ### Detailed spec from LOG-10: Realm registry: realmlist table and gameserver heartbeat
 
@@ -135,8 +135,8 @@ The login server knows which gameservers (realms) are up, where they listen, and
 
 **Acceptance**
 
-- [ ] Unit: a realm whose last_heartbeat is older than Realm.OfflineAfterIntervals heartbeat intervals (default 3) is excluded; the selection policy picks the named realm when it is online, otherwise the least-full one, and returns none when every realm is offline
-- [ ] Integration: starting one gameserver makes its realmlist row show a fresh heartbeat within 1 interval, and stopping it makes the loginserver treat it as offline
+- [x] Unit: a realm whose last_heartbeat is older than Realm.OfflineAfterIntervals heartbeat intervals (default 3) is excluded; the selection policy picks the named realm when it is online, otherwise the least-full one, and returns none when every realm is offline
+- [x] Integration: starting one gameserver makes its realmlist row show a fresh heartbeat within 1 interval, and stopping it makes the loginserver treat it as offline
 
 **Risks**
 

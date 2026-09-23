@@ -3,6 +3,8 @@
  * Login server entry point: runs setup in Setup.Mode for the install and type dump, stopping cleanly when a stop arrives meanwhile and never saving an install it has no type dump for, loads account and login settings and the type dump, declares the login message table and checks it against the client's message definitions, refuses to serve clients from an install without a type dump, naming why and where ClientDir came from, or without both databases, opens the login and characters databases, which the admin API reports, lists the updates of and applies data-only updates to while the server runs, listens for clients, and offers account console commands until shutdown, telling connected clients before it shuts down and closing the databases, which drains their callbacks, before its network threads stop.
  */
 
+#include "TypeDumpCache.h"
+#include "RealmLoader.h"
 #include "AccountCommands.h"
 #include "AccountMgr.h"
 #include "AppenderDB.h"
@@ -154,8 +156,9 @@ namespace
                 LOG_WARN("server.loginserver", "No type dump is in use, so ObjectProperty data cannot be read or written: {}", setup.TypeDumpError);
             else
             {
-                std::filesystem::path binary = *setup.TypeDump;
-                binary.replace_extension(".bin");
+                std::filesystem::path const binary = TypeDumpCache::FastCopyOf(*setup.TypeDump);
+                if (std::string fastCopyError; !TypeDumpCache::EnsureFastCopy(*setup.TypeDump, fastCopyError))
+                    LOG_WARN("server.loginserver", "The type dump's fast copy could not be built, so it is read from JSON this time: {}", fastCopyError);
                 bool loaded = false;
                 if (std::filesystem::exists(binary))
                     loaded = sTypeRegistry.LoadBinary(binary, *setup.TypeDump, setup.Install ? setup.Install->Revision : std::string_view{});
@@ -198,7 +201,13 @@ namespace
             SetClientSetup(setup.Install.has_value(), setup.TypeDump.has_value(), false, setup.TypeDumpError);
             sStats.Publish("sessions", [this] { return Ambrose::StatValue(static_cast<int64>(_sockets ? _sockets->GetConnectionCount() : 0)); });
             AccountCommands::Register(Commands());
+            _realms.Configure(RealmLoaderSettings::Load(Config()));
             return true;
+        }
+
+        void OnUpdate(std::chrono::milliseconds diff) override
+        {
+            _realms.Update(diff);
         }
 
         void OnStatus(std::vector<std::pair<std::string, std::string>>& fields) override
@@ -222,6 +231,7 @@ namespace
     private:
         std::shared_ptr<SessionContext> _context;
         std::unique_ptr<SocketMgr<LoginSession>> _sockets;
+        RealmLoader _realms;
         DatabaseLoader _databases;
         AdminDatabaseView _databaseView;
     };

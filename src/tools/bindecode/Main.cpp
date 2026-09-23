@@ -22,6 +22,7 @@
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -38,13 +39,16 @@ namespace
        bindecode [options] --list [pattern]
        bindecode [options] --sweep
 
-Prints BINd entries of a KIWAD archive from your own Wizard101 install as JSON.
+Prints BINd entries of a KIWAD archive from your own Wizard101 install as JSON,
+and with --text any other entry, such as one of the client's own XML files, as the
+text it holds.
 
 Options:
   --client <dir>      the install holding Data/GameData (default: AMBROSE_CLIENT_DIR)
   --wad <file>        an archive in Data/GameData, or a path to one (default: Root.wad)
   --type-dump <file>  the type dump made from that install (default: AMBROSE_TYPE_DUMP_PATH)
   --compact           print each object's JSON on one line
+  --text              print an entry that is not BINd, such as an XML file, as text
   --threads <count>   threads a sweep decodes on, 1-1024 (default: every hardware thread)
   --list [pattern]    print entry names that contain the pattern
   --sweep             decode every BINd entry and report what does not decode cleanly
@@ -62,12 +66,26 @@ list its root class.
         std::string Wad = "Root.wad";
         std::optional<std::string> TypeDump;
         bool Compact = false;
+        bool Text = false;
         bool List = false;
         bool Sweep = false;
         bool Help = false;
         unsigned Threads = 0;
         std::vector<std::string> Entries;
     };
+
+    std::optional<std::string> AsText(std::span<uint8 const> data)
+    {
+        std::string text;
+        text.reserve(data.size());
+        for (uint8 const byte : data)
+        {
+            if (byte == 0 || (byte < 0x20 && byte != '\t' && byte != '\n' && byte != '\r'))
+                return std::nullopt;
+            text.push_back(static_cast<char>(byte));
+        }
+        return text;
+    }
 
     std::optional<Arguments> Parse(std::vector<std::string> const& args, std::string& error)
     {
@@ -88,6 +106,8 @@ list its root class.
                 parsed.Help = true;
             else if (arg == "--compact")
                 parsed.Compact = true;
+            else if (arg == "--text")
+                parsed.Text = true;
             else if (arg == "--sweep")
                 parsed.Sweep = true;
             else if (arg == "--list")
@@ -162,6 +182,17 @@ list its root class.
             {
                 std::cerr << fmt::format("{}: {}\n", name, read.Error);
                 status = Failure;
+                continue;
+            }
+            if (arguments.Text)
+            {
+                if (std::optional<std::string> const text = AsText(read.Data))
+                    std::cout << *text << (text->empty() || text->back() == '\n' ? "" : "\n");
+                else
+                {
+                    std::cerr << fmt::format("{}: the data is not text: it holds bytes no text file has\n", name);
+                    status = Failure;
+                }
                 continue;
             }
             BindReadResult const result = BindFile::Read(catalog, read.Data);

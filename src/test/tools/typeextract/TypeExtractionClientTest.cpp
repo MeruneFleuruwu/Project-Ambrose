@@ -1,10 +1,11 @@
 /*
  * Project Ambrose by Imjustchico
- * Extracts the type dump from the user's own install named by AMBROSE_CLIENT_DIR and checks that it validates, round-trips through the dump writer and loader into a type catalog, and matches the dump AMBROSE_TYPE_DUMP_PATH names except for classes that dump missed and option values it wrote as 0 where the client holds empty text, which for r806919.Wizard_1_610 must be exactly its 5 known classes and 60 option values; also extracts AMBROSE_SECOND_CLIENT_DIR when set, whose dump the extraction has already built into a catalog.
+ * Extracts the type dump from the user's own install named by AMBROSE_CLIENT_DIR and checks that it validates, round-trips through the dump writer and loader into a type catalog, and matches the dump AMBROSE_TYPE_DUMP_PATH names except for classes that dump missed and option values it wrote as 0 where the client holds empty text, which for r806919.Wizard_1_610 must be exactly its 5 known classes and 60 option values against the reference dump and nothing at all against a dump this project's own extractor wrote; also extracts AMBROSE_SECOND_CLIENT_DIR when set, whose dump the extraction has already built into a catalog.
  */
 
 #include "ConfigMgr.h"
 #include "Environment.h"
+#include "TypeDumpCache.h"
 #include "TypeDumpLoader.h"
 #include "TypeDumpWriter.h"
 #include "TypeExtraction.h"
@@ -25,6 +26,7 @@
 namespace
 {
     constexpr std::string_view PinnedReferenceRevision = "r806919.Wizard_1_610";
+    constexpr std::string_view OurExtractor = "typeextract";
 
     std::optional<std::filesystem::path> EnvironmentPath(char const* name)
     {
@@ -104,15 +106,24 @@ TEST(TypeExtractionClientTest, TheInstallExtractsValidatesAndMatchesTheReference
     EXPECT_TRUE(unexpected.empty());
     if (result.Metadata.Revision == PinnedReferenceRevision)
     {
-        std::set<std::string> const knownExtraClasses{
-            "MadlibArgT<unsigned __int64>",
-            "class MadlibArgT<unsigned __int64>*",
-            "class WeakPointer<class PropertyClass>",
-            "enum PhysicsSimMass::CylinderDirection",
-            "struct CrownShopViews::OnSelectCallbackArg"
-        };
-        EXPECT_EQ(onlyOurs, knownExtraClasses);
-        EXPECT_EQ(emptyOptionValues, 60u);
+        std::optional<TypeDumpHeader> const header = TypeDumpCache::ReadHeader(*referencePath);
+        if (header && header->Extractor.starts_with(OurExtractor))
+        {
+            EXPECT_TRUE(onlyOurs.empty()) << "extracting an install twice must discover the same classes both times";
+            EXPECT_EQ(emptyOptionValues, 0u) << "extracting an install twice must write the same option values both times";
+        }
+        else
+        {
+            std::set<std::string> const knownExtraClasses{
+                "MadlibArgT<unsigned __int64>",
+                "class MadlibArgT<unsigned __int64>*",
+                "class WeakPointer<class PropertyClass>",
+                "enum PhysicsSimMass::CylinderDirection",
+                "struct CrownShopViews::OnSelectCallbackArg"
+            };
+            EXPECT_EQ(onlyOurs, knownExtraClasses);
+            EXPECT_EQ(emptyOptionValues, 60u);
+        }
     }
 }
 

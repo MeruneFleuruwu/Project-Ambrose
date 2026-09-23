@@ -4,6 +4,9 @@
  */
 
 #include "TypeDumpCache.h"
+
+#include "TypeDumpLoader.h"
+#include "TypeRegistryBinary.h"
 #include "ConfigMgr.h"
 #include "SHA256.h"
 #include "StringUtil.h"
@@ -750,4 +753,51 @@ std::filesystem::path TypeDumpCache::DefaultExtractor(std::filesystem::path cons
     if (!std::filesystem::is_regular_file(native, error) && std::filesystem::is_regular_file(other, error))
         return other;
     return native;
+}
+
+std::filesystem::path TypeDumpCache::FastCopyOf(std::filesystem::path const& dump)
+{
+    std::filesystem::path binary = dump;
+    binary.replace_extension(".bin");
+    return binary;
+}
+
+bool TypeDumpCache::EnsureFastCopy(std::filesystem::path const& dump, std::string& error)
+{
+    std::filesystem::path const binary = FastCopyOf(dump);
+    std::error_code code;
+    if (std::filesystem::exists(binary, code))
+    {
+        std::filesystem::file_time_type const built = std::filesystem::last_write_time(binary, code);
+        std::filesystem::file_time_type const source = std::filesystem::last_write_time(dump, code);
+        if (!code && built >= source)
+            return true;
+    }
+    if (!std::filesystem::exists(dump, code))
+    {
+        error = "there is no type dump to build a fast copy of";
+        return false;
+    }
+
+    std::ifstream stream(dump, std::ios::binary);
+    if (!stream)
+    {
+        error = "the type dump cannot be opened";
+        return false;
+    }
+    std::string const text((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
+    if (stream.bad())
+    {
+        error = "the type dump cannot be read";
+        return false;
+    }
+
+    TypeDumpLoader::RawDump raw;
+    std::vector<std::string> errors;
+    if (!TypeDumpLoader::Parse(text, raw, errors))
+    {
+        error = errors.empty() ? std::string("the type dump is not valid") : errors.front();
+        return false;
+    }
+    return TypeRegistryBinary::Write(binary, raw, dump.stem().string(), error);
 }

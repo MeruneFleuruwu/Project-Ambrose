@@ -1,25 +1,39 @@
 /*
  * Project Ambrose by Imjustchico
- * Loads the user's own r806919 type dump into the type registry when AMBROSE_TYPE_DUMP_PATH names it, and checks the class kind counts, that every property type is classified, the load time and size, WizClientObject's first properties in id order, that pointer aliases of unprefixed templates join their class, and that integer defaults are not taken for enum options.
+ * Loads the user's own r806919 type dump into the type registry when AMBROSE_TYPE_DUMP_PATH names it, and checks the class kind counts for the shape the dump's own header names, the reference dump's or the larger one this project's extractor writes, that every property type is classified, the load time and size, WizClientObject's first properties in id order, that pointer aliases of unprefixed templates join their class, and that integer defaults are not taken for enum options.
  */
 
 #include "Environment.h"
 #include "LogConfig.h"
+#include "TypeDumpCache.h"
 #include "TypeRegistry.h"
 
 #include <gtest/gtest.h>
 
 #include <chrono>
 #include <iostream>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <variant>
 #include <vector>
+
+namespace
+{
+    constexpr std::string_view PinnedRevision = "r806919.Wizard_1_610";
+    constexpr std::string_view OurExtractor = "typeextract";
+}
 
 TEST(TypeRegistryClientTest, TheR806919DumpLoadsAndClassifiesEveryType)
 {
     std::optional<std::string> const path = Ambrose::GetEnv("AMBROSE_TYPE_DUMP_PATH");
     if (!path || path->empty())
         GTEST_SKIP() << "set AMBROSE_TYPE_DUMP_PATH to the r806919 type dump (format v2) from your own client to run this test";
+
+    std::optional<TypeDumpHeader> const header = TypeDumpCache::ReadHeader(LogConfig::Utf8Path(*path));
+    if (header && !header->Revision.empty() && header->Revision != PinnedRevision)
+        GTEST_SKIP() << "these counts are r806919.Wizard_1_610's, and AMBROSE_TYPE_DUMP_PATH names " << header->Revision;
+    bool const ours = header && header->Extractor.starts_with(OurExtractor);
 
     TypeRegistry registry;
     auto const start = std::chrono::steady_clock::now();
@@ -28,15 +42,15 @@ TEST(TypeRegistryClientTest, TheR806919DumpLoadsAndClassifiesEveryType)
     TypeCatalogPtr const catalog = registry.GetCatalog();
     ASSERT_TRUE(catalog);
 
-    EXPECT_EQ(catalog->GetClassCount(ClassKind::PropertyClass), 2197u);
-    EXPECT_EQ(catalog->GetClassCount(ClassKind::Enum), 140u);
+    EXPECT_EQ(catalog->GetClassCount(ClassKind::PropertyClass), ours ? 2198u : 2197u);
+    EXPECT_EQ(catalog->GetClassCount(ClassKind::Enum), ours ? 141u : 140u);
     EXPECT_EQ(catalog->GetClassCount(ClassKind::Primitive), 37u);
     EXPECT_EQ(catalog->GetClassCount(ClassKind::Container), 168u);
     EXPECT_EQ(catalog->GetClassCount(ClassKind::ValueType), 13u);
-    EXPECT_EQ(catalog->GetClassCount(ClassKind::Opaque), 37u);
-    EXPECT_EQ(catalog->GetClasses().size(), 2592u);
-    EXPECT_EQ(catalog->GetAliasCount(), 4397u);
-    EXPECT_EQ(catalog->GetPropertyCount(), 16493u);
+    EXPECT_EQ(catalog->GetClassCount(ClassKind::Opaque), ours ? 39u : 37u);
+    EXPECT_EQ(catalog->GetClasses().size(), ours ? 2596u : 2592u);
+    EXPECT_EQ(catalog->GetAliasCount(), ours ? 4398u : 4397u);
+    EXPECT_EQ(catalog->GetPropertyCount(), ours ? 16495u : 16493u);
     EXPECT_LT(elapsed, std::chrono::seconds(10));
     EXPECT_LT(catalog->GetApproximateBytes(), std::size_t{ 150 } << 20);
     std::cout << "Loaded the type dump in " << std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count() << " ms, about " << ((catalog->GetApproximateBytes() + (std::size_t{ 1 } << 19)) >> 20) << " MiB\n";

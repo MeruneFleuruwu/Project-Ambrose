@@ -38,6 +38,12 @@ void LoginSession::HandleLoginNotAfk(LoginMessages::LoginNotAfk&)
 {
 }
 
+void LoginSession::HandleRequestServerList(LoginMessages::RequestServerList&)
+{
+    LoginMessages::ServerList list;
+    SendDmlMessage(list);
+}
+
 bool LoginSession::SendShutdownNotice(uint32 message)
 {
     LoginMessages::LoginServerShutdown notice;

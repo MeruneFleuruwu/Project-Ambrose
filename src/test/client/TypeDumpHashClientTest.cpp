@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Checks every class hash and property hash in the user's own r806919 type dump against the client string hashes, when AMBROSE_TYPE_DUMP_PATH names the dump.
+ * Checks every class hash and property hash in the user's own type dump against the client string hashes, when AMBROSE_TYPE_DUMP_PATH names the dump, and for r806919 checks its class and property counts against the shape its own header names, the reference dump's or the larger one this project's extractor writes.
  */
 
 #include "Environment.h"
@@ -11,12 +11,16 @@
 #include <nlohmann/json.hpp>
 
 #include <fstream>
+#include <iostream>
 #include <optional>
 #include <string>
+#include <string_view>
 
 namespace
 {
     constexpr std::size_t ReportedMismatches = 20;
+    constexpr std::string_view PinnedRevision = "r806919.Wizard_1_610";
+    constexpr std::string_view OurExtractor = "typeextract";
 
     std::optional<uint32> ReadHash(nlohmann::json const& value)
     {
@@ -61,6 +65,14 @@ TEST(TypeDumpHashClientTest, EveryClassAndPropertyHashMatches)
         }
     }
     EXPECT_EQ(mismatches, 0u);
-    EXPECT_EQ(classes, 6981u);
-    EXPECT_EQ(properties, 49461u);
+    std::string const revision = dump.value("revision", std::string());
+    bool const ours = dump.value("extractor", std::string()).starts_with(OurExtractor);
+    std::cout << "Checked " << classes << " classes and " << properties << " properties of "
+              << (revision.empty() ? std::string("a dump naming no revision") : revision)
+              << (ours ? ", written by this project's extractor" : ", not written by this project's extractor") << std::endl;
+    if (revision.empty() || revision == PinnedRevision)
+    {
+        EXPECT_EQ(classes, ours ? 6986u : 6981u);
+        EXPECT_EQ(properties, ours ? 49465u : 49461u);
+    }
 }
