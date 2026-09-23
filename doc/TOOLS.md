@@ -37,7 +37,7 @@ This applies to contributors as well, and their prompts say so. Before writing a
 
 ## Early
 
-### zone_extractor
+### zone_extractor (built in part in 4.08)
 
 `zone_extractor` reads only the operator's own `Data/GameData/*.wad` files. It
 opens each archive, looks for `gamedata.bin`, and decodes the file-level
@@ -290,9 +290,9 @@ Place and tune spatial content from inside the retail Wizard101 client (spawn po
 - Security levels per command in cs_spawn.cpp, cs_session.cpp; open to GMs on dev, admin level on other servers, and audited everywhere
 - Changes are streamed live to clients in the zone
 
-### zone_extractor
+### zone_extractor, the rest of it
 
-Turn each zone WAD (3,356 contain gamedata.bin) into server data: retail spawn points, triggers, volumes, portals/teleporters, path data, collision (collision.bcd), nav (zone.nav), plus a local minimap/top-down geometry cache for editors.
+The tool above already decodes every one of these archives and writes zone templates, named locations and object placements. What follows is the rest of what it should read, and belongs in the same tool rather than a second one. Turn each zone WAD (3,356 contain gamedata.bin) into server data: retail spawn points, triggers, volumes, portals/teleporters, path data, collision (collision.bcd), nav (zone.nav), plus a local minimap/top-down geometry cache for editors.
 
 - **Form:** CLI (C++)
 - **Inspired by:** vmap4_extractor + vmap4_assembler + mmaps_generator split; mmaps-config.yaml

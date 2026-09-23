@@ -40,15 +40,17 @@ The card is generated from the roadmap itself by `apps/progress/progress.py`, so
 
 | Working | Not yet |
 |---|---|
-| Session handshake against a retail client | World, zones and movement |
-| Signing in, a wrong password, and a retry | Quests, combat, pets, housing |
-| The character list, and the shutdown notice | Character creation end to end |
-| Ambrose's own launcher starting the client | Panel accounts, roles and the pages after the overview |
-| Type extraction from your own installation | Patch serving |
-| The admin API: health, status, and a live log stream with secrets hidden | |
-| The panel's overview, served by each server and signed in once | |
+| Session handshake against a retail client, signing in, a wrong password and a retry | A wizard standing in a zone, and moving |
+| The character list, picking one, and the handoff to the game server with the key it was issued | Quests, combat, pets, housing |
+| Ambrose's own launcher starting your own client | Character creation end to end |
+| The game layer's core: a world tick, scripts and modules that join the build by existing, command handling with security levels | Serving patches to a client |
+| Reading your own installation: type extraction, archives, the object format byte for byte, every zone's templates, locations and object placements | The panel's pages beyond the overview, and roles |
+| The admin API and a live log stream with secrets hidden, a supervisor that runs the servers and takes back the ones still running, and the panel's overview with its own accounts | |
+| Errors an app raises, grouped by where they came from, downloadable as a report | |
 
-[doc/ROADMAP.md](doc/ROADMAP.md)'s **Where we are** says exactly which milestones are done. The plan runs in **17 phases**, each milestone ending in something visible in the real client or the panel.
+[doc/ROADMAP.md](doc/ROADMAP.md)'s **Where we are** says exactly which milestones are done, and the [work board](https://justchicoo.github.io/Project-Ambrose/) says what is being built right now and by whom. The plan runs in **17 phases**, each milestone ending in something visible in the real client or the panel.
+
+Outside contributors finished five of those milestones in a single day on 2026-09-23, and four more are part built. What the board shows is generated from the roadmap and the open pull requests every time either changes, so it says what is true rather than what was true.
 
 ## Building
 
