@@ -139,8 +139,8 @@ std::string AdminStatus::CapabilitiesJson()
 
 void AdminStatus::Register(AdminRouter& router, Source source)
 {
-    router.Add("GET", "/api/status", [source](AdminRequest const&) { return AdminResponse::Json(200, StatusJson(source())); });
-    router.Add("GET", "/api/apps", [source](AdminRequest const&) { return AdminResponse::Json(200, AppsJson(source())); });
-    router.Add("GET", "/api/capabilities", [](AdminRequest const&) { return AdminResponse::Json(200, CapabilitiesJson()); });
-    router.Add("GET", "/api/errors", [source](AdminRequest const&) { return AdminResponse::Json(200, ErrorsJson(source().App.Name)); });
+    router.AddGuarded("GET", "/api/status", "status.read", [source](AdminRequest const&) { return AdminResponse::Json(200, StatusJson(source())); });
+    router.AddGuarded("GET", "/api/apps", "status.read", [source](AdminRequest const&) { return AdminResponse::Json(200, AppsJson(source())); });
+    router.AddOpen("GET", "/api/capabilities", [](AdminRequest const&) { return AdminResponse::Json(200, CapabilitiesJson()); });
+    router.AddGuarded("GET", "/api/errors", "status.read", [source](AdminRequest const&) { return AdminResponse::Json(200, ErrorsJson(source().App.Name)); });
 }

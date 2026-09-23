@@ -1,4 +1,4 @@
-<!-- Project Ambrose by Imjustchico: The remote console, live: it lists the apps the supervisor runs, sends what is typed to the app's own command route and prints what came back, keeping each app's output and its recalled commands in memory only. A command that cannot be undone comes back refused rather than run, and typing yes sends the same command again with the confirmation the server asked for, so the confirming is a thing the operator does on purpose rather than a flag the page sets for them. A refusal is printed in the colour of something wrong with the reason the server gave, never as though it had worked, and the prompt is closed while an app is not running or a command is still out. -->
+<!-- Project Ambrose by Imjustchico: The remote console, live: it lists the apps the supervisor runs, sends what is typed to the app's own command route and prints what came back, keeping each app's output and its recalled commands in memory only. A command that cannot be undone comes back refused rather than run, and typing yes sends the same command again with the confirmation the server asked for, so the confirming is a thing the operator does on purpose rather than a flag the page sets for them. A refusal is printed in the colour of something wrong with the reason the server gave, never as though it had worked, and the prompt is closed while an app is not running or a command is still out. The prompt and the power controls are there only for an operator who may use them, hidden by the same permissions the server checks, so the page never offers what would come back refused. -->
 <script lang="ts">
     import * as Card from "$lib/components/ui/card/index.js";
     import * as Select from "$lib/components/ui/select/index.js";
@@ -20,6 +20,7 @@
     import { ApiError } from "$lib/api.svelte.js";
     import { formatUptime } from "$lib/format.js";
     import { live } from "$lib/status.svelte.js";
+    import { may } from "$lib/permission.svelte.js";
     import { runCommand, supervised } from "$lib/supervision.svelte.js";
     import type { AppEntry } from "$lib/schemas.js";
 
@@ -36,6 +37,10 @@
 
     const entries = $derived(supervised());
     const entry = $derived(entries.find((one) => one.name === focus.app) ?? entries[0]);
+    const mayType = $derived(may("console.write", entry?.name));
+    const mayStart = $derived(may("power.start", entry?.name));
+    const mayRestart = $derived(may("power.restart", entry?.name));
+    const mayStop = $derived(may("power.stop", entry?.name));
 
     function appearance(one: AppEntry | undefined): { tone: Tone; word: string } {
         const supervision = one?.supervision;
@@ -177,12 +182,15 @@
             </Select.Content>
         </Select.Root>
         {#if !app.running}
-            <Button onclick={() => requestPower("start", app.name)}><PlayIcon />Start</Button>
+            {#if mayStart}<Button onclick={() => requestPower("start", app.name)}><PlayIcon />Start</Button>{/if}
         {:else}
-            <Button variant="outline" onclick={() => requestPower("restart", app.name)}><RotateCcwIcon />Restart</Button>
-            <Button variant="outline" class="text-destructive hover:text-destructive" onclick={() => requestPower("stop", app.name)}
-                ><SquareIcon />Stop</Button
-            >
+            {#if mayRestart}<Button variant="outline" onclick={() => requestPower("restart", app.name)}><RotateCcwIcon />Restart</Button
+                >{/if}
+            {#if mayStop}
+                <Button variant="outline" class="text-destructive hover:text-destructive" onclick={() => requestPower("stop", app.name)}
+                    ><SquareIcon />Stop</Button
+                >
+            {/if}
         {/if}
     {/snippet}
 </PageHeader>
@@ -218,20 +226,28 @@
                 <p class="font-sans text-sm text-muted-foreground">Nothing here yet. Type a command below, like status.</p>
             {/each}
         </div>
-        <form class="flex items-center gap-2 border-t bg-sidebar/60 px-4 py-2" onsubmit={send}>
-            <span class="font-mono text-primary select-none" aria-hidden="true">›</span>
-            <input
-                bind:value={line}
-                onkeydown={browse}
-                placeholder={!app.running ? `${app.name} is not running` : "Type a command, like status. Up and down recall earlier ones."}
-                disabled={!app.running || sending}
-                class="h-9 min-w-0 flex-1 bg-transparent font-mono text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
-                aria-label="Command"
-                autocomplete="off"
-                spellcheck="false"
-            />
-            <Button type="submit" size="sm" disabled={!app.running || sending || line.trim() === ""}><SendIcon />Send</Button>
-        </form>
+        {#if mayType}
+            <form class="flex items-center gap-2 border-t bg-sidebar/60 px-4 py-2" onsubmit={send}>
+                <span class="font-mono text-primary select-none" aria-hidden="true">›</span>
+                <input
+                    bind:value={line}
+                    onkeydown={browse}
+                    placeholder={!app.running
+                        ? `${app.name} is not running`
+                        : "Type a command, like status. Up and down recall earlier ones."}
+                    disabled={!app.running || sending}
+                    class="h-9 min-w-0 flex-1 bg-transparent font-mono text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
+                    aria-label="Command"
+                    autocomplete="off"
+                    spellcheck="false"
+                />
+                <Button type="submit" size="sm" disabled={!app.running || sending || line.trim() === ""}><SendIcon />Send</Button>
+            </form>
+        {:else}
+            <p class="border-t bg-sidebar/60 px-4 py-3 text-sm text-muted-foreground">
+                You can read {app.name}'s output here. Sending it a command needs console.write on this app.
+            </p>
+        {/if}
     </Card.Root>
 
     <div class="grid content-start gap-3 @md/main:grid-cols-2 @4xl/main:grid-cols-1">

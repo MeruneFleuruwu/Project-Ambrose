@@ -91,29 +91,118 @@ AdminRouter::AdminRouter(AdminAuth& auth) : _auth(auth)
 {
 }
 
-void AdminRouter::Put(std::string method, std::string path, Handler handler, bool isPublic, bool prefix, uint32 cost)
+void AdminRouter::Put(std::string method, std::string path, Handler handler, RouteAccess access, bool prefix, uint32 cost, std::string permission)
 {
     std::unique_lock const lock(_mutex);
+    if (access == RouteAccess::Permission && _known && !_known(permission))
+        return;
     std::string const upper = Ambrose::ToUpper(method);
     auto const existing = std::find_if(_routes.begin(), _routes.end(), [&](Route const& route) { return route.Method == upper && route.Path == path && route.Prefix == prefix; });
     if (existing != _routes.end())
     {
         existing->Run = std::move(handler);
-        existing->Public = isPublic;
+        existing->Access = access;
         existing->Cost = cost;
+        existing->Permission = std::move(permission);
         return;
     }
-    _routes.push_back({ upper, std::move(path), std::move(handler), isPublic, prefix, cost });
+    _routes.push_back({ upper, std::move(path), std::move(handler), access, prefix, cost, std::move(permission) });
+}
+
+void AdminRouter::AddOpen(std::string method, std::string path, Handler handler)
+{
+    Put(std::move(method), std::move(path), std::move(handler), RouteAccess::AnyMember);
+}
+
+void AdminRouter::AddOpenPrefix(std::string method, std::string prefix, Handler handler)
+{
+    if (prefix.empty() || prefix.back() != '/')
+        prefix.push_back('/');
+    Put(std::move(method), std::move(prefix), std::move(handler), RouteAccess::AnyMember, true);
+}
+
+void AdminRouter::SetPermissionKnown(Known known)
+{
+    std::unique_lock const lock(_mutex);
+    _known = std::move(known);
+}
+
+std::vector<std::string> AdminRouter::RouteProblems() const
+{
+    std::shared_lock const lock(_mutex);
+    std::vector<std::string> problems;
+    for (Route const& route : _routes)
+    {
+        std::string const where = route.Method + " " + route.Path + (route.Prefix ? "*" : "");
+        if (route.Access == RouteAccess::Undeclared)
+            problems.push_back(where + " says neither which permission it needs nor that any signed-in member may call it");
+        else if (route.Access == RouteAccess::Permission && _known && !_known(route.Permission))
+            problems.push_back(where + " asks for " + route.Permission + ", which the catalog does not hold");
+    }
+    std::sort(problems.begin(), problems.end());
+    return problems;
+}
+
+void AdminRouter::AddGuarded(std::string method, std::string path, std::string permission, Handler handler)
+{
+    Put(std::move(method), std::move(path), std::move(handler), RouteAccess::Permission, false, 0, std::move(permission));
+}
+
+void AdminRouter::AddGuardedPrefix(std::string method, std::string prefix, std::string permission, Handler handler)
+{
+    Put(std::move(method), std::move(prefix), std::move(handler), RouteAccess::Permission, true, 0, std::move(permission));
+}
+
+PermissionVerdict AdminRouter::MayI(AdminRequest const& request, std::string_view permission) const
+{
+    PermissionCheck check;
+    {
+        std::shared_lock const lock(_mutex);
+        check = _permission;
+    }
+    return check ? check(request, permission) : PermissionVerdict::Allowed;
+}
+
+bool AdminRouter::Holds(AdminRequest const& request, std::string_view permission) const
+{
+    PermissionCheck check;
+    {
+        std::shared_lock const lock(_mutex);
+        check = _permission;
+    }
+    return check && check(request, permission) == PermissionVerdict::Allowed;
+}
+
+void AdminRouter::SetPermissionCheck(PermissionCheck check)
+{
+    std::unique_lock const lock(_mutex);
+    _permission = std::move(check);
+}
+
+std::vector<std::pair<std::string, std::string>> AdminRouter::DeclaredRoutes() const
+{
+    std::shared_lock const lock(_mutex);
+    std::vector<std::pair<std::string, std::string>> declared;
+    declared.reserve(_routes.size());
+    for (Route const& route : _routes)
+        if (!route.Public())
+            declared.emplace_back(route.Method + " " + route.Path, route.Permission);
+    return declared;
 }
 
 void AdminRouter::Add(std::string method, std::string path, Handler handler)
 {
-    Put(std::move(method), std::move(path), std::move(handler), false);
+    Put(std::move(method), std::move(path), std::move(handler), RouteAccess::Undeclared);
 }
 
-void AdminRouter::AddCosting(std::string method, std::string path, uint32 cost, Handler handler)
+void AdminRouter::AddCosting(std::string method, std::string path, std::string permission, uint32 cost, Handler handler)
 {
-    Put(std::move(method), std::move(path), std::move(handler), false, false, cost);
+    Put(std::move(method), std::move(path), std::move(handler), RouteAccess::Permission, false, cost, std::move(permission));
+}
+
+void AdminRouter::AddOpenCosting(std::string method, std::string path, uint32 cost, Handler handler)
+{
+    Put(std::move(method), std::move(path), std::move(handler), RouteAccess::AnyMember, false, cost);
 }
 
 void AdminRouter::SetThrottle(Throttle throttle)
@@ -141,12 +230,12 @@ void AdminRouter::AddPrefix(std::string method, std::string prefix, Handler hand
 {
     if (prefix.empty() || prefix.back() != '/')
         prefix.push_back('/');
-    Put(std::move(method), std::move(prefix), std::move(handler), false, true);
+    Put(std::move(method), std::move(prefix), std::move(handler), RouteAccess::Undeclared, true);
 }
 
 void AdminRouter::AddPublic(std::string method, std::string path, Handler handler)
 {
-    Put(std::move(method), std::move(path), std::move(handler), true);
+    Put(std::move(method), std::move(path), std::move(handler), RouteAccess::Public);
 }
 
 void AdminRouter::SetFiles(Handler files)
@@ -362,7 +451,7 @@ AdminResponse AdminRouter::Answer(AdminRequest& request) const
         std::string const method = Ambrose::ToUpper(request.Method);
         for (Route const& route : _routes)
         {
-            if (route.Public && !route.Prefix && route.Path == request.Path && route.Method == method)
+            if (route.Public() && !route.Prefix && route.Path == request.Path && route.Method == method)
             {
                 open = route.Run;
                 break;
@@ -438,9 +527,12 @@ void AdminRouter::Finish(AdminRequest const& request, AdminResponse& response) c
 AdminResponse AdminRouter::Serve(AdminRequest const& request) const
 {
     Handler handler;
+    std::string permission;
+    PermissionCheck check;
     std::vector<std::string> allowed;
     {
         std::shared_lock const lock(_mutex);
+        check = _permission;
         std::string const method = Ambrose::ToUpper(request.Method);
         for (Route const& route : _routes)
         {
@@ -449,6 +541,7 @@ AdminResponse AdminRouter::Serve(AdminRequest const& request) const
             if (route.Method == method)
             {
                 handler = route.Run;
+                permission = route.Permission;
                 break;
             }
             allowed.push_back(route.Method);
@@ -464,12 +557,18 @@ AdminResponse AdminRouter::Serve(AdminRequest const& request) const
                 {
                     longest = route.Path.size();
                     handler = nullptr;
+                    permission.clear();
                     allowed.clear();
                 }
                 if (route.Method == method)
+                {
                     handler = route.Run;
+                    permission = route.Permission;
+                }
                 else
+                {
                     allowed.push_back(route.Method);
+                }
             }
             if (handler)
                 allowed.clear();
@@ -487,6 +586,19 @@ AdminResponse AdminRouter::Serve(AdminRequest const& request) const
         AdminResponse response = AdminResponse::Problem(405, "method_not_allowed", request.Path + " answers " + methods);
         response.Headers.emplace_back("Allow", methods);
         return response;
+    }
+
+    if (check && !permission.empty())
+    {
+        switch (check(request, permission))
+        {
+            case PermissionVerdict::Allowed:
+                break;
+            case PermissionVerdict::OutOfScope:
+                return AdminResponse::Problem(404, "not_found", "The admin API has no " + request.Path);
+            case PermissionVerdict::Forbidden:
+                return AdminResponse::Problem(403, "forbidden", "This account is not allowed to " + permission);
+        }
     }
 
     try

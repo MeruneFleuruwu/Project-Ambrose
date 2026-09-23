@@ -244,14 +244,14 @@ AdminResponse AdminDatabaseView::Reload(std::string const& body) const
 
 void AdminDatabaseView::Register(AdminRouter& router)
 {
-    router.Add("GET", "/api/database", [this](AdminRequest const&) { return AdminResponse::Json(200, StatusJson(_loader.GetStatus())); });
-    router.Add("GET", "/api/database/updates", [this](AdminRequest const&)
+    router.AddOpen("GET", "/api/database", [this](AdminRequest const&) { return AdminResponse::Json(200, StatusJson(_loader.GetStatus())); });
+    router.AddOpen("GET", "/api/database/updates", [this](AdminRequest const&)
     {
         std::vector<DatabaseUpdates> databases;
         for (std::string const& name : _loader.GetNames())
             databases.push_back(_loader.InspectUpdates(name));
         return AdminResponse::Json(200, UpdatesJson(databases));
     });
-    router.Add("POST", "/api/database/apply", [this](AdminRequest const& request) { return Apply(request.Body); });
-    router.Add("POST", "/api/database/reload", [this](AdminRequest const& request) { return Reload(request.Body); });
+    router.AddOpen("POST", "/api/database/apply", [this](AdminRequest const& request) { return Apply(request.Body); });
+    router.AddOpen("POST", "/api/database/reload", [this](AdminRequest const& request) { return Reload(request.Body); });
 }

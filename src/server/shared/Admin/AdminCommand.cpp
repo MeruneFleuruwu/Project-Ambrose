@@ -106,7 +106,7 @@ void AdminCommand::Register(AdminRouter& router, ConsoleCommandTable const& tabl
 
 void AdminCommand::Register(AdminRouter& router, Runner runner, ConsoleCommandTable const& table, std::string appName, std::filesystem::path auditFile)
 {
-    router.Add("POST", "/api/command", [runner = std::move(runner), &table, appName = std::move(appName), auditFile = std::move(auditFile)](AdminRequest const& request)
+    router.AddGuarded("POST", "/api/command", "console.write", [runner = std::move(runner), &table, appName = std::move(appName), auditFile = std::move(auditFile)](AdminRequest const& request)
     {
         if (request.Body.size() > MaxCommandBytes)
             return AdminResponse::Invalid("A command is at most 4096 bytes", { { "command", "this is longer than 4096 bytes" } });

@@ -57,6 +57,8 @@ public:
     void Shutdown();
     void Register(AdminRouter& router, std::function<AdminStatusSnapshot()> self);
     std::vector<std::pair<std::string, std::string>> CollectErrorReports();
+    static std::string_view PermissionFor(std::string_view tail) noexcept;
+    std::optional<AdminResponse> Refuse(AdminRequest const& request, std::string_view permission) const;
 
     PowerResult Power(std::string_view name, PowerAction action, uint32 countdownSeconds);
     std::vector<AppSnapshot> Snapshots() const;
@@ -76,6 +78,7 @@ private:
     ChildBreakSender _sendBreak;
     std::unique_ptr<SupervisorState> _state;
     mutable std::shared_mutex _mutex;
+    AdminRouter* _routes = nullptr;
     std::vector<std::unique_ptr<ManagedApp>> _apps;
 };
 

@@ -1,9 +1,11 @@
 /*
  * Project Ambrose by Imjustchico
- * Tests the settings answer and the shutdown route: every loaded key with its effective value, shipped default, layer, file and line, secrets masked in both values, restart reasons only on the keys an app declares, one by name and one for every key under a prefix, and POST /api/shutdown refusing bad bodies field by field, scheduling and cancelling a countdown, and stopping the app.
+ * Tests the settings answer and the shutdown route: every loaded key with its effective value, shipped default, layer, file and line, secrets masked in both values, restart reasons only on the keys an app declares, one by name and one for every key under a prefix, and POST /api/shutdown refusing bad bodies field by field, scheduling and cancelling a countdown, and stopping the app, and that a secret stays masked until the caller holds the permission to read one, which the route asks per request rather than once when it was registered.
  */
 
+#include "AdminAuth.h"
 #include "AdminConfigView.h"
+#include "AdminRouter.h"
 #include "AdminServer.h"
 #include "ConfigMgr.h"
 #include "LogTestDirectory.h"
@@ -17,6 +19,7 @@
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cstdlib>
@@ -26,6 +29,7 @@
 #include <string>
 #include <system_error>
 #include <thread>
+#include <vector>
 
 namespace
 {
@@ -151,7 +155,7 @@ TEST(AdminConfigViewTest, EachKeyShowsItsValueDefaultLayerAndSourceWithSecretsMa
     ASSERT_TRUE(config.LoadInitial(file, {}, { { "Admin.Token", "fedcba9876543210fedcba9876543210" } }).Succeeded());
 
     std::array<RestartRequiredOption, 2> const restart{ { { "World.UpdateInterval", "the tick starts with the app" }, { "Extra.*", "everything extra is read once" } } };
-    std::string const text = AdminConfigView::SettingsJson(config, restart);
+    std::string const text = AdminConfigView::SettingsJson(config, restart, false);
     EXPECT_EQ(text.find("distpass"), std::string::npos);
     EXPECT_EQ(text.find("localpass"), std::string::npos);
     EXPECT_EQ(text.find("0123456789abcdef"), std::string::npos);
@@ -249,4 +253,52 @@ TEST(AdminConfigViewTest, ShutdownRefusesBadBodiesSchedulesCancelsAndStops)
     EXPECT_TRUE(WaitFor([&running] { return running.Finished(); }, std::chrono::seconds(10)));
     EXPECT_EQ(running.ExitCode(), 0);
     EXPECT_NE(harness.Device().Output().find("The admin API asked testserver to stop now"), std::string::npos);
+}
+
+TEST(AdminConfigViewTest, ASecretIsMaskedUntilTheCallerMayReadOneAndTheRouteAsksPerRequest)
+{
+    LogTestDirectory directory;
+    std::filesystem::path const file = directory.Write("testserver.conf", Header +
+        "Login.Name = Local\nAdmin.Token = 0123456789abcdef0123456789abcdef\n");
+    ConfigMgr config([](std::string const&) { return std::optional<std::string>(); });
+    ASSERT_TRUE(config.LoadInitial(file).Succeeded());
+
+    std::string const masked = AdminConfigView::SettingsJson(config, {}, false);
+    EXPECT_EQ(masked.find("0123456789abcdef"), std::string::npos);
+    std::string const revealed = AdminConfigView::SettingsJson(config, {}, true);
+    EXPECT_NE(revealed.find("0123456789abcdef"), std::string::npos);
+    EXPECT_NE(revealed.find("Local"), std::string::npos) << "revealing a secret changes nothing about the rest";
+
+    AdminAuth auth(10, 1.0);
+    auth.SetToken("0123456789abcdef0123456789abcdef");
+    AdminRouter routes(auth);
+    AdminConfigView::Register(routes, config);
+
+    std::vector<std::string> asked;
+    bool allow = false;
+    routes.SetPermissionCheck([&asked, &allow](AdminRequest const&, std::string_view permission)
+    {
+        asked.emplace_back(permission);
+        if (permission == "settings.read")
+            return PermissionVerdict::Allowed;
+        return allow ? PermissionVerdict::Allowed : PermissionVerdict::Forbidden;
+    });
+
+    AdminRequest request;
+    request.Method = "GET";
+    request.Path = "/api/settings";
+    request.RemoteAddress = "127.0.0.1";
+    request.Authorization = "Bearer 0123456789abcdef0123456789abcdef";
+
+    AdminResponse const without = routes.Dispatch(request);
+    EXPECT_EQ(without.Status, 200);
+    EXPECT_EQ(without.Body.find("0123456789abcdef"), std::string::npos);
+
+    allow = true;
+    AdminResponse const with = routes.Dispatch(request);
+    EXPECT_EQ(with.Status, 200);
+    EXPECT_NE(with.Body.find("0123456789abcdef"), std::string::npos);
+
+    EXPECT_EQ(std::count(asked.begin(), asked.end(), std::string("settings.secrets.read")), 2)
+        << "the reveal is decided once per request, so it can be recorded each time it happens";
 }

@@ -221,10 +221,40 @@ std::string Supervisor::OutputJson(std::string_view name, OutputRun run, std::ve
 
 void Supervisor::Register(AdminRouter& router, std::function<AdminStatusSnapshot()> self)
 {
-    router.Add("GET", "/api/apps", [this, self](AdminRequest const&) { return AdminResponse::Json(200, AppsJson(self(), Snapshots())); });
-    router.Add("GET", "/api/supervisor", [this](AdminRequest const&) { return AdminResponse::Json(200, SupervisionJson(Snapshots())); });
+    _routes = &router;
+    router.AddGuarded("GET", "/api/apps", "status.read", [this, self](AdminRequest const&) { return AdminResponse::Json(200, AppsJson(self(), Snapshots())); });
+    router.AddGuarded("GET", "/api/supervisor", "status.read", [this](AdminRequest const&) { return AdminResponse::Json(200, SupervisionJson(Snapshots())); });
     for (char const* method : { "GET", "POST", "PUT", "PATCH", "DELETE" })
-        router.AddPrefix(method, "/api/apps/", [this](AdminRequest const& request) { return Answer(request); });
+        router.AddGuardedPrefix(method, "/api/apps/", "status.read", [this](AdminRequest const& request) { return Answer(request); });
+}
+
+std::string_view Supervisor::PermissionFor(std::string_view tail) noexcept
+{
+    if (tail == "/api/command")
+        return "console.write";
+    if (tail.starts_with("/api/logs"))
+        return "console.read";
+    if (tail.starts_with("/api/settings"))
+        return "settings.read";
+    if (tail.starts_with("/api/database"))
+        return "database.read";
+    return "status.read";
+}
+
+std::optional<AdminResponse> Supervisor::Refuse(AdminRequest const& request, std::string_view permission) const
+{
+    if (_routes == nullptr)
+        return std::nullopt;
+    switch (_routes->MayI(request, permission))
+    {
+        case PermissionVerdict::Allowed:
+            return std::nullopt;
+        case PermissionVerdict::OutOfScope:
+            return AdminResponse::Problem(404, "not_found", fmt::format("The supervisor has nothing at {}", request.Path));
+        case PermissionVerdict::Forbidden:
+            return AdminResponse::Problem(403, "forbidden", fmt::format("This account is not allowed to {}", permission));
+    }
+    return std::nullopt;
 }
 
 AdminResponse Supervisor::Answer(AdminRequest const& request)
@@ -258,6 +288,8 @@ AdminResponse Supervisor::Answer(AdminRequest const& request)
             return only("POST");
         return PowerRoute(*app, request);
     }
+    if (std::optional<AdminResponse> refused = Refuse(request, tail == "/output/current" || tail == "/output/previous" ? "console.read" : PermissionFor(tail)))
+        return std::move(*refused);
     if (tail == "/output/current" || tail == "/output/previous")
     {
         if (method != "GET")
@@ -304,6 +336,8 @@ AdminResponse Supervisor::PowerRoute(ManagedApp& app, AdminRequest const& reques
     }
     if (!fields.empty())
         return AdminResponse::Invalid("The power request has problems", std::move(fields));
+    if (std::optional<AdminResponse> refused = Refuse(request, std::string("power.") + std::string(ManagedApp::ActionName(action))))
+        return std::move(*refused);
     PowerResult const result = app.Power(action, seconds);
     if (!result.Accepted)
         return AdminResponse::Problem(result.Status, result.Code, result.Message);

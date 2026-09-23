@@ -89,6 +89,8 @@ std::string_view PanelUsers::Explain(PanelUserResult result) noexcept
         case PanelUserResult::UnknownUser:
         case PanelUserResult::Disabled:
         case PanelUserResult::WrongPassword: return "that name and password do not sign in";
+        case PanelUserResult::Themselves: return "nobody changes their own role or grants, so that widening a person's authority is always somebody else's decision";
+        case PanelUserResult::LastOwner: return "the last owner cannot be removed, disabled or given a narrower role, since nobody would be left who could undo it";
         case PanelUserResult::HashFailed: return "the password could not be hashed";
         case PanelUserResult::StoreFailed: break;
     }
@@ -294,6 +296,13 @@ PanelUserResult PanelUsers::SetPassword(int64 id, std::string_view password, boo
 
 bool PanelUsers::SetDisabled(int64 id, bool disabled, std::string& error)
 {
+    if (disabled && IsLastOwner(id, error))
+    {
+        error = std::string(Explain(PanelUserResult::LastOwner));
+        return false;
+    }
+    if (!error.empty())
+        return false;
     std::optional<PanelStore::Statement> update = _store.Prepare("UPDATE panel_user SET disabled = ?, generation = generation + 1 WHERE id = ?", error);
     if (!update)
         return false;
@@ -302,6 +311,62 @@ bool PanelUsers::SetDisabled(int64 id, bool disabled, std::string& error)
     if (!update->Run(error))
         return false;
     return _store.Changed() == 1;
+}
+
+PanelUserResult PanelUsers::SetRole(int64 id, PanelRole role, int64 byUserId, std::string& error)
+{
+    if (byUserId == id)
+        return PanelUserResult::Themselves;
+    if (role != PanelRole::Owner && IsLastOwner(id, error))
+        return PanelUserResult::LastOwner;
+    if (!error.empty())
+        return PanelUserResult::StoreFailed;
+    std::optional<PanelStore::Statement> update = _store.Prepare(
+        "UPDATE panel_user SET role = ?, is_owner = ?, generation = generation + 1 WHERE id = ?", error);
+    if (!update)
+        return PanelUserResult::StoreFailed;
+    update->Bind(1, PanelPermissions::NameOf(role));
+    update->Bind(2, role == PanelRole::Owner ? int64{ 1 } : int64{ 0 });
+    update->Bind(3, id);
+    if (!update->Run(error))
+        return PanelUserResult::StoreFailed;
+    return _store.Changed() == 1 ? PanelUserResult::Ok : PanelUserResult::UnknownUser;
+}
+
+PanelUserResult PanelUsers::Remove(int64 id, std::string& error)
+{
+    if (IsLastOwner(id, error))
+        return PanelUserResult::LastOwner;
+    if (!error.empty())
+        return PanelUserResult::StoreFailed;
+    std::optional<PanelStore::Statement> remove = _store.Prepare("DELETE FROM panel_user WHERE id = ?", error);
+    if (!remove)
+        return PanelUserResult::StoreFailed;
+    remove->Bind(1, id);
+    if (!remove->Run(error))
+        return PanelUserResult::StoreFailed;
+    return _store.Changed() == 1 ? PanelUserResult::Ok : PanelUserResult::UnknownUser;
+}
+
+uint32 PanelUsers::CountOwners(std::string& error)
+{
+    std::optional<PanelStore::Statement> rows = _store.Prepare("SELECT COUNT(*) FROM panel_user WHERE role = ? AND disabled = 0", error);
+    if (!rows)
+        return 0;
+    rows->Bind(1, PanelPermissions::NameOf(PanelRole::Owner));
+    if (!rows->Step(error))
+        return 0;
+    return static_cast<uint32>(rows->Int64(0));
+}
+
+bool PanelUsers::IsLastOwner(int64 id, std::string& error)
+{
+    std::optional<PanelUser> const user = FindById(id, error);
+    if (!user || !error.empty())
+        return false;
+    if (user->Role != PanelRole::Owner || user->Disabled)
+        return false;
+    return CountOwners(error) <= 1 && error.empty();
 }
 
 bool PanelUsers::RecordSignIn(int64 id, std::string& error)

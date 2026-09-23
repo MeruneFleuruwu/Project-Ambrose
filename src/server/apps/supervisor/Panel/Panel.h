@@ -11,11 +11,15 @@
 #include "PanelAudit.h"
 #include "PanelRateLimit.h"
 #include "PanelErrors.h"
+#include "PanelGrants.h"
+#include "PanelAuthorization.h"
 #include "PanelSessions.h"
 #include "PanelSignIn.h"
 #include "PanelUsers.h"
 #include "PanelStore.h"
 #include "Types.h"
+
+#include <nlohmann/json_fwd.hpp>
 
 #include <chrono>
 #include <filesystem>
@@ -63,6 +67,7 @@ public:
     PanelUsers& Users() { return _users; }
     PanelSessions& Sessions() { return _sessions; }
     PanelErrors& Errors() { return _errors; }
+    PanelGrants& Grants() { return _grants; }
     void SetErrorSource(std::function<std::vector<std::pair<std::string, std::string>>()> source);
     std::size_t GatherErrorsOnce();
 
@@ -85,6 +90,7 @@ private:
     AdminResponse SignOut(AdminRequest const& request);
     AdminResponse WhoAmI(AdminRequest const& request);
     std::optional<PanelUser> UserOf(AdminRequest const& request);
+    nlohmann::json UserAnswer(PanelUser const& user);
     std::optional<AdminResponse> Throttle(AdminRequest const& request, uint32 cost);
 
     Log& _log;
@@ -93,6 +99,8 @@ private:
     PanelUsers _users;
     PanelSessions _sessions;
     PanelErrors _errors;
+    PanelGrants _grants;
+    std::unique_ptr<PanelAuthorization> _authorization;
     PanelSignInThrottle _signIn;
     std::mutex _claimMutex;
     std::string _claimToken;
