@@ -75,6 +75,10 @@ public:
     bool operator==(PropertyObject const& other) const;
 
     std::vector<PropertyValue>& GetValues(BuildKey key) noexcept;
+    bool IsPresent(std::size_t ordinal) const noexcept;
+    void MarkPresent(std::size_t ordinal, BuildKey key) noexcept;
+    std::vector<std::size_t> const& GetPresentOrder() const noexcept { return _presentOrder; }
+    bool HasPreservedOrder() const noexcept { return _preserveOrder; }
 
 private:
     PropertyObject(TypeCatalogPtr catalog, ClassInfo const& type) noexcept;
@@ -85,6 +89,9 @@ private:
     TypeCatalogPtr _catalog;
     ClassInfo const* _type;
     std::vector<PropertyValue> _values;
+    std::vector<bool> _present;
+    std::vector<std::size_t> _presentOrder;
+    bool _preserveOrder = false;
 };
 
 #endif

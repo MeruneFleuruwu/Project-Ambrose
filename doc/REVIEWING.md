@@ -2,7 +2,7 @@
 
 # Reviewing contributor pull requests
 
-This is the maintainer's side of doc/CONTRIBUTOR-TRACK.md. It says how a pull request on the track is judged, in what order, and what has gone wrong before. Read it whole before reviewing anything, and when it changes, change it here rather than in a review comment.
+This is the maintainer's side of both tracks, doc/CONTRIBUTOR-TRACK.md and doc/MILESTONE-TRACK.md. It says how a pull request is judged, in what order, what has gone wrong before, and how landed work is committed. **Read it whole before reviewing anything**, including after a lost context, and when it changes, change it here rather than in a review comment. The board at https://justchicoo.github.io/Project-Ambrose/ says what is claimed and held while a review is under way.
 
 ## The rules that do not bend
 
@@ -46,7 +46,29 @@ doc/MILESTONE-TRACK.md is the contributor's side of this. A milestone pull reque
 8. **Every ticked box, one at a time.** For each `- [x]`, find the evidence in its brackets in the tree, then run it by name, `ctest --preset <preset> -R <test>`, and read what it asserts. A check ticked by a test that does not exist, or by one that asserts nothing, ends the review: say so plainly, keep the rest, and do not go looking for what else might be wrong until that is answered. For the milestone's central claim, break the code deliberately and watch the test fail, because a test that only ever passed proves nothing.
 9. **Every unticked box is accounted for** in the description, as a gated check the contributor could not run. An unticked box nobody mentions is the milestone half-built, which merges with the row left in "In flight" and what is left written next to it.
 10. **The phase's review notes** that name the milestone are resolved, in the code or in the description.
-11. **Merge, then finish it on main.** Squash with subject `<id>: <what landed>`, the contributor's `Co-Authored-By`, and `Contributed on the milestone track.` in the body. Then on main, in one commit: move the row to "Landed" or "In flight", update doc/ROADMAP.md's "Where we are" to say what is now built, and regenerate the card with `python apps/progress/progress.py`, which is why those files are kept off a milestone branch. `python apps/progress/ready.py` then says what the merge opened up.
+11. **Land it as one commit, and close the pull request naming that commit.** A bare merge pushes ticked acceptance checks to main without the roadmap summary beside them, which `apps/ci/ci_roadmap_state.py` refuses and rightly so. Instead, on main: `git merge --squash prN`, apply whatever the review fixes, tick every check the work earns, update doc/ROADMAP.md's "Where we are", move the row in doc/MILESTONE-TRACK.md, regenerate with `python apps/progress/progress.py`, then commit it all together with `--author` set to the contributor's numeric noreply address, `Contributed on the milestone track.` in the body, and the AI trailer. Push, then close the pull request with the message, naming the commit and saying that closed means landed here. Look their id up with `gh api users/<login>`.
+
+## What a review has found more than once
+
+- **A parser, a decoder or an offset asks one question before the code is read: what already reads this format?** If the answer is one of ours, the pull request should be calling it or extending it, and a second copy is a defect rather than a duplication. 4.08's zone extractor wrote its own path for the client's zone data and emitted 3356 zones with every position and orientation empty, while `bindecode` and the ObjectProperty serializer already read that format and 8.14 had just made the versionable path byte-exact. The workaround produced wrong data, which is the usual way this goes.
+- **A red Linux leg is usually a warning MSVC never mentions**, not a broken change. Three so far: a range loop binding a pair by value (`-Werror=range-loop-construct`), an aggregate initialised with fewer members than it has (`-Werror=missing-field-initializers`), and a macro with a top-level comma used inside another macro, which GCC refuses and MSVC builds into code that reads off the end of itself. For the second, look at the structure before the call site: each time here the real cause was members with no default initialiser, so no caller could have written it correctly, and the fix belongs on main.
+- **A check can already be earned by a test that exists.** 1.06, 1.07 and 1.08 each carried the same last check, marked as moved elsewhere and never ticked, and one client-gated test had covered it for weeks. Run it, tick it, and say the run rather than the reading. Where sibling milestones share a check word for word, one run earns all of them, so tick them together rather than closing one and leaving two open.
+- **A check can describe another milestone's work.** 4.04 carries a second specification's acceptance while building only part of that specification, so three of its checks belong to 4.05. Leave them unticked, land the rest, keep the milestone open, and write the finding into the phase's own review notes so the next reader does not take it for half-finished work.
+- **Deliverables are binding, and a missing one is partial delivery.** A tool that runs but ships without the schema or the config template its milestone names is merged with the milestone left open and the gap written into the track, not held back whole.
+- **Fix small things on main rather than sending them back.** One ampersand, a structure's defaults, a warn-once that a cast to void silenced, a file read twice per pass. Each costs a round trip to ask for and a minute to do, and the contributor stays the author.
+
+## When to hand a review to the other session
+
+Split by who wrote the code underneath, not by how many are left. A pull request against the database updater, the object codec, the type registry or the panel is reviewed faster and better by the session that built them, and a reviewer guessing at somebody else's subsystem is how a plausible change gets merged. Send it with the failure already triaged, say what the checks do, and say which milestones are in the board's way. Ask them to finish what they are mid-way through first: a half-built subsystem is worse than a review that waits an hour.
+
+## Our own checks have been wrong
+
+Both were found by a contributor doing the right thing, which is the only way this kind of defect surfaces.
+
+- `apps/progress/ready.py` leaves out a milestone that is finished, so the moment a contributor ticked the last box of one the track opened, two checks called it a milestone that does not exist. They now ask whether it exists at all and accept it as takeable or already finished. Fixed as b1cbbd0.
+- The trailer check demanded an AI attribution trailer on a commit a bot wrote, which Dependabot's first grouped update failed within a minute. A bot-authored commit names its tool in the author field, so it is exempt by author, never by anything the message claims.
+
+When a check fails a contributor for doing the right thing, fix the check the same sitting and say so in the message. A checker that punishes correct work teaches people to work around it.
 
 ## What is automated, so it is not done by hand
 

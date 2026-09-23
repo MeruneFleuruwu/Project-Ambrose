@@ -53,12 +53,16 @@ The palette runs in three tiers. The raw values are the first tier and nothing o
 | `gold-darkest` | `#6A4E0F` | The pressed edge of a gold control on parchment |
 | `teal-dark` | `#0F6F63` | Teal that can be read on parchment |
 | `edge-control` | `#546AA5` | A control with nothing else to show it exists |
-| `value-number` | `#72BCFA` | A number with a unit inside a message |
-| `value-number-dark` | `#233E5A` | A number with a unit that can be read on parchment |
-| `value-text` | `#5BA2EC` | Quoted text inside a message |
-| `value-text-dark` | `#2D5075` | Quoted text that can be read on parchment |
-| `value-name` | `#4887DC` | A path or identifier inside a message |
-| `value-name-dark` | `#376390` | A path or identifier that can be read on parchment |
+| `value-number` | `#D1988F` | A number with a unit inside a message |
+| `value-number-dark` | `#521915` | A number with a unit that can be read on parchment |
+| `value-text` | `#B4A5FB` | Quoted text inside a message |
+| `value-text-dark` | `#172075` | Quoted text that can be read on parchment |
+| `value-name` | `#8EE4A1` | An identifier inside a message |
+| `value-name-dark` | `#043415` | An identifier that can be read on parchment |
+| `value-address` | `#28BDFA` | An address, URL or path inside a message |
+| `value-address-dark` | `#00435C` | An address, URL or path that can be read on parchment |
+| `value-setting` | `#E07AAE` | A configuration option inside a message |
+| `value-setting-dark` | `#5B013A` | A configuration option that can be read on parchment |
 | `violet-dark` | `#6B2FA0` | Violet that can be read on parchment |
 | `ember-dark` | `#A33A25` | Ember that can be read on parchment |
 
@@ -75,9 +79,11 @@ The names above are the raw values. A component never names one of them: it name
 | `edge-quiet` | `#1B2540` | `#D9CBAB` | Quiet separators |
 | `edge-strong` | `#22304F` | `#C3AE86` | Card and control edges |
 | `edge-control` | `#546AA5` | `#546AA5` | A control boundary when nothing else shows it exists |
-| `value-number` | `#72BCFA` | `#233E5A` | A number with a unit inside a message |
-| `value-text` | `#5BA2EC` | `#2D5075` | Quoted text inside a message |
-| `value-name` | `#4887DC` | `#376390` | A path or identifier inside a message |
+| `value-number` | `#D1988F` | `#521915` | A number with a unit inside a message |
+| `value-text` | `#B4A5FB` | `#172075` | Quoted text inside a message |
+| `value-name` | `#8EE4A1` | `#043415` | An identifier inside a message, such as an app, a database or a category |
+| `value-address` | `#28BDFA` | `#00435C` | An address, URL, path or connection target inside a message |
+| `value-setting` | `#E07AAE` | `#5B013A` | A configuration option inside a message |
 | `fg-body` | `#F2E8D5` | `#1B1608` | Body text |
 | `fg-muted` | `#A8B6D4` | `#4A3F28` | Secondary text |
 | `fg-faint` | `#8798BC` | `#5F5238` | Labels, timestamps, hints |
@@ -188,15 +194,21 @@ A log line is colored by part, never by level. The timestamp is faint and the ca
 
 The message therefore begins at the same column, 40 by default, on every line, and punctuation between two adjacent value runs takes `fg-faint`. Only a terminal pads, shortens, wraps or colors: the file keeps the full date, no padding, no wrapping and no escape of any kind, and a redirected console writes exactly what the file writes. Every line of a record with several lines carries the full prefix, so text from a player cannot forge a line. The panel's console row is these same four columns as a grid, reading the runs from the record's own typed ranges rather than lexing text in a browser, so the terminal and the panel cannot drift.
 
-A value does not take the level's color. Settled on 2026-09-18: a warning line gold from its level word to its values is the thing this rule exists to prevent, so values take a small ramp of their own, beside the chart series ramp and outside the four meanings.
+A value does not take the level's color. Settled on 2026-09-18: a warning line gold from its level word to its values is the thing this rule exists to prevent, so values take a ramp of their own, beside the chart series ramp and outside the four meanings.
 
-| Token | What it marks | Dark | On ground, panel, sunken, chrome | Light | On parchment, light panel |
+Settled again on 2026-09-22 at the maintainer's direction, after reading real output on the panel: the ramp was three steps of one blue, and on screen an address, a setting and a database name all came out the same blue, so a color said a run was a value without saying which kind. The ramp is now five hues, one per kind, and a kind is what the reader actually wants told apart.
+
+| Token | What it marks | Dark | On ground, panel, sunken, chrome | Light | On parchment, light panel, sunken |
 |---|---|---|---|---|---|
-| `value-number` | a number with a unit, such as 184 ms or 11 MiB | `#72BCFA` | 9.28:1, 8.37:1, 8.91:1, 9.63:1 | `#233E5A` | 9.21:1, 10.82:1 |
-| `value-text` | text inside quotes | `#5BA2EC` | 7.05:1, 6.37:1, 6.77:1, 7.32:1 | `#2D5075` | 6.99:1, 8.21:1 |
-| `value-name` | a path, an address, a digest or an identifier | `#4887DC` | 5.21:1, 4.70:1, 5.00:1, 5.40:1 | `#376390` | 5.25:1, 6.16:1 |
+| `value-address` | an address, a port, a URL, a path or a connection target | `#28BDFA` | 8.79:1, 7.93:1, 8.44:1, 9.12:1 | `#00435C` | 8.98:1, 9.87:1, 8.10:1 |
+| `value-name` | an identifier: an app, a database, a category, a version or a digest | `#8EE4A1` | 12.41:1, 11.20:1, 11.91:1, 12.88:1 | `#043415` | 11.66:1, 12.82:1, 10.52:1 |
+| `value-setting` | a configuration option, which is a thing the reader can go and change | `#E07AAE` | 6.82:1, 6.16:1, 6.55:1, 7.08:1 | `#5B013A` | 11.64:1, 12.79:1, 10.50:1 |
+| `value-number` | a number with a unit, such as 184 ms or 11 MiB | `#D1988F` | 7.75:1, 7.00:1, 7.44:1, 8.05:1 | `#521915` | 11.65:1, 12.80:1, 10.51:1 |
+| `value-text` | text inside quotes | `#B4A5FB` | 8.76:1, 7.91:1, 8.41:1, 9.09:1 | `#172075` | 11.72:1, 12.88:1, 10.57:1 |
 
-Each entry is two values, as the accents are, because no single value clears 4.5:1 on both the ground and parchment: a color light enough for `#0B1020` is too light for `#F4EAD5`. Every value above clears 4.5:1 on every surface of its own theme. The three are one blue family stepping in lightness, not three hues, because lightness is the one difference every kind of color blindness keeps: the steps stay apart by at least 8.6 CIELAB units in the dark theme and 8.9 in the light one, under normal vision, protanopia, deuteranopia and tritanopia alike, where three hues in the room left by gold, teal, ember and violet would collapse into each other. The light theme's range is narrower, because a value there must stay dark enough to clear 4.5:1 on the darkest parchment, the sunken one at `#EADFC4`, which is what fixes the lightest step: the generator refused the first ramp written here for reaching 4.21:1 against it. Against the four accents the ramp sits 45 or more units away in the dark theme and 37 or more in the light one, measured with normal vision. The honest limit, said out loud: under protanopia and deuteranopia a blue converges with violet, and under tritanopia with teal. That costs nothing here, because a value never carries state meaning, the level word keeps its own column and its own word, and violet marks what a person owns rather than how something is. A bare count with no unit is never a value, and no line marks more than eight runs; without those two rules a line holding twenty numbers is a rainbow, which is the failure this ramp exists to avoid.
+Each entry is two values, as the accents are, because no single value clears 4.5:1 on both the ground and parchment. Every value above clears 4.5:1 on every surface of its own theme, and the generator is what proved it: it refuses a ramp that does not. The five were not chosen by eye but searched for, under three constraints at once, which is why they are the colors they are: clear 4.6:1 on all four surfaces of the theme, stay 26 or more CIELAB units from gold, teal, violet, ember, body and faint, and stay as far from each other as that leaves room for. The result holds 35 units between any two in the dark theme and 30 in the light one, and 28 and 24 from the nearest accent, measured with normal vision.
+
+The honest limit, said out loud, and it is a real cost of this change: five hues cannot all survive color blindness the way three steps of one lightness ramp did. Under deuteranopia the green and the salmon converge, and under tritanopia the blue and the green do. That is accepted rather than hidden, for three reasons: a value never carries state meaning, so nothing is lost but which kind of value it is; the level word keeps its own column and its own word, so no state is read from a hue anywhere; and 17.107 puts the kind in the hovercard as words, which is the reading that does not depend on seeing a hue at all. A bare count with no unit is never a value, and no line marks more than eight runs; without those two rules a line holding twenty numbers is a rainbow, which is the failure this ramp exists to avoid.
 
 ## Live data
 

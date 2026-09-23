@@ -27,6 +27,14 @@ Unverified assumptions behind some tools:
 
 Sources: the actools, anatomy, patchmod and renderers research results in the brief, and doc\ARCHITECTURE.md.
 
+## How this list is used
+
+Read this file before starting a milestone, then look at what is actually built under src/tools and apps, because a tool marked here as planned may already exist and one marked built may do more than its line says. The point is not bookkeeping: a milestone that needs to read something the suite already reads should call the tool rather than write the same decoder again beside it.
+
+When a tool cannot do what a milestone needs, the answer is to teach it, not to work around it. A one-off script, a hard-coded offset or a hand-written parser inside a milestone is the suite failing to learn something, and the next milestone that needs the same thing will pay for it again. Add the function to the tool, note it against the tool's entry here, and the milestone ends with the suite able to decode more than it could at the start.
+
+This applies to contributors as well, and their prompts say so. Before writing anything, look through src/tools, apps, doc/TOOLS.md and the libraries under src for the thing you are about to build. Upgrading one of ours is a welcome part of a milestone; duplicating one is what makes a pull request hard to merge.
+
 ## Early
 
 ### zone_extractor
@@ -59,6 +67,10 @@ Extracts world database rows from the user's own install. `extractor names` read
 ### typeextract (built in 3.21)
 
 Builds the type dump of the user's own install by emulating its client program, without launching the game or writing into the install. The C and C++ initializers, the lazy type getters and the client's own race adder rebuild the client's type registry, which is then checked and written as format v2. `typeextract --help` lists its options. It reads the install named by `--client` or `AMBROSE_CLIENT_DIR`, or else the newest revision found on the machine. It writes `--out` or types/<revision>.json in the Ambrose data folder, and `--compare <dump>` prints every difference from another dump, which is read before extracting, so it may name the output file. When the revision or the data folder cannot name the default file, it asks for `--out`. `--exit-when-input-ends` makes it exit with code 1 as soon as its standard input ends, which the servers and tools use so a build never outlives the process that started it. It exits 0 on success, 1 when extraction, validation or writing fails, and 2 on bad usage.
+
+### typeregbuild (built in 5.07)
+
+Wraps a format-v2 type dump from the user's own install in a versioned binary cache. `typeregbuild --input <revision>.json --output <revision>.bin` validates the JSON, records the input filename's revision, stores fixed-width raw records plus one shared string table, stamps the exact payload bytes with SHA-256, and writes only to the requested output path. `TypeRegistry::LoadBinary` validates the envelope, revision and hash before building the same catalog directly from those records; the login and game servers prefer a sibling `.bin` cache when present, and callers may provide the JSON path as a fallback, which is logged when a cache is stale or corrupt. The cache is a local data file and must never be committed.
 
 ### localetool (built in 3.13)
 

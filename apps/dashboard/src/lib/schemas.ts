@@ -86,6 +86,34 @@ export const AppEntry = v.looseObject({
 
 export const AppList = v.array(AppEntry);
 
+export const LogRecord = v.looseObject({
+    sequence: v.number(),
+    time: v.string(),
+    epoch_ms: v.number(),
+    level: v.string(),
+    category: v.string(),
+    message: v.string(),
+    template: v.optional(v.string()),
+    source: v.optional(v.nullable(v.looseObject({ file: v.string(), line: v.number(), function: v.string() }))),
+});
+
+export const LogAnswer = v.looseObject({
+    schema: v.number(),
+    oldest: v.number(),
+    latest: v.number(),
+    records: v.array(LogRecord),
+    dropped: v.nullable(v.looseObject({ from: v.number(), to: v.number(), count: v.number() })),
+});
+
+export const CommandAnswer = v.looseObject({
+    command: v.string(),
+    success: v.boolean(),
+    refused: v.boolean(),
+    reason: v.string(),
+    request_id: v.string(),
+    lines: v.array(v.string()),
+});
+
 export const Problem = v.looseObject({
     code: v.string(),
     message: v.string(),
@@ -225,6 +253,8 @@ export type SessionAnswer = v.InferOutput<typeof SessionAnswer>;
 export type PanelUser = v.InferOutput<typeof PanelUser>;
 export type PanelSessionAnswer = v.InferOutput<typeof PanelSessionAnswer>;
 export type AppEntry = v.InferOutput<typeof AppEntry>;
+export type LogRecord = v.InferOutput<typeof LogRecord>;
+export type LogAnswer = v.InferOutput<typeof LogAnswer>;
 export type Problem = v.InferOutput<typeof Problem>;
 export type Status = v.InferOutput<typeof Status>;
 export type Capabilities = v.InferOutput<typeof Capabilities>;

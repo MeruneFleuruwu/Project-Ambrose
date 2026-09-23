@@ -1,12 +1,13 @@
 /*
  * Project Ambrose by Imjustchico
- * One log record plus prefix rendering under a layout, the coloring spans each rendered part covers, multi-line splitting, control-character escaping and UTF-8 repair.
+ * One log record, the place in the code it was written at, the format template it was written from, which is what groups two errors raised at one line as one error however their arguments differed, plus prefix rendering under a layout, the coloring spans each rendered part covers, multi-line splitting, control-character escaping and UTF-8 repair. The template is copied rather than pointed at, because a caller may build one at runtime through fmt::runtime and a view of that would outlive it.
  */
 
 #ifndef AMBROSE_LOGMESSAGE_H
 #define AMBROSE_LOGMESSAGE_H
 
 #include "LogCommon.h"
+#include "LogSource.h"
 
 #include <chrono>
 #include <string>
@@ -57,6 +58,8 @@ struct LogMessage
     std::chrono::system_clock::time_point Time;
     uint64 Sequence = 0;
     uint64 ThreadId = 0;
+    LogSource Source;
+    std::string Template;
     bool Nested = false;
 
     void AppendPrefix(std::string& out, AppenderFlags flags, bool utc, std::vector<LogSpan>* spans = nullptr) const;

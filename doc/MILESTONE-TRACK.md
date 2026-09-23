@@ -74,6 +74,7 @@ It refuses another phase's file, so a change that needs one is a change of scope
 
 - **It builds and its tests pass on at least one platform, and you say which.** `cmake --preset windows-msvc-x64` then `cmake --build --preset windows-debug` and `ctest --preset windows-debug`, or `linux-gcc` with `linux-gcc-debug`. The first configure builds every dependency from source and takes about an hour. `ctest` also runs the style and CI checks, so a green `ctest` is most of the review.
 - **New tests live in `src/test/`, mirroring the folder of the code they test**, and are named in the acceptance check they prove. A test that needs an installation carries the CTest label `client` and skips unless `AMBROSE_CLIENT_DIR` is set; one that needs the user's own type dump reads `AMBROSE_TYPE_DUMP_PATH`. Never make an existing test optional to get it passing.
+- **The tools come first, and leave better than they were.** Read doc/TOOLS.md and look at what is actually built under `src/tools` and `apps` before writing anything that reads a file format, because that list has drifted and a tool marked planned may exist. Call the one that exists, or teach it the function the milestone needs, which is welcome work and part of the milestone. Writing a second copy inside the milestone is what makes a pull request hard to merge, and in one case it emitted an entire dataset with every position empty.
 - **C++20, and the architecture as written.** doc/ARCHITECTURE.md's layering, its folder for each subsystem, dated SQL update files, content in the world database, and the settled Decisions. A milestone is not the place to re-litigate one.
 - **The branding header and no other comment**, in the form doc/ARCHITECTURE.md gives for the file type. `python apps/codestyle/codestyle.py` is the judge. Files are UTF-8 with no byte order mark, LF endings, no trailing whitespace, ending in a newline, ASCII unless the content is a translation.
 - **No file from the game client, and nothing generated from one.** Not an archive, an asset, a dump, a capture or a run of bytes pasted from one. A tool reads the user's own installation at run time; that is the line, and `python apps/ci/ci_forbidden_files.py` guards it.
@@ -91,14 +92,8 @@ Then one of four things happens, each with one message saying which and why: it 
 
 | ID | Milestone | Size | What you need | Why it is a good one to take |
 |---|---|---|---|---|
-| 1.06, 1.07, 1.08 | ByteBuffer and DML primitives, BitReader/BitWriter, and the text encodings | S | Your own client installation | One optional integration test, decoding the UTF-16 text of a single `Locale/*.lang` entry from your own `Root.wad`, is the last unticked check of all three milestones. The smallest way to finish three at once, on a branch named `milestone/1.06-lang-round-trip` |
-| 3.18 | Updater part 2: rehash, rename, dead refs, pending, modules | M | A build and a MySQL or MariaDB | Needs no client at all. Four unit and integration checks about the SQL updater's own behaviour, each one a named case with the expected error |
 | 4.04 | World wire math and LocationString | S | A build; one check reads your client's XML | Self-contained maths and parsing with eleven checks that say the exact numbers. Everything the world phase does with positions rests on it |
 | 4.08 | Zone extractor part 1: WizZoneData | M | Your own client installation | The largest one open, and the one that unblocks most: zone templates, locations and objects read out of your own install into the world database. Its phase file calls it oversized, so landing the extractor and its reporting first, with the row checks after, is expected |
-| 5.07 | Binary type-registry cache | S | Your own client installation | A converter and a loader that make startup fast, with a stale cache rejected. Three checks, all mechanical |
-| 6.09 | Schema probe for classes missing from the dump | M | Your own client installation | Names the classes the client's own dump does not describe, by sweeping archives and reading hashes. The check lists the exact hashes and counts to reproduce |
-| 8.14 | Versionable BINd encoder, byte-exact | M | Your own client installation | Round-trips the client's object format back to identical bytes over a 2000-file sample. The encoder is written and decoding is tested; what is missing is that proof at scale and whatever it breaks |
-| 16.01 | FileBinary table codec | S | A build; the dev-gated check needs a file you obtained yourself | The patch server's table format, byte for byte, with the first bytes of a written list spelled out in the check |
 
 ## Reserved
 
@@ -121,14 +116,16 @@ Everything not in the table above, including every milestone whose dependencies 
 
 ## In flight
 
-Nothing yet.
-
 | ID | Who | Pull request | What is left |
 |---|---|---|---|
+| 5.07 | MeruneFleuruwu | [#124](https://github.com/Justchicoo/Project-Ambrose/pull/124) | The cache is built, wired into the login server and measured at a third of the JSON path's time on the pinned install, and a truncated, bit-flipped or random cache is refused by name. Left: a client-gated comparison of every class, property and enum table, and a measurement showing a load under 200 ms |
+| 6.09 | MeruneFleuruwu | [#128](https://github.com/Justchicoo/Project-Ambrose/pull/128) | The sweep is delivered and its two measurable checks are earned, but the oracle the milestone exists for is not: a run collects no unknown properties at all and names nothing for any of the 104 unknown classes, so 520243970 is still unnamed and the draft schema the next milestone feeds on comes out empty |
+| 8.14 | MeruneFleuruwu | [#129](https://github.com/Justchicoo/Project-Ambrose/pull/129) | Both acceptance checks are earned and the byte comparison has teeth, but the order preservation this adds to PropertyObject is never what makes the bytes match: disabling it leaves every test passing, because on each file tested the client's order is already the ordinal one. It needs a file that requires it, or it should be removed with the per-object memory it costs |
+| 3.18 | MeruneFleuruwu | [#127](https://github.com/Justchicoo/Project-Ambrose/pull/127) | The four acceptance checks are earned and ticked, but the deliverable asking for unit tests of the decision logic against an in-memory applied set, with no database, is not delivered: the three cases it names are covered by an integration test that skips wherever no database is configured. ARCHIVED files and module includes are also still to come |
 
 ## Landed
 
-Nothing yet.
-
 | ID | Who | Pull request | What landed |
 |---|---|---|---|
+| 16.01 | MeruneFleuruwu | [#131](https://github.com/Justchicoo/Project-Ambrose/pull/131) | The client's binary table list read and written byte for byte, proven against a reference list of exactly the size the check names, with all six checks earned |
+| 1.06, 1.07, 1.08 | MeruneFleuruwu | [#130](https://github.com/Justchicoo/Project-Ambrose/pull/130) | The last check of all three was stale: the locale round-trip it asks for is covered by a client-gated test that passes on the pinned install |

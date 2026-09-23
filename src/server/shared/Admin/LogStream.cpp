@@ -1,10 +1,11 @@
 /*
  * Project Ambrose by Imjustchico
- * Opens a session by subscribing to the hub, marks the range a resume can no longer reach or a full queue threw away, drains every session on one pump thread into its sink, and encodes records, markers and the subscribe request as JSON with every secret redacted before it leaves.
+ * Opens a session by subscribing to the hub, marks the range a resume can no longer reach or a full queue threw away, drains every session on one pump thread into its sink, and encodes records, markers and the subscribe request as JSON with every secret redacted before it leaves. A record carries the place in the code it was written at and the template it was written from, added to the shape rather than changing it, so a reader that knows nothing of them reads it as before.
  */
 
 #include "LogStream.h"
 #include "LogRedaction.h"
+#include "LogSource.h"
 #include "LogTimestamp.h"
 #include "StringUtil.h"
 
@@ -401,7 +402,47 @@ std::optional<LogStreamRequest> LogStreamService::ParseRequest(std::string const
     return request;
 }
 
+namespace
+{
+    nlohmann::json RecordObject(LogMessage const& record);
+}
+
 std::string LogStreamService::EncodeRecord(LogMessage const& record)
+{
+    return RecordObject(record).dump();
+}
+
+std::string LogStreamService::BacklogJson(LogStreamHub const& hub, uint64 after, std::size_t max)
+{
+    std::vector<std::shared_ptr<LogMessage const>> const backlog = hub.GetBacklog();
+    uint64 const oldest = backlog.empty() ? 0 : backlog.front()->Sequence;
+    uint64 const latest = backlog.empty() ? 0 : backlog.back()->Sequence;
+
+    nlohmann::json records = nlohmann::json::array();
+    for (std::shared_ptr<LogMessage const> const& record : backlog)
+    {
+        if (record->Sequence <= after)
+            continue;
+        if (records.size() >= max)
+            break;
+        records.push_back(RecordObject(*record));
+    }
+
+    nlohmann::json body;
+    body["schema"] = 1;
+    body["oldest"] = oldest;
+    body["latest"] = latest;
+    body["records"] = std::move(records);
+    if (after != 0 && oldest > 0 && after + 1 < oldest)
+        body["dropped"] = { { "from", after + 1 }, { "to", oldest - 1 }, { "count", oldest - after - 1 } };
+    else
+        body["dropped"] = nullptr;
+    return body.dump();
+}
+
+namespace
+{
+nlohmann::json RecordObject(LogMessage const& record)
 {
     nlohmann::json body;
     body["type"] = "record";
@@ -411,7 +452,14 @@ std::string LogStreamService::EncodeRecord(LogMessage const& record)
     body["level"] = Ambrose::ToLower(std::string(Ambrose::Logging::GetLogLevelName(record.Level)));
     body["category"] = record.Category;
     body["message"] = LogRedaction::Redact(record.Text);
-    return body.dump();
+    if (record.Source.Known())
+        body["source"] = { { "file", LogSourcePath::Portable(record.Source.File) }, { "line", record.Source.Line },
+            { "function", std::string(record.Source.Function) } };
+    else
+        body["source"] = nullptr;
+    body["template"] = record.Template;
+    return body;
+}
 }
 
 std::string LogStreamService::EncodeDropped(uint64 from, uint64 to, uint64 count)

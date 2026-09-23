@@ -13,12 +13,6 @@
 #include <string>
 #include <string_view>
 
-struct UpdaterSettings
-{
-    bool AutoSetup = true;
-    std::filesystem::path SourceDirectory;
-};
-
 class DBUpdater
 {
 public:

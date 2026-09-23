@@ -9,6 +9,7 @@
 #include "LogTestDirectory.h"
 #include "LogTestHarness.h"
 #include "Panel.h"
+#include "PanelErrors.h"
 #include "PanelAudit.h"
 #include "TlsCertificate.h"
 
@@ -322,4 +323,34 @@ TEST_F(PanelTest, AReloadSwapsTheCertificateWithNoRestart)
     ASSERT_TRUE(panel.Reload(Configured(again)));
     EXPECT_EQ(panel.GetPort(), port);
     EXPECT_EQ(fingerprintNow(), replacement.GetInfo().Fingerprint);
+}
+
+TEST_F(PanelTest, GatheringKeepsWhatAnAppReportedAndIgnoresAnAnswerItCannotRead)
+{
+    Panel panel = Make();
+    std::string error;
+    ASSERT_TRUE(panel.Start(Configured("Panel.Enable = 1\nPanel.Port = 0\n"), error)) << error;
+
+    panel.SetErrorSource([]
+    {
+        return std::vector<std::pair<std::string, std::string>>{
+            { "gameserver", R"({"schema":1,"dropped":0,"groups":[{"app":"gameserver","category":"server.database","file":"src/server/database/Pool.cpp","line":42,"function":"Open","template":"could not reach {}","level":"error","revision":"abc1234","count":3,"first_epoch_ms":1000,"last_epoch_ms":2000,"last_message":"could not reach the store"}]})" },
+            { "patchserver", "this is not json at all" },
+        };
+    });
+
+    EXPECT_EQ(panel.GatherErrorsOnce(), 1u) << "one group from the app that answered, none from the one that did not";
+
+    std::vector<PanelErrorGroup> const kept = panel.Errors().List(error);
+    ASSERT_EQ(kept.size(), 1u) << error;
+    EXPECT_EQ(kept[0].App, "gameserver");
+    EXPECT_EQ(kept[0].Line, 42u);
+    EXPECT_EQ(kept[0].Template, "could not reach {}");
+    EXPECT_EQ(kept[0].TotalCount, 3u);
+    EXPECT_EQ(kept[0].LastMessage, "could not reach the store");
+
+    EXPECT_EQ(panel.GatherErrorsOnce(), 1u);
+    EXPECT_EQ(panel.Errors().List(error).size(), 1u) << "the same report twice is still one group";
+    EXPECT_EQ(panel.Errors().List(error)[0].TotalCount, 3u) << "and the count is not doubled by reading it again";
+    panel.Stop();
 }

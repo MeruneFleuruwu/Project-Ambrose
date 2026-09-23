@@ -56,6 +56,7 @@ public:
     bool Start(ConfigMgr const& config, SupervisorSettings const& settings, bool watch, std::vector<std::string>& problems, std::string& error);
     void Shutdown();
     void Register(AdminRouter& router, std::function<AdminStatusSnapshot()> self);
+    std::vector<std::pair<std::string, std::string>> CollectErrorReports();
 
     PowerResult Power(std::string_view name, PowerAction action, uint32 countdownSeconds);
     std::vector<AppSnapshot> Snapshots() const;

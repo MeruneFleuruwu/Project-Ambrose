@@ -67,16 +67,21 @@ The name of the test that runs it, or the tool run and what it printed, or the s
 ## How I want you to work
 
 1. **Find out whether Ambrose already has it, before writing that it lacks it.** This is the single most common fault in contributions here: two proposals in a row set out to add what the project had already built. Read "Where we are", then the phase file, then grep `src/` for the type or the file name, then grep `src/test/` for a test that already proves it. The cheapest disproof of "nothing does X" is the test that does X, and it takes five minutes.
-2. **Plan before writing.** What each acceptance check will be satisfied by, which file each deliverable lands in, and what the smallest failing test is. Put the cheapest experiment that could kill the approach first, so I do not spend a week on something wrong.
-3. **Write the test before or with the code**, and make it fail first for the right reason. A check says the exact numbers to expect, such as packing (-2408.09, 2609.10, -7.13) landing within 4 units, or the first bytes of a written table. Assert those numbers, not a re-derivation of them, because a test that computes its own expectation proves only that the code agrees with itself.
-4. **Verify by running, never by reading.** Build it, run the test, run the whole `ctest` suite, and run the tool on real input where there is one. Read the output rather than assuming it. When I paste output, read that too rather than agreeing with it.
-5. **If the milestone's point is that something gets faster, smaller or quieter, measure it against what it replaces, and write the test that fails when it does not.** The first milestone sent here was a startup cache that loaded correctly and took twice as long as the JSON file it was replacing, because its payload was decoded and then handed back through the same parser. Nothing in it was careless; there was simply no measurement, so the one thing the milestone existed for was the one thing nobody checked. Time the old way and the new way on real input, print both, and keep the comparison as a test.
-6. **Make it fail usefully.** Name the file and the reason, return a typed error rather than a bare code, carry on past what can be skipped rather than losing a whole run to one unreadable input, and say what would make the output wrong. A decoder that reports zero problems on a corrupt file is worse than one that stops.
-7. **Respect the limits already in the code.** Decoding is bounded by depth, object, list, memory and inflation limits read from settings; a new path through it keeps those bounds. New settings go in the app's `.conf.dist` with the same naming as its neighbours.
-8. **Keep the diff to the milestone.** Renaming, reformatting or improving code on the way past makes the change unreviewable and is the most common reason a sound pull request is sent back. If you find a real bug outside the milestone, say so and leave it.
-9. **Resolve the phase's review notes that name my milestone**, in the milestone or in the pull request, saying which and how.
-10. Write the files, then have me run every check below and fix whatever they print.
-11. Write the pull request description: the milestone id, what was built, how it was verified, which checks are ticked, which are not and why.
+2. **Before writing a parser, a decoder or anything that reads a file format, find what already reads it.** `doc/TOOLS.md` lists the suite and `src/tools` and `apps` hold it, and that list has drifted: something marked planned may exist, and something marked built may do more than its line says, so look at the folder rather than trusting the line. Using one of ours is the fast path, and **upgrading one is a welcome part of a milestone**: if a tool almost does what my milestone needs, teaching it that function is better work than writing a second copy inside the milestone, and it leaves the suite able to read more than it could before.
+
+This is not a style preference, and one pull request in this batch shows why. 4.08's zone extractor wrote its own decode path for the client's zone data, and every position and orientation in its output came out empty, across all 3356 zones. The project already had a reader for exactly that format, in `bindecode` and the ObjectProperty serializer, and 8.14 had just made the versionable path byte-exact. Built on those, it would have inherited working vector decoding. The duplicate did not merely repeat work: it produced wrong data, and the milestone did not land.
+
+So, before I write: name the format, say what in this repository already reads it, and tell me whether the plan is to call it, to extend it, or to explain why neither fits.
+3. **Plan before writing.** What each acceptance check will be satisfied by, which file each deliverable lands in, and what the smallest failing test is. Put the cheapest experiment that could kill the approach first, so I do not spend a week on something wrong.
+4. **Write the test before or with the code**, and make it fail first for the right reason. A check says the exact numbers to expect, such as packing (-2408.09, 2609.10, -7.13) landing within 4 units, or the first bytes of a written table. Assert those numbers, not a re-derivation of them, because a test that computes its own expectation proves only that the code agrees with itself.
+5. **Verify by running, never by reading.** Build it, run the test, run the whole `ctest` suite, and run the tool on real input where there is one. Read the output rather than assuming it. When I paste output, read that too rather than agreeing with it.
+6. **If the milestone's point is that something gets faster, smaller or quieter, measure it against what it replaces, and write the test that fails when it does not.** The first milestone sent here was a startup cache that loaded correctly and took twice as long as the JSON file it was replacing, because its payload was decoded and then handed back through the same parser. Nothing in it was careless; there was simply no measurement, so the one thing the milestone existed for was the one thing nobody checked. Time the old way and the new way on real input, print both, and keep the comparison as a test.
+7. **Make it fail usefully.** Name the file and the reason, return a typed error rather than a bare code, carry on past what can be skipped rather than losing a whole run to one unreadable input, and say what would make the output wrong. A decoder that reports zero problems on a corrupt file is worse than one that stops.
+8. **Respect the limits already in the code.** Decoding is bounded by depth, object, list, memory and inflation limits read from settings; a new path through it keeps those bounds. New settings go in the app's `.conf.dist` with the same naming as its neighbours.
+9. **Keep the diff to the milestone.** Renaming, reformatting or improving code on the way past makes the change unreviewable and is the most common reason a sound pull request is sent back. If you find a real bug outside the milestone, say so and leave it.
+10. **Resolve the phase's review notes that name my milestone**, in the milestone or in the pull request, saying which and how.
+11. Write the files, then have me run every check below and fix whatever they print.
+12. Write the pull request description: the milestone id, what was built, how it was verified, which checks are ticked, which are not and why.
 
 ## Setting the whole thing up on my machine
 
@@ -119,6 +124,30 @@ AMBROSE_PANEL_API=https://127.0.0.1:12080 npm run dev --workspace apps/dashboard
 
 A branch named `milestone/<id>-<short-name>` builds the Linux GCC leg in CI by itself, so an open pull request tells us both whether it compiles there, and the maintainer adds a label for the Windows leg when it is worth one. The first run from a new contributor waits for a maintainer to approve it.
 
+## What has actually gone wrong here, so we do not repeat it
+
+Every one of these came from real pull requests on this track. None of them was carelessness, and each cost a round trip.
+
+**The Linux leg fails on warnings MSVC never mentions.** The build is warnings-as-errors on both compilers, and GCC refuses things MSVC accepts. Three that have already bitten:
+
+- A range loop that binds by value: `for (auto const [tag, expected] : std::array<std::pair<std::string_view, uint8>, 8>{...})` copies each pair, and GCC calls that `-Werror=range-loop-construct`. Bind by reference, `auto const&`.
+- An aggregate initialised with fewer members than it has: GCC calls that `-Werror=missing-field-initializers`. Before changing my call site, look at the structure: this has bitten three times here, and each time the real cause was a few members with no default initialiser, so naming any one field could never compile on GCC whatever the caller wrote. Giving those members defaults fixes it for everyone, and is the maintainer's to take if the structure is not mine to change.
+- A macro whose expansion contains a top-level comma, used inside another macro. GCC says so plainly. MSVC accepts it and builds code that reads off the end of itself, which surfaces later as a crash in a test that passed for weeks. Braces do not protect commas from the preprocessor, only parentheses do. If Windows crashes where Linux compiles, and anything near the logging macros changed, suspect the macro before the build system.
+
+If I can only build on one platform, say so and let the leg tell us, but expect this class of thing rather than being surprised by it.
+
+**Every acceptance check the work earns gets ticked, in the same pull request.** Seven pull requests in one night ticked nothing at all, which reads as a milestone half-built even when the code is complete, and makes a reviewer guess what was claimed. Three rules fall out of it:
+
+- A check another milestone shares word for word is earned by the same run, so tick every milestone that shares it and say so. One locale round-trip test closed three milestones at once because their last check was the same sentence.
+- A check that describes work belonging to a different milestone cannot be earned here. Say which, and why, in the description. Do not tick it and do not leave it silent: 4.04 carries three checks that describe 4.05, and that was a flaw in the roadmap rather than in the contribution.
+- A check may already be earned by a test that exists. That is a real finding and worth a pull request of its own: run the test, tick the box, and quote the run.
+
+**The pull request description is not the template.** Arriving with the template's own prompts still in it tells the reviewer nothing, and it is the first thing read. Fill every section: which milestone, what it adds, the platform built on and what `ctest` ended with, which boxes this ticks and what proves each, and which boxes stay empty and why.
+
+**Say when the work deviates from the deliverables.** Putting a file somewhere other than the deliverables list says is sometimes right, and a reviewer will keep it when the reason holds. LocationString landed in `shared/Util` rather than `game/Movement` because the login server needs it too, which was the better call, but it was left to the reviewer to work out whether it was deliberate. One sentence in the description settles it.
+
+**A closed pull request is not a rejected one.** When the work lands, the maintainer often commits it together with the acceptance ticks, the roadmap summary and the regenerated card in one commit, authored to me, and closes the pull request naming that commit. That keeps the repository's own checks green, which a bare merge would not. Look for the commit before assuming anything went wrong.
+
 ## Before the pull request
 
 Have me commit first, because these read committed work, then run these from the repository root (`python` may be `py` on Windows):
@@ -139,6 +168,8 @@ Three dots, and the remote branch my pull request targets, never a local `main`,
 
 Every commit on the branch needs a trailer naming you, such as `Co-Authored-By: <your model name> <noreply@example.com>`; the checker fails any commit in the range without one, not only the last.
 
+Then write the description, replacing the template's prompts rather than leaving them. It needs, in order: the milestone id and title; what the change adds; the platform I built on and the line `ctest` ended with, pasted; which acceptance boxes this ticks and what proves each; which boxes stay empty and why; and any place the work departs from the milestone's deliverables, with the reason. A reviewer reads that before the code, and every question it leaves open is a round trip.
+
 ## One milestone per branch, claimed before it is built
 
 ```
@@ -148,6 +179,16 @@ git switch -c milestone/<id>-<short-name>
 ```
 
 Always from `upstream/main`, never from another branch that has an open pull request, because that turns two independent contributions into a chain where revising the first breaks the second.
+
+**The names have to be exactly these, because machines read them:**
+
+| What | Form | Example |
+|---|---|---|
+| Branch | `milestone/<id>-<short-name>`, lower case, hyphens | `milestone/16.01-filebinary-table-codec` |
+| Pull request title | `<id> <what you are building>` | `16.01 FileBinary table codec` |
+| Claim issue, if I use one instead | `Claim: <id> <title>`, from the claim form | `Claim: 16.01 FileBinary table codec` |
+
+The id is exactly as the board writes it, with its leading zero where it has one, so `4.04` and not `4.4`. The branch name is the one that matters: `apps/ci/ci_contrib_paths.py` reads it, and it is the only reason CI accepts a change under `src/`, so a branch named anything else fails every source file at once with a wall of refusals. The board reads it too, which is how the claim appears without anybody being told. The title is for people.
 
 **Open the pull request as a draft on the first day, before the work is done.** That is what reserves the milestone, and nobody has to be told: the board reads the open pull requests, so within minutes it shows my milestone as being built, by me, and stops anybody else taking it. Building for a week in silence risks somebody else landing it first. Title it `<id> <what you are building>`.
 

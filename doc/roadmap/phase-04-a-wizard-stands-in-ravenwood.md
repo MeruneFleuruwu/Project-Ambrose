@@ -34,6 +34,7 @@ The roadmap critic flagged these. Resolve each one before or while implementing 
 - **Missing work.** Multi-realm inter-process communication: friends presence, cross-realm whispers, party member zones, realm-transfer handoff, and kicking a character online on another realm all need a login<->game or game<->game bus (or DB polling). Only heartbeat rows (4.03) and login keys exist.
 - **Oversized.** 4.14 LOGINCOMPLETE and standing in zone (M). This is the first full CoreObject acceptance by the real client, with segmentation, CriticalObjects and CLIENTZONED. It is historically the hardest single step and should be split: byte-level LOGINCOMPLETE against a decoded capture, then real-client zone-in.
 - **Oversized.** 4.08 zone extractor across 3356 zone WADs with 0 failures (M). The failure triage alone is open-ended.
+- **Ordering.** 4.04 carries LOG-11's acceptance as well as WLD-1's, but only the LocationString part of LOG-11 is its own work. Three of its checks, the CharID selection errors, the MSG_ATTACH integration and the real-client Play, describe 4.05 and cannot be earned until 4.05 lands, so 4.04 stays open with its own eight ticked. Found on 2026-09-23 when an outside contributor delivered every part of 4.04 that 4.04 builds.
 - **Ordering.** 4.09 depends on 4.15, so 4.15 lands before 4.09. Settings named in 4.02-4.14 read their config value until 4.16 lands, then become live settings with the same keys.
 
 ## 4.01 sWorld tick, GameSession, ScriptMgr hooks and AddSC loaders (new core)
@@ -152,9 +153,9 @@ The login server knows which gameservers (realms) are up, where they listen, and
 
 **Acceptance**
 
-- [ ] Packing (-2408.09, 2609.10, -7.13) is within 4 units
-- [ ] '-32,-552,-28,6.350083' formats and parses exactly; '857.9,5730.8,-18.09,1.40' parses under fr-FR; 'Start' is named
-- [ ] GAME ordinals ADDEFFECT=2, ATTACH=7, CLIENTMOVE=36, ENTERSTATE=72, LOGINCOMPLETE=108, NEWOBJECT=122, SERVERMOVE=218, WIZBANG=247
+- [x] Packing (-2408.09, 2609.10, -7.13) is within 4 units (MovementPackingTest.CapturedCoordinatesRoundTripWithinFourUnits)
+- [x] '-32,-552,-28,6.350083' formats and parses exactly; '857.9,5730.8,-18.09,1.40' parses under fr-FR; 'Start' is named (LocationStringTest.FormatsAndParsesTheCapturedCoordinates, .ParsesDecimalPointsIndependentlyOfTheProcessLocale, .PreservesNamedLocations)
+- [x] GAME ordinals ADDEFFECT=2, ATTACH=7, CLIENTMOVE=36, ENTERSTATE=72, LOGINCOMPLETE=108, NEWOBJECT=122, SERVERMOVE=218, WIZBANG=247 (GameOrdinalClientTest.ServiceFiveOrdinalsMatchTheClientCatalog, run against the pinned install)
 
 ### Detailed spec from WLD-1: World wire math: coordinate/direction packing, location strings, GAME ordinals
 
@@ -176,10 +177,10 @@ Every later world milestone can pack and unpack positions and message ids with u
 
 **Acceptance**
 
-- [ ] Unit: packing (x=-2408.09,y=2609.10,z=-7.13) and unpacking lands within 4 units per axis; values below -32768*4 are rejected or clamped by a documented rule
-- [ ] Unit: yaw 0, pi/2, pi and 3pi/2 survive a byte round-trip within 1 byte step
-- [ ] Unit: '857.9,5730.8,-18.09,1.40' parses to 4 floats under a fr-FR process locale; 'Start' parses as a named location
-- [ ] Unit: GAME ordinals computed by sorting the XML element tag names (not _MsgName) ordinally, with the duplicate MSG_REMOVEOBJECT collapsed, give ADDEFFECT=2, ATTACH=7, CLIENTMOVE=36, ENTERSTATE=72, LOGINCOMPLETE=108, NEWOBJECT=122, SERVERMOVE=218, WIZBANG=247, matching the live capture in a local session capture
+- [x] Unit: packing (x=-2408.09,y=2609.10,z=-7.13) and unpacking lands within 4 units per axis; values below -32768*4 are rejected or clamped by a documented rule (MovementPackingTest.CapturedCoordinatesRoundTripWithinFourUnits and .OutOfRangeAndNonFiniteCoordinatesAreRejected, which hold the documented rule that an out-of-range or non-finite value is refused rather than clamped)
+- [x] Unit: yaw 0, pi/2, pi and 3pi/2 survive a byte round-trip within 1 byte step (MovementPackingTest.YawCardinalValuesRoundTripWithinOneByteStep)
+- [x] Unit: '857.9,5730.8,-18.09,1.40' parses to 4 floats under a fr-FR process locale; 'Start' parses as a named location (LocationStringTest.ParsesDecimalPointsIndependentlyOfTheProcessLocale, which sets the global locale to fr-FR and skips where it is not installed, and .PreservesNamedLocations)
+- [x] Unit: GAME ordinals computed by sorting the XML element tag names (not _MsgName) ordinally, with the duplicate MSG_REMOVEOBJECT collapsed, give ADDEFFECT=2, ATTACH=7, CLIENTMOVE=36, ENTERSTATE=72, LOGINCOMPLETE=108, NEWOBJECT=122, SERVERMOVE=218, WIZBANG=247, matching the live capture in a local session capture (GameOrdinalClientTest.ServiceFiveOrdinalsMatchTheClientCatalog, run against the pinned install)
 
 **Risks**
 
@@ -212,7 +213,7 @@ Picking a wizard sends the client to the right gameserver with a one-time key, s
 
 **Acceptance**
 
-- [ ] Unit: LocationString formats (-32,-552,-28, yaw 6.350083) as '-32,-552,-28,6.350083', the exact string in the capture, and parses it back
+- [x] Unit: LocationString formats (-32,-552,-28, yaw 6.350083) as '-32,-552,-28,6.350083', the exact string in the capture, and parses it back (LocationStringTest.FormatsAndParsesTheCapturedCoordinates)
 - [ ] Unit: selecting another account's CharID, a deleted character or with no realm online gives Error!=0 and no login_key row
 - [ ] Integration: a stub TCP listener on the realm port receives a connection and a GAME MSG_ATTACH whose LoginKey == Key, UserID and CharID match, and ZoneName and Location echo the CHARACTERSELECTED values (the behavior at capture lines 11-12)
 - [ ] Real client: after clicking Play, the loading screen appears and the client connects to the gameserver port (visible in the gameserver log) instead of showing a disconnect dialog
@@ -261,7 +262,7 @@ Picking a wizard sends the client to the right gameserver with a one-time key, s
 
 **Acceptance**
 
-- [ ] Unit: LocationString formats (-32,-552,-28, yaw 6.350083) as '-32,-552,-28,6.350083', the exact string in the capture, and parses it back
+- [x] Unit: LocationString formats (-32,-552,-28, yaw 6.350083) as '-32,-552,-28,6.350083', the exact string in the capture, and parses it back (LocationStringTest.FormatsAndParsesTheCapturedCoordinates)
 - [ ] Unit: selecting another account's CharID, a deleted character or with no realm online gives Error!=0 and no login_key row
 - [ ] Integration: a stub TCP listener on the realm port receives a connection and a GAME MSG_ATTACH whose LoginKey == Key, UserID and CharID match, and ZoneName and Location echo the CHARACTERSELECTED values (the behavior at capture lines 11-12)
 - [ ] Real client: after clicking Play, the loading screen appears and the client connects to the gameserver port (visible in the gameserver log) instead of showing a disconnect dialog

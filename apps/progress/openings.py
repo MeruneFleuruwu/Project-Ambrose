@@ -95,6 +95,9 @@ def main(argv=None):
         return 1
     try:
         message_id, status, what = announce.send(url, payload, None, announce.remembered(args.state))
+    except urllib.error.HTTPError as failure:
+        print(f"the webhook refused the post: {announce.reason(failure)}", file=sys.stderr)
+        return 1
     except (urllib.error.URLError, OSError) as failure:
         print(f"the webhook refused the post: {failure}", file=sys.stderr)
         return 1

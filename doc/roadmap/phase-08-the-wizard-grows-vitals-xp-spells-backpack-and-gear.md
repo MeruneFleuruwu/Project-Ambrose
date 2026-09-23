@@ -699,8 +699,8 @@ Players can spend training points at a school trainer to learn spells, with the 
 
 **Acceptance**
 
-- [ ] Synthetic encode/decode equal
-- [ ] Hat template and a 2000-file sample re-encode byte-identically (inflated compare for the manifest)
+- [x] Synthetic encode/decode equal. `VersionableRoundTripTest.SyntheticVersionableObjectRoundTrips` encodes a synthetic object and decodes it back equal
+- [x] Hat template and a 2000-file sample re-encode byte-identically (inflated compare for the manifest). `VersionableRoundTripTest.HatTemplateAndManifestAreByteExact` and `TwoThousandDecodedFilesAreByteExact`, run against the pinned install. Both fail when the write order is reversed, so they compare bytes rather than assert nothing
 
 ### Detailed spec from OBJ-7: Versionable BINd encoder with byte-exact round trip
 

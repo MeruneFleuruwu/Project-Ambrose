@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Tests the status, apps and capabilities routes: two loopback clients show as two sessions and none within a second of closing, reported memory sits within ten percent of the operating system's own figure, the status, apps and capabilities fields are only ever added, a missing type dump appears as a problem and clears once a dump is in use, the capabilities response lists every entry the registries hold, and an app's own apps answer is exactly itself in the shape the supervisor will share.
+ * Tests the status, apps, capabilities and errors routes: two loopback clients show as two sessions and none within a second of closing, reported memory sits within ten percent of the operating system's own figure, the status, apps and capabilities fields are only ever added, a missing type dump appears as a problem and clears once a dump is in use, the capabilities response lists every entry the registries hold, and an app's own apps answer is exactly itself in the shape the supervisor will share.
  */
 
 #include "AdminCapabilities.h"
@@ -307,6 +307,31 @@ TEST_F(AdminStatusTest, FieldsAreOnlyEverAdded)
     for (std::string const& field : AdminStatus::StatusFields())
         EXPECT_TRUE(status.contains(field)) << "status declares " << field << " and does not write it";
     EXPECT_EQ(nlohmann::json::parse(AdminStatus::StatusJson(snapshot))["schema"], AdminStatus::SchemaVersion);
+}
+
+TEST_F(AdminStatusTest, TheErrorsRouteReportsAGroupPerPlaceAnErrorWasRaised)
+{
+    sLog.GetErrors().Clear();
+    for (char const* why : { "a password", "again" })
+        LOG_ERROR("server.test", "could not reach {} for {}", "the store", why);
+
+    nlohmann::json const body = nlohmann::json::parse(AdminStatus::ErrorsJson("gameserver"));
+    EXPECT_EQ(body["schema"], AdminStatus::SchemaVersion);
+    ASSERT_EQ(body["groups"].size(), 1u) << body.dump();
+    nlohmann::json const& group = body["groups"][0];
+    EXPECT_EQ(group["app"], "gameserver");
+    EXPECT_EQ(group["category"], "server.test");
+    EXPECT_EQ(group["level"], "error");
+    EXPECT_EQ(group["count"], 2u);
+    EXPECT_EQ(group["template"], "could not reach {} for {}");
+    EXPECT_NE(std::string(group["file"]).find("AdminStatusTest.cpp"), std::string::npos);
+    EXPECT_GT(group["line"].get<uint32>(), 0u);
+    EXPECT_LE(group["first_epoch_ms"].get<int64>(), group["last_epoch_ms"].get<int64>());
+
+    std::set<std::string> const keys = Keys(group);
+    for (std::string const& field : AdminStatus::ErrorFields())
+        EXPECT_TRUE(keys.contains(field)) << "errors declares " << field << " and does not write it";
+    sLog.GetErrors().Clear();
 }
 
 TEST_F(AdminStatusTest, AMissingTypeDumpIsAProblemUntilOneIsInUse)

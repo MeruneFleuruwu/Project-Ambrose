@@ -317,6 +317,25 @@ AdminResponse Supervisor::PowerRoute(ManagedApp& app, AdminRequest const& reques
     return AdminResponse::Json(202, answer.dump());
 }
 
+std::vector<std::pair<std::string, std::string>> Supervisor::CollectErrorReports()
+{
+    std::vector<std::pair<std::string, std::string>> reports;
+    for (std::unique_ptr<ManagedApp> const& app : _apps)
+    {
+        AppSnapshot const snapshot = app->Snapshot();
+        if (!snapshot.ProcessId)
+            continue;
+        std::optional<AdminClient> const admin = app->GetAdminClient();
+        if (!admin)
+            continue;
+        AdminClientResponse const answer = admin->Send({ "GET", "/api/errors", {}, "application/json", {} }, RelayTimeout);
+        if (!answer.Answered || answer.Status != 200)
+            continue;
+        reports.emplace_back(app->GetDefinition().Name, answer.Body);
+    }
+    return reports;
+}
+
 AdminResponse Supervisor::Relay(ManagedApp& app, AdminRequest const& request, std::string_view path)
 {
     std::string const& name = app.GetDefinition().Name;

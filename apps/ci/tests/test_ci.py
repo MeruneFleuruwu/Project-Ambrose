@@ -798,14 +798,15 @@ class MilestoneTrackTests(unittest.TestCase):
             self.assertIn("`" + held + "`", prompt, held)
 
     def test_the_track_opens_only_milestones_that_exist_and_are_ready(self):
-        ready, blocked = ready_report.state(ROOT)
-        known = {row["id"] for row in ready} | {row["id"] for row in blocked}
+        ready, _blocked = ready_report.state(ROOT)
+        everything = ready_report.milestones(ROOT)
         opened = [row["id"] for row in ready if row["status"] == "open"]
         self.assertGreater(len(opened), 0)
         for identifier in re.findall(r"^\| ([\d., ]+) \|", self.section("Open now"), re.M):
             for one in re.findall(r"\d+\.\d+", identifier):
-                self.assertIn(one, known, one + " is opened by the track but is not a milestone")
-                self.assertIn(one, opened, one + " is opened by the track but its dependencies are not built")
+                self.assertIn(one, everything, one + " is opened by the track but is not a milestone")
+                self.assertTrue(one in opened or everything[one]["done"],
+                                one + " is opened by the track but its dependencies are not built")
 
     def test_a_milestone_is_not_open_and_reserved_at_once(self):
         tables = {name: set(re.findall(r"\d+\.\d+", self.section(name)))
@@ -816,9 +817,10 @@ class MilestoneTrackTests(unittest.TestCase):
 
     def test_a_milestone_the_track_does_not_name_is_reserved(self):
         ready, _blocked = ready_report.state(ROOT)
+        everything = ready_report.milestones(ROOT)
         opened = {row["id"] for row in ready if row["status"] == "open"}
         named = set(re.findall(r"\d+\.\d+", self.section("Open now")))
-        self.assertEqual(opened, named)
+        self.assertEqual(opened, {one for one in named if not everything[one]["done"]})
         for row in ready:
             self.assertIn(row["status"], ("open", "reserved", "claimed", "landed"), row["id"])
 

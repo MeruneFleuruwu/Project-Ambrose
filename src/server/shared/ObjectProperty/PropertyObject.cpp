@@ -124,6 +124,7 @@ PropertyObjectPtr PropertyObject::Build(TypeCatalogPtr const& catalog, ClassInfo
 {
     PropertyObjectPtr object(new PropertyObject(catalog, type));
     object->_values.reserve(type.Properties.size());
+    object->_present.resize(type.Properties.size());
     for (PropertyInfo const& property : type.Properties)
         object->_values.push_back(MakeDefault(catalog, property));
     return object;
@@ -133,6 +134,8 @@ PropertyObjectPtr PropertyObject::CreateBlank(BuildKey, TypeCatalogPtr const& ca
 {
     PropertyObjectPtr object(new PropertyObject(catalog, type));
     object->_values.resize(type.Properties.size());
+    object->_present.resize(type.Properties.size());
+    object->_preserveOrder = true;
     return object;
 }
 
@@ -266,6 +269,7 @@ PropertySetResult PropertyObject::SetAt(std::size_t ordinal, PropertyValue&& val
     if (property.Kind == ValueKind::Object && Reaches(value))
         return PropertySetResult::WouldOwnItself;
     _values[ordinal] = std::move(value);
+    _present[ordinal] = true;
     return PropertySetResult::Ok;
 }
 
@@ -316,6 +320,9 @@ PropertyObjectPtr PropertyObject::Clone() const
 {
     PropertyObjectPtr copy(new PropertyObject(_catalog, *_type));
     copy->_values = _values;
+    copy->_present = _present;
+    copy->_presentOrder = _presentOrder;
+    copy->_preserveOrder = _preserveOrder;
     return copy;
 }
 
@@ -327,6 +334,20 @@ bool PropertyObject::operator==(PropertyObject const& other) const
 std::vector<PropertyValue>& PropertyObject::GetValues(BuildKey) noexcept
 {
     return _values;
+}
+
+bool PropertyObject::IsPresent(std::size_t ordinal) const noexcept
+{
+    return ordinal < _present.size() && _present[ordinal];
+}
+
+void PropertyObject::MarkPresent(std::size_t ordinal, BuildKey) noexcept
+{
+    if (ordinal < _present.size() && !_present[ordinal])
+    {
+        _present[ordinal] = true;
+        _presentOrder.push_back(ordinal);
+    }
 }
 
 bool PropertyObject::Reaches(PropertyValue const& value) const noexcept

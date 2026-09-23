@@ -5,6 +5,7 @@
 
 #include "ServerApp.h"
 #include "AdminCapabilities.h"
+#include "AdminCommand.h"
 #include "AdminConfigView.h"
 #include "AdminServer.h"
 #include "ListenerSettings.h"
@@ -34,6 +35,11 @@
 #include <exception>
 #include <filesystem>
 #include <ostream>
+
+namespace
+{
+    constexpr std::size_t LogBacklogPage = 500;
+}
 
 ServerApp::ServerApp(ServerAppInfo info, ConfigMgr& config, Log& log, std::ostream& out, std::ostream& err)
     : _info(std::move(info)), _category("server." + _info.Name), _config(config), _log(log), _out(out), _err(err), _updateTimer(_io.GetImpl()), _shutdownTimer(_io.GetImpl())
@@ -269,6 +275,15 @@ bool ServerApp::StartAdminApi()
     _logStream = std::make_unique<LogStreamService>(_log.GetStreamHub());
     _logStream->Start();
     _admin->AddSocket(_logStream->MakeSocketRoute("/api/logs"));
+    _admin->Routes().AddPrefix("GET", "/api/logs/after/", [this](AdminRequest const& request)
+    {
+        std::string_view tail(request.Path);
+        tail.remove_prefix(std::string_view("/api/logs/after/").size());
+        std::optional<uint64> const after = Ambrose::StringTo<uint64>(tail);
+        if (!after)
+            return AdminResponse::Invalid("Reading a log takes the sequence number to read after", { { "after", "Give a whole number, or 0 for everything kept" } });
+        return AdminResponse::Json(200, LogStreamService::BacklogJson(_log.GetStreamHub(), *after, LogBacklogPage));
+    });
 
     OnAdminApiReady(*_admin);
 
@@ -282,10 +297,17 @@ bool ServerApp::StartAdminApi()
     return false;
 }
 
+std::filesystem::path ServerApp::CommandAuditFile() const
+{
+    std::filesystem::path const folder = _config.GetFilename().parent_path();
+    return folder / "audit" / (_info.Name + "-commands.jsonl");
+}
+
 void ServerApp::RegisterStandardRoutes(AdminRouter& routes)
 {
     AdminStatus::Register(routes, [this] { return BuildStatus(); });
     AdminConfigView::Register(routes, _config, GetRestartRequiredOptions());
+    AdminCommand::Register(routes, _commands, _info.Name, CommandAuditFile());
     routes.Add("POST", "/api/shutdown", [this](AdminRequest const& request)
     {
         nlohmann::json const body = request.Body.empty() ? nlohmann::json::object() : nlohmann::json::parse(request.Body, nullptr, false);

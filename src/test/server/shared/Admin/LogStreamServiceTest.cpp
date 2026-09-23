@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Tests the stream layer without opening a socket: a warn filter passes only warnings and above, a new session gets the hello and the whole backlog in sequence order, a resume after N gets exactly the records after N or a dropped marker naming the evicted range, a full queue drops the oldest and reports how many with their range, sequence numbers never go backwards across pump batches, secret setting values are masked before a record leaves, a bad subscribe request names its fault, and a subscriber that stops reading changes the cost of 100000 log lines by no more than ten percent against one that reads, with the cost of having no subscriber at all recorded beside them.
+ * Tests the stream layer without opening a socket: a warn filter passes only warnings and above, the same backlog is readable over HTTP after a sequence number and says what it could no longer show, and a record read that way is the record the socket would have sent, a record carries the place in the code it was written at and the template it was written from while one with neither carries no location rather than a wrong one, a new session gets the hello and the whole backlog in sequence order, a resume after N gets exactly the records after N or a dropped marker naming the evicted range, a full queue drops the oldest and reports how many with their range, sequence numbers never go backwards across pump batches, secret setting values are masked before a record leaves, a bad subscribe request names its fault, and a subscriber that stops reading changes the cost of 100000 log lines by no more than ten percent against one that reads, with the cost of having no subscriber at all recorded beside them.
  */
 
 #include "LogRedaction.h"
@@ -146,6 +146,34 @@ TEST_F(LogStreamServiceTest, AWarnFilterPassesOnlyWarningsAndAbove)
     for (nlohmann::json const& record : sink->OfType("record"))
         EXPECT_NE(record["level"].get<std::string>(), "info") << record.dump();
     EXPECT_TRUE(sink->OfType("dropped").empty());
+}
+
+TEST_F(LogStreamServiceTest, ARecordCarriesWhereItWasWrittenAndWhatItWasWrittenFrom)
+{
+    LogMessage located = Record(1, LogLevel::Error, "a", "Listening on 127.0.0.1:12001 with 1 network thread(s)");
+    located.Source = LogSource{ "src/server/Whatever.cpp", "Listen", 42 };
+    located.Template = "Listening on {} with {} network thread(s)";
+    LogMessage plain = Record(2, LogLevel::Error, "a", "written as text");
+
+    _hub.Publish(std::move(located));
+    _hub.Publish(std::move(plain));
+    auto const sink = std::make_shared<RecordingSink>();
+    Open(sink, LogStreamRequest{});
+    while (_service.Pump() > 0)
+    {
+    }
+
+    std::vector<nlohmann::json> const records = sink->OfType("record");
+    ASSERT_EQ(records.size(), 2u);
+    EXPECT_EQ(records[0]["source"]["file"].get<std::string>(), "src/server/Whatever.cpp");
+    EXPECT_EQ(records[0]["source"]["line"].get<uint32>(), 42u);
+    EXPECT_EQ(records[0]["source"]["function"].get<std::string>(), "Listen");
+    EXPECT_EQ(records[0]["template"].get<std::string>(), "Listening on {} with {} network thread(s)");
+    EXPECT_TRUE(records[1]["source"].is_null()) << records[1].dump();
+    EXPECT_EQ(records[1]["template"].get<std::string>(), "");
+    for (nlohmann::json const& record : records)
+        for (char const* field : { "sequence", "time", "epoch_ms", "level", "category", "message" })
+            EXPECT_TRUE(record.contains(field)) << field << " " << record.dump();
 }
 
 TEST_F(LogStreamServiceTest, ACategoryFilterPassesOnlyThoseCategories)
@@ -398,4 +426,45 @@ TEST(LogStreamCost, ASubscriberThatStopsReadingChangesLoggingCostByNoMoreThanTen
     RecordProperty("best_round_reading_subscriber_us", static_cast<int>(reading * 1e6));
     RecordProperty("best_round_stalled_subscriber_us", static_cast<int>(stalled * 1e6));
     EXPECT_LE(stalled, reading * 1.10) << "best round alone " << alone << " s, with a reading subscriber " << reading << " s, with one that stopped reading " << stalled << " s, over " << Rounds * LinesPerRound << " lines each";
+}
+
+TEST_F(LogStreamServiceTest, TheBacklogIsReadableOverHttpAfterASequenceNumber)
+{
+    PublishRange(_hub, 1, 20);
+
+    nlohmann::json const all = nlohmann::json::parse(LogStreamService::BacklogJson(_hub, 0, 500), nullptr, false);
+    ASSERT_TRUE(all.is_object());
+    EXPECT_EQ(all["schema"], 1);
+    EXPECT_EQ(all["oldest"], 1u);
+    EXPECT_EQ(all["latest"], 20u);
+    EXPECT_EQ(all["records"].size(), 20u);
+    EXPECT_TRUE(all["dropped"].is_null());
+
+    nlohmann::json const rest = nlohmann::json::parse(LogStreamService::BacklogJson(_hub, 15, 500), nullptr, false);
+    ASSERT_EQ(rest["records"].size(), 5u) << "only what came after 15";
+    EXPECT_EQ(rest["records"][0]["sequence"], 16u);
+
+    nlohmann::json const page = nlohmann::json::parse(LogStreamService::BacklogJson(_hub, 0, 4), nullptr, false);
+    EXPECT_EQ(page["records"].size(), 4u) << "a page is capped and the caller comes back for more";
+    EXPECT_EQ(page["records"][0]["sequence"], 1u);
+}
+
+TEST_F(LogStreamServiceTest, TheHttpReadSaysWhatItCouldNotShowAndMatchesTheSocketsRecord)
+{
+    _hub.SetBacklogCapacity(10);
+    PublishRange(_hub, 1, 30);
+
+    nlohmann::json const missed = nlohmann::json::parse(LogStreamService::BacklogJson(_hub, 5, 500), nullptr, false);
+    ASSERT_FALSE(missed["dropped"].is_null()) << "the reader asked for lines the backlog no longer holds";
+    EXPECT_EQ(missed["dropped"]["from"], 6u);
+    EXPECT_EQ(missed["dropped"]["count"].get<uint64>(), missed["dropped"]["to"].get<uint64>() - 5u);
+
+    LogMessage one = Record(31, LogLevel::Error, "a", "the same line both ways");
+    one.Template = "the same line both ways";
+    _hub.Publish(one);
+
+    nlohmann::json const overHttp = nlohmann::json::parse(LogStreamService::BacklogJson(_hub, 30, 500), nullptr, false)["records"][0];
+    nlohmann::json const overSocket = nlohmann::json::parse(LogStreamService::EncodeRecord(one), nullptr, false);
+    for (char const* field : { "sequence", "level", "category", "message", "template", "source" })
+        EXPECT_EQ(overHttp[field], overSocket[field]) << field << " differs between the two ways of reading the same record";
 }

@@ -135,6 +135,8 @@ EncodeResult BindFile::Write(PropertyObject const* object, SerializerFlag flags,
     options.Limits = GetDefaultLimits();
     options.IsDirty = [](PropertyObject const& owner, PropertyInfo const& property)
     {
+        if (owner.IsPresent(property.Id))
+            return true;
         PropertyValue const* const value = owner.Get(property.Hash);
         return !value || !(*value == PropertyObject::MakeDefault(owner.GetCatalog(), property));
     };

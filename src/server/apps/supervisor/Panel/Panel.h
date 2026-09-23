@@ -10,6 +10,7 @@
 #include "ListenerSettings.h"
 #include "PanelAudit.h"
 #include "PanelRateLimit.h"
+#include "PanelErrors.h"
 #include "PanelSessions.h"
 #include "PanelSignIn.h"
 #include "PanelUsers.h"
@@ -19,6 +20,8 @@
 #include <chrono>
 #include <filesystem>
 #include <map>
+#include <condition_variable>
+#include <thread>
 #include <utility>
 #include <functional>
 #include <mutex>
@@ -59,6 +62,11 @@ public:
     PanelStore& Store() { return _store; }
     PanelUsers& Users() { return _users; }
     PanelSessions& Sessions() { return _sessions; }
+    PanelErrors& Errors() { return _errors; }
+    void SetErrorSource(std::function<std::vector<std::pair<std::string, std::string>>()> source);
+    std::size_t GatherErrorsOnce();
+
+    static constexpr std::chrono::seconds GatherInterval{ 30 };
     PanelSignInThrottle& SignInThrottle() { return _signIn; }
     PanelRateLimit& Limit() { return _rateLimit; }
     AdminRouter& Routes() { return _listener.Routes(); }
@@ -84,6 +92,7 @@ private:
     PanelStore _store;
     PanelUsers _users;
     PanelSessions _sessions;
+    PanelErrors _errors;
     PanelSignInThrottle _signIn;
     std::mutex _claimMutex;
     std::string _claimToken;
@@ -93,6 +102,14 @@ private:
     std::map<std::string, std::pair<int64, std::chrono::steady_clock::time_point>> _resets;
     PanelRateLimit _rateLimit;
     std::mutex _storeMutex;
+    void StartGathering();
+    void StopGathering();
+
+    std::function<std::vector<std::pair<std::string, std::string>>()> _errorSource;
+    std::thread _gatherThread;
+    std::mutex _gatherMutex;
+    std::condition_variable _gatherWake;
+    bool _gathering = false;
     AdminServer _listener;
     bool _secure = false;
 };

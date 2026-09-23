@@ -70,6 +70,10 @@ UpdaterSettings DatabaseLoader::ReadUpdaterSettings() const
     std::string const source = _config.GetOption<std::string>("Updates.SourcePath", "", true);
     if (!source.empty())
         settings.SourceDirectory = ConfigMgr::PathFromUtf8(source);
+    settings.Redundancy = _config.GetOption<bool>("Updates.Redundancy", false, true);
+    settings.AllowRehash = _config.GetOption<bool>("Updates.AllowRehash", false, true);
+    settings.CleanDeadRefMaxCount = _config.GetOption<int32>("Updates.CleanDeadRefMaxCount", 3, true);
+    settings.AllowPending = _config.GetOption<bool>("Updates.AllowPending", false, true);
     return settings;
 }
 

@@ -1,4 +1,4 @@
-<!-- Project Ambrose by Imjustchico: The remote console laid out like Pterodactyl's: the app and its power buttons on top, the console with each app's own output and a prompt that recalls the commands typed on this page with the arrow keys, held in memory only, and the app's address, state, uptime, sessions, tick and build beside it, answered locally until 17.05 sends commands to the server. -->
+<!-- Project Ambrose by Imjustchico: The remote console, live: it lists the apps the supervisor runs, sends what is typed to the app's own command route and prints what came back, keeping each app's output and its recalled commands in memory only. A command that cannot be undone comes back refused rather than run, and typing yes sends the same command again with the confirmation the server asked for, so the confirming is a thing the operator does on purpose rather than a flag the page sets for them. A refusal is printed in the colour of something wrong with the reason the server gave, never as though it had worked, and the prompt is closed while an app is not running or a command is still out. -->
 <script lang="ts">
     import * as Card from "$lib/components/ui/card/index.js";
     import * as Select from "$lib/components/ui/select/index.js";
@@ -12,48 +12,81 @@
     import RotateCcwIcon from "@lucide/svelte/icons/rotate-ccw";
     import SendIcon from "@lucide/svelte/icons/send-horizontal";
     import SquareIcon from "@lucide/svelte/icons/square";
-    import UsersIcon from "@lucide/svelte/icons/users";
     import { toast } from "svelte-sonner";
     import PageHeader from "../components/PageHeader.svelte";
     import StatusBadge from "../components/StatusBadge.svelte";
     import { focus } from "../focus.svelte";
     import { requestPower } from "../power";
-    import { apps } from "../sample";
+    import { ApiError } from "$lib/api.svelte.js";
+    import { formatUptime } from "$lib/format.js";
+    import { live } from "$lib/status.svelte.js";
+    import { runCommand, supervised } from "$lib/supervision.svelte.js";
+    import type { AppEntry } from "$lib/schemas.js";
 
-    type Line = { kind: "command" | "reply" | "status"; text: string };
+    type Line = { kind: "command" | "reply" | "status" | "refused"; text: string };
+    type Tone = "healthy" | "waiting" | "wrong" | "unknown";
 
-    const app = $derived(apps.find((entry) => entry.name === focus.app) ?? apps[0]);
-    const outputs = $state<Record<string, Line[]>>({
-        gameserver: [
-            { kind: "status", text: "Connected to gameserver" },
-            { kind: "command", text: "status" },
-            { kind: "reply", text: "gameserver 573f769, up 6 h 12 min, running, 9 sessions" },
-            { kind: "command", text: "help account" },
-            { kind: "reply", text: "account create <name> <password>\naccount set password <name> <password>" },
-        ],
+    const tones: Record<string, Tone> = {
+        running: "healthy",
+        starting: "waiting",
+        stopping: "waiting",
+        crashed: "wrong",
+        offline: "unknown",
+    };
+
+    const entries = $derived(supervised());
+    const entry = $derived(entries.find((one) => one.name === focus.app) ?? entries[0]);
+
+    function appearance(one: AppEntry | undefined): { tone: Tone; word: string } {
+        const supervision = one?.supervision;
+        if (!supervision) return { tone: "unknown", word: "Not supervised" };
+        if (supervision.state === "crashed" && supervision.restart_epoch_ms) return { tone: "waiting", word: "Starting again" };
+        return {
+            tone: tones[supervision.state] ?? "unknown",
+            word: supervision.state.charAt(0).toUpperCase() + supervision.state.slice(1),
+        };
+    }
+
+    const app = $derived({
+        name: entry?.name ?? "",
+        address: entry?.address ?? "",
+        port: entry?.port ?? 0,
+        revision: entry?.revision ?? "",
+        running: entry?.supervision?.state === "running",
+        state: appearance(entry).tone,
+        word: appearance(entry).word,
+        uptime:
+            entry?.supervision?.state === "running" && entry.supervision.started_epoch_ms
+                ? formatUptime(Math.max(0, Math.round((live.now - entry.supervision.started_epoch_ms) / 1000)))
+                : "",
     });
-    const output = $derived(
-        outputs[app.name] ?? [
-            { kind: "status" as const, text: app.state === "unknown" ? `${app.name} is not running` : `Connected to ${app.name}` },
-        ],
-    );
+
+    const outputs = $state<Record<string, Line[]>>({});
+    const output = $derived(outputs[app.name] ?? []);
 
     let line = $state("");
     let recall = -1;
     let screen = $state<HTMLDivElement | null>(null);
+    let sending = $state(false);
+    let awaiting = $state("");
 
     const stats = $derived([
-        { icon: NetworkIcon, title: "Address", value: `${app.address}:${app.port}`, copy: true, tone: "" },
+        {
+            icon: NetworkIcon,
+            title: "Address",
+            value: app.address ? `${app.address}:${app.port}` : "Not listening",
+            copy: Boolean(app.address),
+            tone: "",
+        },
         { icon: ClockIcon, title: "Uptime", value: app.uptime || "Not running", copy: false, tone: "" },
-        { icon: UsersIcon, title: "Sessions", value: app.sessions === null ? "None" : String(app.sessions), copy: false, tone: "" },
         {
             icon: ActivityIcon,
-            title: "Tick, average and worst",
-            value: app.tickAverage === null ? "No game loop" : `${app.tickAverage} ms / ${app.tickMax} ms`,
+            title: "State",
+            value: app.word,
             copy: false,
-            tone: (app.tickMax ?? 0) > 10 ? "bg-waiting/15 text-waiting" : "",
+            tone: app.state === "wrong" ? "bg-destructive/15 text-destructive" : "",
         },
-        { icon: GitCommitIcon, title: "Build", value: app.revision, copy: true, tone: "" },
+        { icon: GitCommitIcon, title: "Build", value: app.revision || "Not read", copy: Boolean(app.revision), tone: "" },
     ]);
 
     const typed: Record<string, string[]> = {};
@@ -63,25 +96,53 @@
     }
 
     function remember(name: string, command: string) {
-        typed[name] = [command, ...history(name).filter((entry) => entry !== command)].slice(0, 50);
+        typed[name] = [command, ...history(name).filter((one) => one !== command)].slice(0, 50);
     }
 
-    function answer(command: string): string {
-        if (command === "status")
-            return `${app.name} ${app.revision}, ${app.uptime ? `up ${app.uptime}, running` : "stopped"}, ${app.sessions ?? 0} sessions`;
-        if (command === "help")
-            return "status, help, account, server, reload\nThis is a sample console: commands run for real once 17.05 lands.";
-        return "This is a sample console: commands run for real once 17.05 lands.";
+    function say(name: string, lines: Line[]) {
+        outputs[name] = [...(outputs[name] ?? []), ...lines];
+    }
+
+    async function run(command: string, confirm: boolean) {
+        const name = app.name;
+        sending = true;
+        try {
+            const answer = await runCommand(name, command, confirm);
+            awaiting = "";
+            if (answer.lines.length > 0)
+                say(
+                    name,
+                    answer.lines.map((text) => ({ kind: "reply" as const, text })),
+                );
+            if (!answer.success) say(name, [{ kind: "refused", text: answer.reason }]);
+        } catch (failure) {
+            const problem = failure instanceof ApiError ? failure.message : String(failure);
+            say(name, [{ kind: "refused", text: problem }]);
+            awaiting = "";
+        } finally {
+            sending = false;
+        }
     }
 
     function send(event: SubmitEvent) {
         event.preventDefault();
         const command = line.trim();
-        if (command === "") return;
-        outputs[app.name] = [...output, { kind: "command", text: command }, { kind: "reply", text: answer(command) }];
-        remember(app.name, command);
+        if (command === "" || sending) return;
+        const name = app.name;
+        if (awaiting !== "" && (command === "yes" || command === "confirm")) {
+            const held = awaiting;
+            say(name, [{ kind: "command", text: command }]);
+            line = "";
+            recall = -1;
+            void run(held, true);
+            return;
+        }
+        say(name, [{ kind: "command", text: command }]);
+        remember(name, command);
         line = "";
         recall = -1;
+        awaiting = command;
+        void run(command, false);
     }
 
     function browse(event: KeyboardEvent) {
@@ -112,10 +173,10 @@
         <Select.Root type="single" bind:value={focus.app} onValueChange={() => (recall = -1)}>
             <Select.Trigger class="w-44" aria-label="App">{focus.app}</Select.Trigger>
             <Select.Content>
-                {#each apps as entry (entry.name)}<Select.Item value={entry.name} label={entry.name} />{/each}
+                {#each entries as one (one.name)}<Select.Item value={one.name} label={one.name} />{/each}
             </Select.Content>
         </Select.Root>
-        {#if app.state === "unknown"}
+        {#if !app.running}
             <Button onclick={() => requestPower("start", app.name)}><PlayIcon />Start</Button>
         {:else}
             <Button variant="outline" onclick={() => requestPower("restart", app.name)}><RotateCcwIcon />Restart</Button>
@@ -146,6 +207,8 @@
                     <div class="flex gap-2 text-foreground">
                         <span class="text-primary select-none">›</span><span class="break-all">{entry.text}</span>
                     </div>
+                {:else if entry.kind === "refused"}
+                    <div class="pl-4 break-words whitespace-pre-wrap text-destructive">{entry.text}</div>
                 {:else if entry.kind === "status"}
                     <div class="text-xs text-muted-foreground italic">{entry.text}</div>
                 {:else}
@@ -160,16 +223,14 @@
             <input
                 bind:value={line}
                 onkeydown={browse}
-                placeholder={app.state === "unknown"
-                    ? `${app.name} is not running`
-                    : "Type a command, like status. Up and down recall earlier ones."}
-                disabled={app.state === "unknown"}
+                placeholder={!app.running ? `${app.name} is not running` : "Type a command, like status. Up and down recall earlier ones."}
+                disabled={!app.running || sending}
                 class="h-9 min-w-0 flex-1 bg-transparent font-mono text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
                 aria-label="Command"
                 autocomplete="off"
                 spellcheck="false"
             />
-            <Button type="submit" size="sm" disabled={app.state === "unknown" || line.trim() === ""}><SendIcon />Send</Button>
+            <Button type="submit" size="sm" disabled={!app.running || sending || line.trim() === ""}><SendIcon />Send</Button>
         </form>
     </Card.Root>
 

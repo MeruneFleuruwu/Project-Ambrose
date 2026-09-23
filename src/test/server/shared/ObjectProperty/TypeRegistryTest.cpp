@@ -5,12 +5,16 @@
 
 #include "StringHash.h"
 #include "TypeRegistry.h"
+#include "TypeRegistryBinary.h"
 
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <string>
+#include <filesystem>
+#include <fstream>
 #include <variant>
 
 namespace
@@ -150,6 +154,117 @@ TEST_F(TypeRegistryTest, AliasesCollapseAndBasesResolve)
     EXPECT_GT(catalog->GetApproximateBytes(), 0u);
     EXPECT_EQ(catalog->FindClass("class Missing"), nullptr);
     EXPECT_EQ(catalog->FindClass(uint32{ 12345 }), nullptr);
+}
+
+TEST(TypeRegistryBinaryTest, RoundTripsTheRegistryAndRejectsAnEditedPayload)
+{
+    std::filesystem::path const path = std::filesystem::temp_directory_path() / "ambrose-typeregistry-test.bin";
+    std::string const text = SyntheticDump().dump();
+    TypeDumpLoader::RawDump dump;
+    std::vector<std::string> parseErrors;
+    ASSERT_TRUE(TypeDumpLoader::Parse(text, dump, parseErrors));
+    std::string error;
+    ASSERT_TRUE(TypeRegistryBinary::Write(path, dump, "r-test", error)) << error;
+
+    TypeRegistry registry;
+    ASSERT_TRUE(registry.LoadBinary(path, "r-test")) << (registry.GetErrors().empty() ? std::string() : registry.GetErrors().front());
+    TypeCatalogPtr const catalog = registry.GetCatalog();
+    ASSERT_TRUE(catalog);
+    EXPECT_EQ(catalog->GetClassCount(ClassKind::PropertyClass), 5u);
+    EXPECT_EQ(catalog->GetPropertyCount(), 10u);
+
+    std::fstream stream(path, std::ios::binary | std::ios::in | std::ios::out);
+    ASSERT_TRUE(stream);
+    stream.seekp(-1, std::ios::end);
+    char byte = '\0';
+    stream.read(&byte, 1);
+    stream.seekp(-1, std::ios::end);
+    byte = static_cast<char>(byte ^ 0x01);
+    stream.write(&byte, 1);
+    stream.close();
+
+    TypeRegistry stale;
+    EXPECT_FALSE(stale.LoadBinary(path, "r-test"));
+    ASSERT_FALSE(stale.GetErrors().empty());
+    EXPECT_NE(stale.GetErrors().front().find("SHA-256"), std::string::npos);
+    std::error_code ignored;
+    std::filesystem::remove(path, ignored);
+}
+
+TEST(TypeRegistryBinaryTest, FallsBackToJsonForMissingOrStaleCaches)
+{
+    std::filesystem::path const directory = std::filesystem::temp_directory_path();
+    std::filesystem::path const jsonPath = directory / "ambrose-typeregistry-fallback.json";
+    std::filesystem::path const binaryPath = directory / "ambrose-typeregistry-fallback.bin";
+    std::string const text = SyntheticDump().dump();
+    {
+        std::ofstream json(jsonPath, std::ios::binary | std::ios::trunc);
+        json << text;
+    }
+    TypeDumpLoader::RawDump dump;
+    std::vector<std::string> parseErrors;
+    ASSERT_TRUE(TypeDumpLoader::Parse(text, dump, parseErrors));
+    std::string error;
+    ASSERT_TRUE(TypeRegistryBinary::Write(binaryPath, dump, "r-test", error)) << error;
+
+    TypeRegistry stale;
+    ASSERT_TRUE(stale.LoadBinary(binaryPath, jsonPath, "r-other"));
+    EXPECT_EQ(stale.GetCatalog()->GetPropertyCount(), 10u);
+
+    std::filesystem::remove(binaryPath);
+    TypeRegistry missing;
+    ASSERT_TRUE(missing.LoadBinary(binaryPath, jsonPath, "r-test"));
+    EXPECT_EQ(missing.GetCatalog()->GetPropertyCount(), 10u);
+
+    std::error_code ignored;
+    std::filesystem::remove(jsonPath, ignored);
+    std::filesystem::remove(binaryPath, ignored);
+}
+
+TEST(TypeRegistryBinaryTest, DirectCacheLoadIsFasterThanJsonForARepresentativeDump)
+{
+        Json large = SyntheticDump();
+        for (uint32 index = 0; index != 1000; ++index)
+        {
+            std::string const name = "struct CacheBenchmark" + std::to_string(index);
+            AddClass(large["classes"], name, Json::array(), Json::object());
+        }
+        std::string const text = large.dump();
+        TypeDumpLoader::RawDump dump;
+        std::vector<std::string> parseErrors;
+        ASSERT_TRUE(TypeDumpLoader::Parse(text, dump, parseErrors));
+
+        std::filesystem::path const jsonPath = std::filesystem::temp_directory_path() / "ambrose-typeregistry-benchmark.json";
+        std::filesystem::path const binaryPath = std::filesystem::temp_directory_path() / "ambrose-typeregistry-benchmark.bin";
+        {
+            std::ofstream json(jsonPath, std::ios::binary | std::ios::trunc);
+            json << text;
+        }
+        std::string error;
+        ASSERT_TRUE(TypeRegistryBinary::Write(binaryPath, dump, "r-test", error)) << error;
+
+        TypeRegistry jsonRegistry;
+        TypeRegistry binaryRegistry;
+        ASSERT_TRUE(jsonRegistry.LoadFromFile(jsonPath));
+        ASSERT_TRUE(binaryRegistry.LoadBinary(binaryPath, "r-test"));
+
+        auto const measure = [](auto&& load, int rounds)
+        {
+            bool succeeded = true;
+            auto const start = std::chrono::steady_clock::now();
+            for (int round = 0; round != rounds; ++round)
+                succeeded = load() && succeeded;
+            return std::pair{ std::chrono::steady_clock::now() - start, succeeded };
+        };
+        auto const jsonResult = measure([&] { return jsonRegistry.LoadFromFile(jsonPath); }, 3);
+        auto const binaryResult = measure([&] { return binaryRegistry.LoadBinary(binaryPath, "r-test"); }, 3);
+        ASSERT_TRUE(jsonResult.second);
+        ASSERT_TRUE(binaryResult.second);
+        EXPECT_LT(binaryResult.first, jsonResult.first) << "binary cache should be faster than JSON for the representative dump";
+
+        std::error_code ignored;
+        std::filesystem::remove(jsonPath, ignored);
+        std::filesystem::remove(binaryPath, ignored);
 }
 
 TEST_F(TypeRegistryTest, PropertiesAreOrderedByIdAndClassified)

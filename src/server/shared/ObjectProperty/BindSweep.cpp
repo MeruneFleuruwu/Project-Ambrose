@@ -36,6 +36,7 @@ namespace
         std::size_t FirstEntry = NoEntry;
         std::string FirstPath;
         std::string FirstDetail;
+        std::map<uint64, uint64> BitSizes;
     };
 
     using IssueKey = std::pair<DecodeIssueKind, uint32>;
@@ -63,6 +64,11 @@ namespace
         }
     }
 
+    void CountBits(Use& use, uint64 bits)
+    {
+        ++use.BitSizes[bits];
+    }
+
     void Merge(Use& into, Use&& from)
     {
         into.Count += from.Count;
@@ -73,6 +79,8 @@ namespace
             into.FirstPath = std::move(from.FirstPath);
             into.FirstDetail = std::move(from.FirstDetail);
         }
+        for (auto const& [bits, count] : from.BitSizes)
+            into.BitSizes[bits] += count;
     }
 
     void SweepEntry(KiwadArchive const& archive, TypeCatalogPtr const& catalog, SerializerLimits const& limits, std::size_t index, Tally& tally, Stage& stage)
@@ -111,7 +119,10 @@ namespace
             if (issue.Kind == DecodeIssueKind::UnknownClass)
                 Count(tally.Classes[issue.Hash], index, issue.Path, issue.Detail, newInFile);
             else
+            {
                 Count(tally.Issues[key], index, issue.Path, issue.Detail, newInFile);
+                CountBits(tally.Issues[key], issue.Bits);
+            }
         }
         stage = Stage::Done;
     }
@@ -203,7 +214,7 @@ BindSweepReport BindSweep::Run(KiwadArchive const& archive, TypeCatalogPtr const
     for (auto& [hash, use] : classes)
         report.UnknownClasses.push_back(BindSweepUnknownClass{ hash, use.Count, use.Files, entries[use.FirstEntry].Name, std::move(use.FirstPath) });
     for (auto& [key, use] : issues)
-        report.Issues.push_back(BindSweepIssue{ key.first, key.second, use.Count, use.Files, entries[use.FirstEntry].Name, std::move(use.FirstPath), std::move(use.FirstDetail) });
+        report.Issues.push_back(BindSweepIssue{ key.first, key.second, use.Count, use.Files, entries[use.FirstEntry].Name, std::move(use.FirstPath), std::move(use.FirstDetail), std::move(use.BitSizes) });
     std::sort(report.UnknownClasses.begin(), report.UnknownClasses.end(), [](BindSweepUnknownClass const& left, BindSweepUnknownClass const& right)
     {
         return left.Count != right.Count ? left.Count > right.Count : left.Hash < right.Hash;

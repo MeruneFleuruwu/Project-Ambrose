@@ -304,5 +304,7 @@ TEST_F(BindFileTest, ASweepReportsEveryFileInEntryOrderOnAnyThreadCount)
         EXPECT_EQ(report.Issues[0].Files, 2u);
         EXPECT_EQ(report.Issues[0].FirstFile, "OddA.xml");
         EXPECT_EQ(report.Issues[0].FirstPath, "class FileManifest.m_entries[0]");
+        ASSERT_EQ(report.Issues[0].BitSizes.size(), 1u);
+        EXPECT_EQ(report.Issues[0].BitSizes.at(32), 4u);
     }
 }

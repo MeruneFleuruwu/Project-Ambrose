@@ -1,11 +1,13 @@
 /*
  * Project Ambrose by Imjustchico
- * What the panel asks about one app: the supervisor's own routes for power and captured output, and the app's own routes for its status, settings and databases, sent through the supervisor's relay when the supervisor served this panel and straight to the app when the app served it itself, so every page reads the same way whichever is in front of it.
+ * What the panel asks about one app: running a command on it, the supervisor's own routes for power and captured output, and the app's own routes for its status, settings and databases, sent through the supervisor's relay when the supervisor served this panel and straight to the app when the app served it itself, so every page reads the same way whichever is in front of it.
  */
 
 import { request } from "./api.svelte";
 import { live } from "./status.svelte";
 import {
+    CommandAnswer,
+    LogAnswer,
     DatabaseAnswer,
     DatabaseApplyAnswer,
     DatabaseUpdatesAnswer,
@@ -44,6 +46,14 @@ export function power(app: string, action: PowerAction, seconds = 0) {
 
 export function output(app: string, run: OutputRun, signal?: AbortSignal) {
     return request("GET", `api/apps/${app}/output/${run}`, OutputAnswer, undefined, signal);
+}
+
+export function logsAfter(app: string, after: number, signal?: AbortSignal) {
+    return request("GET", pathFor(app, `logs/after/${after}`), LogAnswer, undefined, signal);
+}
+
+export function runCommand(app: string, command: string, confirm = false) {
+    return request("POST", pathFor(app, "command"), CommandAnswer, confirm ? { command, confirm } : { command });
 }
 
 export function settingsOf(app: string, signal?: AbortSignal) {

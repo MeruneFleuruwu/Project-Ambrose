@@ -8,6 +8,7 @@
 
 #include "BindFile.h"
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -40,6 +41,7 @@ struct BindSweepIssue
     std::string FirstFile;
     std::string FirstPath;
     std::string FirstDetail;
+    std::map<uint64, uint64> BitSizes;
 };
 
 struct BindSweepReport
