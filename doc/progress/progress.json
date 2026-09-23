@@ -1,14 +1,14 @@
 {
   "schema": 1,
   "milestones": {
-    "done": 48,
+    "done": 51,
     "total": 389,
-    "percent": 12.3
+    "percent": 13.1
   },
   "checks": {
-    "done": 485,
+    "done": 488,
     "total": 2356,
-    "percent": 20.6
+    "percent": 20.7
   },
   "contributor_track": {
     "merged": 71,
@@ -18,9 +18,9 @@
     {
       "phase": 1,
       "title": "Foundations to first handshake",
-      "milestones_done": 15,
+      "milestones_done": 18,
       "milestones_total": 22,
-      "checks_done": 180,
+      "checks_done": 183,
       "checks_total": 197
     },
     {

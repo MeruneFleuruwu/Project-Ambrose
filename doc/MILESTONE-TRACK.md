@@ -91,7 +91,6 @@ Then one of four things happens, each with one message saying which and why: it 
 
 | ID | Milestone | Size | What you need | Why it is a good one to take |
 |---|---|---|---|---|
-| 1.06, 1.07, 1.08 | ByteBuffer and DML primitives, BitReader/BitWriter, and the text encodings | S | Your own client installation | One optional integration test, decoding the UTF-16 text of a single `Locale/*.lang` entry from your own `Root.wad`, is the last unticked check of all three milestones. The smallest way to finish three at once, on a branch named `milestone/1.06-lang-round-trip` |
 | 3.18 | Updater part 2: rehash, rename, dead refs, pending, modules | M | A build and a MySQL or MariaDB | Needs no client at all. Four unit and integration checks about the SQL updater's own behaviour, each one a named case with the expected error |
 | 4.04 | World wire math and LocationString | S | A build; one check reads your client's XML | Self-contained maths and parsing with eleven checks that say the exact numbers. Everything the world phase does with positions rests on it |
 | 4.08 | Zone extractor part 1: WizZoneData | M | Your own client installation | The largest one open, and the one that unblocks most: zone templates, locations and objects read out of your own install into the world database. Its phase file calls it oversized, so landing the extractor and its reporting first, with the row checks after, is expected |
@@ -128,7 +127,6 @@ Nothing yet.
 
 ## Landed
 
-Nothing yet.
-
 | ID | Who | Pull request | What landed |
 |---|---|---|---|
+| 1.06, 1.07, 1.08 | MeruneFleuruwu | [#130](https://github.com/Justchicoo/Project-Ambrose/pull/130) | The last check of all three was stale: the locale round-trip it asks for is covered by a client-gated test that passes on the pinned install |
