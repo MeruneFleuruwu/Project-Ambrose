@@ -9,8 +9,10 @@ import unittest
 import urllib.error
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import announce
+import openings
 
 
 class FakePost:
@@ -114,6 +116,38 @@ class AnnouncerTests(unittest.TestCase):
         with io.open(path, "w", encoding="utf-8", newline="\n") as handle:
             handle.write("{not json")
         self.assertIsNone(announce.remembered(path))
+
+
+class OpeningsTests(unittest.TestCase):
+    def setUp(self):
+        self.original = announce.post
+        self.folder = tempfile.mkdtemp()
+
+    def tearDown(self):
+        announce.post = self.original
+
+    def run_it(self):
+        announce.post = FakePost()
+        state = os.path.join(self.folder, "state.json")
+        environment = dict(os.environ, AMBROSE_TEST_WEBHOOK="https://discord.com/api/webhooks/1/token")
+        saved = os.environ.copy()
+        os.environ.update(environment)
+        try:
+            return openings.main(["--webhook-env", "AMBROSE_TEST_WEBHOOK", "--state", state])
+        finally:
+            os.environ.clear()
+            os.environ.update(saved)
+
+    def test_it_posts_through_the_same_sender_the_progress_message_uses(self):
+        self.assertEqual(self.run_it(), 0)
+        self.assertEqual(announce.post.calls[0]["method"], "POST")
+
+    def test_its_message_names_the_board_and_the_prompt(self):
+        payload = openings.embed(ROOT)
+        described = payload["embeds"][0]["description"]
+        self.assertIn("justchicoo.github.io/Project-Ambrose", described)
+        self.assertIn("AI-MILESTONES-HERE.md", described)
+        self.assertTrue(payload["embeds"][0]["fields"])
 
 
 if __name__ == "__main__":

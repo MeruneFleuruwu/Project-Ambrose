@@ -94,7 +94,7 @@ def main(argv=None):
         print("the webhook must be a Discord webhook URL", file=sys.stderr)
         return 1
     try:
-        message_id, status, what = announce.send(url, payload, None, announce.remembered(args.state))
+        message_id, status, what, _held = announce.send(url, payload, announce.remembered(args.state))
     except urllib.error.HTTPError as failure:
         print(f"the webhook refused the post: {announce.reason(failure)}", file=sys.stderr)
         return 1
