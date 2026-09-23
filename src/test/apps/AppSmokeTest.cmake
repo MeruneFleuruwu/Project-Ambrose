@@ -151,7 +151,8 @@ if(NAME STREQUAL "gameserver" AND DEFINED ENV{AMBROSE_TEST_DB} AND NOT "$ENV{AMB
         if(NOT beatResult EQUAL 0)
             ambrose_test_fail("gameserver --check as realm ${realmName} exited ${beatResult}: ${beatOutput}${beatError}")
         endif()
-        if(NOT beatOutput MATCHES "Realm ${realmName} says it is alive")
+        if(NOT beatOutput MATCHES "Realm ${realmName}[^
+]*says it is alive")
             ambrose_test_fail("gameserver as realm ${realmName} did not say it beats: ${beatOutput}${beatError}")
         endif()
         ambrose_realm_step("${loginInfo}" "${realmName}" DISABLED_TheRealmBeatWhileItRanAndIsOfflineNow "reading the realm back after the server stopped")

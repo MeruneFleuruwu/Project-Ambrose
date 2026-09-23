@@ -40,6 +40,7 @@ namespace
             Refuse(LoginService, "MSG_CHARACTERSELECTED");
             Refuse(LoginService, "MSG_CREATECHARACTERRESPONSE");
             Refuse(LoginService, "MSG_DELETECHARACTERRESPONSE");
+            Refuse(LoginService, "MSG_SERVERLIST");
             Refuse(LoginService, "MSG_STARTCHARACTERLIST");
             Refuse(LoginService, "MSG_USER_AUTHEN_RSP");
             Refuse(LoginService, "MSG_USER_VALIDATE_RSP");

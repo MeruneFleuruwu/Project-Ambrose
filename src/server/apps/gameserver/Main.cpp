@@ -181,14 +181,34 @@ namespace
             _heartbeat.Configure(RealmHeartbeatSettings::Load(Config()),
                 [](std::string const& realm, uint32 population, int64 heartbeat, bool online)
                 {
+                    if (!LoginDatabase.IsOpen())
+                        return;
                     std::unique_ptr<PreparedStatement<LoginDatabaseConnection>> beat = LoginDatabase.GetPreparedStatement(LOGIN_UPD_REALM_HEARTBEAT);
+                    if (!beat)
+                        return;
                     beat->SetData(0, population);
                     beat->SetData(1, static_cast<uint64>(heartbeat));
                     beat->SetData(2, online ? uint32{ 0 } : uint32{ REALM_FLAG_OFFLINE });
                     beat->SetData(3, realm);
                     LoginDatabase.DirectExecute(*beat);
                 },
-                [] { return static_cast<uint32>(sWorld.GetSessionCount()); });
+                [] { return static_cast<uint32>(sWorld.GetSessionCount()); },
+                [](RealmHeartbeatSettings const& realm)
+                {
+                    if (!LoginDatabase.IsOpen())
+                        return;
+                    std::unique_ptr<PreparedStatement<LoginDatabaseConnection>> add = LoginDatabase.GetPreparedStatement(LOGIN_INS_REALM);
+                    if (!add)
+                        return;
+                    add->SetData(0, realm.RealmName);
+                    add->SetData(1, realm.Address);
+                    add->SetData(2, realm.Address);
+                    add->SetData(3, realm.Port);
+                    if (std::optional<uint64> const added = LoginDatabase.DirectExecuteCounted(*add); added && *added > 0)
+                        LOG_INFO("server.worldserver", "Realm {} was not in the realm list, so it was added at {}:{}; edit that row to change where players reach it",
+                            realm.RealmName, realm.Address, realm.Port);
+                },
+                [] { return LoginDatabase.IsOpen(); });
             return true;
         }
 

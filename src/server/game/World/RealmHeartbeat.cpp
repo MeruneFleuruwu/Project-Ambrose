@@ -17,16 +17,24 @@ RealmHeartbeatSettings RealmHeartbeatSettings::Load(ConfigMgr const& config)
 {
     RealmHeartbeatSettings settings;
     settings.RealmName = std::string(Ambrose::Trim(config.GetOption<std::string>("Realm.Name", "", true)));
+    settings.Address = std::string(Ambrose::Trim(config.GetOption<std::string>("Realm.Address", "", true)));
+    if (settings.Address.empty())
+        settings.Address = std::string(Ambrose::Trim(config.GetOption<std::string>("BindIP", "127.0.0.1", true)));
+    if (settings.Address.empty() || settings.Address == "0.0.0.0" || settings.Address == "::")
+        settings.Address = "127.0.0.1";
+    settings.Port = static_cast<uint16>(config.GetOption<uint32>("WorldServerPort", 12333, true));
     uint32 const interval = config.GetOption<uint32>("Realm.HeartbeatInterval", DefaultIntervalSeconds, true);
     settings.IntervalSeconds = interval != 0 ? interval : DefaultIntervalSeconds;
     return settings;
 }
 
-void RealmHeartbeat::Configure(RealmHeartbeatSettings settings, Writer writer, Counter counter)
+void RealmHeartbeat::Configure(RealmHeartbeatSettings settings, Writer writer, Counter counter, Registrar registrar, Ready canWrite)
 {
     _settings = std::move(settings);
     _writer = std::move(writer);
     _counter = std::move(counter);
+    _registrar = std::move(registrar);
+    _canWrite = std::move(canWrite);
     _since = std::chrono::milliseconds::zero();
     _beats = 0;
 
@@ -36,9 +44,17 @@ void RealmHeartbeat::Configure(RealmHeartbeatSettings settings, Writer writer, C
         LOG_INFO("server.worldserver", "Realm.Name names no realm, so this server does not appear in the realm list and no player is sent to it");
         return;
     }
+    if (_canWrite && !_canWrite())
+    {
+        _beating = false;
+        LOG_INFO("server.worldserver", "There is no login database to keep the realm list in, so realm {} is not offered to players", _settings.RealmName);
+        return;
+    }
 
     _beating = true;
-    LOG_INFO("server.worldserver", "Realm {} says it is alive every {} second(s)", _settings.RealmName, _settings.IntervalSeconds);
+    if (_registrar)
+        _registrar(_settings);
+    LOG_INFO("server.worldserver", "Realm {} at {}:{} says it is alive every {} second(s)", _settings.RealmName, _settings.Address, _settings.Port, _settings.IntervalSeconds);
     BeatNow();
 }
 
