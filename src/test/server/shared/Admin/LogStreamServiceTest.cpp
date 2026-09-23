@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Tests the stream layer without opening a socket: a warn filter passes only warnings and above, a new session gets the hello and the whole backlog in sequence order, a resume after N gets exactly the records after N or a dropped marker naming the evicted range, a full queue drops the oldest and reports how many with their range, sequence numbers never go backwards across pump batches, secret setting values are masked before a record leaves, a bad subscribe request names its fault, and a subscriber that stops reading changes the cost of 100000 log lines by no more than ten percent against one that reads, with the cost of having no subscriber at all recorded beside them.
+ * Tests the stream layer without opening a socket: a warn filter passes only warnings and above, a record carries the place in the code it was written at and the template it was written from while one with neither carries no location rather than a wrong one, a new session gets the hello and the whole backlog in sequence order, a resume after N gets exactly the records after N or a dropped marker naming the evicted range, a full queue drops the oldest and reports how many with their range, sequence numbers never go backwards across pump batches, secret setting values are masked before a record leaves, a bad subscribe request names its fault, and a subscriber that stops reading changes the cost of 100000 log lines by no more than ten percent against one that reads, with the cost of having no subscriber at all recorded beside them.
  */
 
 #include "LogRedaction.h"
@@ -146,6 +146,34 @@ TEST_F(LogStreamServiceTest, AWarnFilterPassesOnlyWarningsAndAbove)
     for (nlohmann::json const& record : sink->OfType("record"))
         EXPECT_NE(record["level"].get<std::string>(), "info") << record.dump();
     EXPECT_TRUE(sink->OfType("dropped").empty());
+}
+
+TEST_F(LogStreamServiceTest, ARecordCarriesWhereItWasWrittenAndWhatItWasWrittenFrom)
+{
+    LogMessage located = Record(1, LogLevel::Error, "a", "Listening on 127.0.0.1:12001 with 1 network thread(s)");
+    located.Source = LogSource{ "src/server/Whatever.cpp", "Listen", 42 };
+    located.Template = "Listening on {} with {} network thread(s)";
+    LogMessage plain = Record(2, LogLevel::Error, "a", "written as text");
+
+    _hub.Publish(std::move(located));
+    _hub.Publish(std::move(plain));
+    auto const sink = std::make_shared<RecordingSink>();
+    Open(sink, LogStreamRequest{});
+    while (_service.Pump() > 0)
+    {
+    }
+
+    std::vector<nlohmann::json> const records = sink->OfType("record");
+    ASSERT_EQ(records.size(), 2u);
+    EXPECT_EQ(records[0]["source"]["file"].get<std::string>(), "src/server/Whatever.cpp");
+    EXPECT_EQ(records[0]["source"]["line"].get<uint32>(), 42u);
+    EXPECT_EQ(records[0]["source"]["function"].get<std::string>(), "Listen");
+    EXPECT_EQ(records[0]["template"].get<std::string>(), "Listening on {} with {} network thread(s)");
+    EXPECT_TRUE(records[1]["source"].is_null()) << records[1].dump();
+    EXPECT_EQ(records[1]["template"].get<std::string>(), "");
+    for (nlohmann::json const& record : records)
+        for (char const* field : { "sequence", "time", "epoch_ms", "level", "category", "message" })
+            EXPECT_TRUE(record.contains(field)) << field << " " << record.dump();
 }
 
 TEST_F(LogStreamServiceTest, ACategoryFilterPassesOnlyThoseCategories)

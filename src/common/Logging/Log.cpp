@@ -490,6 +490,7 @@ void Log::WriteFormatted(LogSite const* site, std::string_view category, LogLeve
     message.Time = std::chrono::system_clock::now();
     message.Sequence = _sequence.fetch_add(1, std::memory_order_relaxed) + 1;
     message.ThreadId = LogMessage::CurrentOsThreadId();
+    message.Template.assign(format.data(), format.size());
     if (site != nullptr)
         message.Source = site->GetSource();
     _written.fetch_add(1, std::memory_order_relaxed);

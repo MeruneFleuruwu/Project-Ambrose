@@ -1,10 +1,11 @@
 /*
  * Project Ambrose by Imjustchico
- * Opens a session by subscribing to the hub, marks the range a resume can no longer reach or a full queue threw away, drains every session on one pump thread into its sink, and encodes records, markers and the subscribe request as JSON with every secret redacted before it leaves.
+ * Opens a session by subscribing to the hub, marks the range a resume can no longer reach or a full queue threw away, drains every session on one pump thread into its sink, and encodes records, markers and the subscribe request as JSON with every secret redacted before it leaves. A record carries the place in the code it was written at and the template it was written from, added to the shape rather than changing it, so a reader that knows nothing of them reads it as before.
  */
 
 #include "LogStream.h"
 #include "LogRedaction.h"
+#include "LogSource.h"
 #include "LogTimestamp.h"
 #include "StringUtil.h"
 
@@ -411,6 +412,12 @@ std::string LogStreamService::EncodeRecord(LogMessage const& record)
     body["level"] = Ambrose::ToLower(std::string(Ambrose::Logging::GetLogLevelName(record.Level)));
     body["category"] = record.Category;
     body["message"] = LogRedaction::Redact(record.Text);
+    if (record.Source.Known())
+        body["source"] = { { "file", LogSourcePath::Portable(record.Source.File) }, { "line", record.Source.Line },
+            { "function", std::string(record.Source.Function) } };
+    else
+        body["source"] = nullptr;
+    body["template"] = record.Template;
     return body.dump();
 }
 
