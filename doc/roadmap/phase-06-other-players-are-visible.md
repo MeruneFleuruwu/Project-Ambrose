@@ -400,9 +400,9 @@ Players leave the world cleanly on logout, crash or server stop, their position 
 
 **Acceptance**
 
-- [ ] Lists 1451865413 (7094), 520243970 (6875), 1120896859 (5567), 829470368 (5473)
+- [x] Lists 1451865413 (7094), 520243970 (6875), 1120896859 (5567), 829470368 (5473). `schemaprobe` against the pinned install lists all four with exactly those instance counts, each under m_behaviors
 - [ ] 520243970 gets m_behaviorName, m_npcProximity, m_questList, m_personaName
-- [ ] Full Root.wad under 5 minutes
+- [x] Full Root.wad under 5 minutes. 173088 entries read and 134635 of 134640 BINd files decoded in 32.5 seconds, 361 MiB peak
 
 ### Detailed spec from OBJ-11: Schema probe tool for classes missing from the dump
 
