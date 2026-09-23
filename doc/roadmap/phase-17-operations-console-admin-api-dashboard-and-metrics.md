@@ -114,6 +114,9 @@
 | 17.106 | Error reports: source locations, grouping and a report file | M | 17.04, 17.08, 17.14 |
 | 17.107 | A value in a log line is a place you can go | M | 17.07, 17.76, 17.106 |
 | 17.108 | A panel nobody has to click past a warning to use | M | 17.14, 17.24 |
+| 17.109 | Plugins: what one is, and the tab that installs it | M | 17.101, 17.48, 17.18 |
+| 17.110 | A panel tool runs without being trusted | M | 17.109 |
+| 17.111 | The plugin registry and the checks a plugin passes | M | 17.109, 17.110, 17.65 |
 
 ## Review notes for this phase
 
@@ -139,7 +142,7 @@ The roadmap critic flagged these. Resolve each one before or while implementing 
 - **Request size.** 17.02 bounds what the admin API accepts with `Admin.MaxRequestBytes`, checked after the token and before any handler, and the same value caps a WebSocket message. Crow buffers a request body in memory before any handler or middleware runs and offers no hook to refuse one earlier, so that setting bounds what an endpoint sees, not what an unauthenticated peer can make the process allocate. Closing that needs a patched Crow parser or another HTTP library, and it is listed here so a later milestone decides rather than the gap going unrecorded.
 - **Listening socket.** Crow's acceptor sets `SO_REUSEADDR` on the socket it listens on and offers no way to choose otherwise, so on Windows another process running under any account on the same machine can bind the same address and port as a running admin API and receive the connections meant for it, reading the bearer token an operator's dashboard or `curl` then sends. 17.02's pre-flight check already skips the option for exactly this reason, but the socket Crow binds is beyond its reach. Closing it needs `SO_EXCLUSIVEADDRUSE` on that socket, which means either a project-owned acceptor handed to `crow::Server` in place of `App::run_async`, or a patched Crow port, the same choice the Request size note asks for, so both are listed here for one decision rather than two. Until then the admin port is only as private as the machine's local accounts, and `doc/config/<app>.md` says so beside `Admin.BindIP`.
 - **Risk.** 2.15's real-client check showed that the client displays MSG_LOGINSERVERSHUTDOWN as the server going down, and the login server closes the connection as it sends it. A login-screen warning at 5 and 1 minutes therefore needs a notice that does not disconnect, found by capture or client reverse engineering. Until one is found, 17.15 sends only the final notice on the login server and earlier warnings go to players in the world.
-- **Operations depth.** 17.74-17.104 were added on 2026-09-18, after research against the panels and observability tools operators already run and after the maintainer judged the console this phase shipped. They fall in five bands. Reading a line: 17.74-17.77, which rework what 17.01 shipped and carry their own checks rather than editing 17.01's ticked ones. Seeing from outside: 17.81 and 17.94, because every health signal the first 73 milestones define is the server reporting on itself, and a server that is healthy by every internal figure and unreachable behind a firewall rule reads as fully green. Understanding what happened: 17.78, 17.79, 17.80, 17.83, 17.90, 17.91 and 17.92, which answer why rather than whether. Acting on the game rather than on the process: 17.89, 17.95, 17.101, 17.103 and 17.104, since nothing in the first 73 restores anything smaller than a whole database or gives a player anything. Not being told twice: 17.85, 17.86 and 17.87. The rest, 17.82, 17.84, 17.88, 17.93, 17.96, 17.97, 17.98, 17.99, 17.100 and 17.102, each remove a reason to reach for something Ambrose deliberately does not have, such as a shell. **Scheduled now:** 17.74, with 17.75, 17.76 and 17.77 behind it; 17.74 is in the Built first order immediately after 17.01. Everything else here is planned work that waits for its dependencies and its turn, and nothing else in this phase is reordered for it. Once those dependencies allow, the order worth taking is 17.81, 17.78, 17.83, 17.80, 17.82, 17.86, 17.89, 17.88 and 17.95; if the phase has to be cut, the last to schedule are 17.79, 17.96, 17.97, 17.98, 17.99, 17.100, 17.101, 17.102, 17.103 and 17.104, none of which blocks a server from running. Four ideas from the same research were deliberately not taken: statistical anomaly detection per metric, which on one machine with tens of players pages on every unusual login hour; browser push, which routes through another company's endpoints and would break the rule that nothing leaves the machine; a browser shell, which would defeat the path jail, the protected paths and the audit model in one control, and which 17.84 removes the reason to ask for; and a plugin API, which is a remote code execution surface on a panel that fronts a game database, and whose useful half 17.101 gives without running anybody's code.
+- **Operations depth.** 17.74-17.104 were added on 2026-09-18, after research against the panels and observability tools operators already run and after the maintainer judged the console this phase shipped. They fall in five bands. Reading a line: 17.74-17.77, which rework what 17.01 shipped and carry their own checks rather than editing 17.01's ticked ones. Seeing from outside: 17.81 and 17.94, because every health signal the first 73 milestones define is the server reporting on itself, and a server that is healthy by every internal figure and unreachable behind a firewall rule reads as fully green. Understanding what happened: 17.78, 17.79, 17.80, 17.83, 17.90, 17.91 and 17.92, which answer why rather than whether. Acting on the game rather than on the process: 17.89, 17.95, 17.101, 17.103 and 17.104, since nothing in the first 73 restores anything smaller than a whole database or gives a player anything. Not being told twice: 17.85, 17.86 and 17.87. The rest, 17.82, 17.84, 17.88, 17.93, 17.96, 17.97, 17.98, 17.99, 17.100 and 17.102, each remove a reason to reach for something Ambrose deliberately does not have, such as a shell. **Scheduled now:** 17.74, with 17.75, 17.76 and 17.77 behind it; 17.74 is in the Built first order immediately after 17.01. Everything else here is planned work that waits for its dependencies and its turn, and nothing else in this phase is reordered for it. Once those dependencies allow, the order worth taking is 17.81, 17.78, 17.83, 17.80, 17.82, 17.86, 17.89, 17.88 and 17.95; if the phase has to be cut, the last to schedule are 17.79, 17.96, 17.97, 17.98, 17.99, 17.100, 17.101, 17.102, 17.103 and 17.104, none of which blocks a server from running. Four ideas from the same research were deliberately not taken: statistical anomaly detection per metric, which on one machine with tens of players pages on every unusual login hour; browser push, which routes through another company's endpoints and would break the rule that nothing leaves the machine; a browser shell, which would defeat the path jail, the protected paths and the audit model in one control, and which 17.84 removes the reason to ask for; and a plugin API, which is a remote code execution surface on a panel that fronts a game database, and whose useful half 17.101 gives without running anybody's code. That refusal was reversed on 2026-09-23 at the maintainer's direction, and 17.109, 17.110 and 17.111 are the terms on which it comes back rather than a change of mind about the risk. The objection stands and is answered in three places: a plugin ships in this repository and arrives by the same signed release as the panel, so there is no second trust root and no registry to take over; a panel tool runs in a frame with no session, no cookies and one audited bridge whose every call names a capability the operator granted, so a review that misses something costs a broken tool rather than a database; and the server never loads code a plugin shipped, because a server-side plugin is source the operator builds. A plugin API that skipped any one of those three would still be the thing this note refused.
 
 ## 17.01 Server console: colored logs and a command prompt
 
@@ -2641,3 +2644,80 @@ Added on 2026-09-22 at the maintainer's direction, from running the panel: 17.14
 - [ ] The desktop app names the store, asks once, and after the operator agrees the browser reaches the panel with no warning; refusing leaves the store untouched
 - [ ] The fingerprint on the page, in the log and in the desktop app are the same string, and it is the certificate actually served
 - [ ] Undoing the trust removes exactly the one certificate it added and nothing else
+
+## 17.109 Plugins: what one is, and the tab that installs it
+
+**Goal:** A plugin is a named, versioned bundle that adds a tool to the panel or content to the game, installed, listed, enabled, disabled and removed from a Plugins tab. It is the content pack of 17.101 with a wider idea of what a pack may carry, on the same manifest, the same checksums and the same journal, so nothing about how it lands is new.
+
+**Size:** M. **Depends on:** 17.101, 17.48, 17.18
+
+Added on 2026-09-23 at the maintainer's direction: people should be able to contribute plugins that modify the game or add tools such as a quest editor, and an operator should install them from the panel once they have passed this project's checks.
+
+**Deliverables**
+
+- The format, extending 17.101's manifest rather than replacing it: name, version, kind, what it touches, checksums, licence, the Ambrose versions it says it works with, and the capabilities it asks for, each written for an operator to read rather than for a machine to parse
+- Three kinds, named apart in the format because what each may do differs completely: a panel tool, which is a page and runs in the browser; content, which is data and dated database updates and is exactly a 17.101 pack; and a server module, which is source the operator builds, never a binary the panel loads
+- Install, enable, disable and uninstall through the journal world edits already keep, so everything a plugin did is recorded and reversible, with disable stopping a plugin while leaving what it wrote in place and uninstall reversing it under 17.101's rules
+- The Plugins tab: what is installed, its version, its kind, where it came from, what it touches, which capabilities were granted and when, with enable, disable, update and remove
+- A plugin never carries a file from the game client, checked on install the way a pack is, and stated in the format
+- Installing, enabling, granting to and removing a plugin are permissions of their own under 17.48, each audited with who, what and when
+
+**Acceptance**
+
+- [ ] A panel tool, a content plugin and a server module each install from a file, appear in the tab with their kind and version, and are refused when their manifest names an Ambrose version this build is not
+- [ ] Disabling a plugin stops it without removing what it wrote, and enabling it again reinstalls nothing
+- [ ] Uninstalling reverses exactly what installing did, and is refused, naming what depends, when something else depends on it
+- [ ] A plugin carrying a file that came from a client install is refused, and so is one whose checksums do not match its bundle
+- [ ] A server module plugin never loads into a running server: installing it stages source for the operator to build, and the tab says so rather than offering to run it
+- [ ] An operator without the grant cannot install, enable or remove, and each of those actions writes an audit row naming the plugin
+
+## 17.110 A panel tool runs without being trusted
+
+**Goal:** A tool somebody else wrote runs inside the panel without being able to do anything the operator did not grant it. This is the milestone that answers why a plugin API was refused here until now. The panel fronts a game database, so the answer cannot be that plugins are reviewed and therefore safe. It has to be that a plugin cannot reach what it was not handed, whether it is honest or not, and that a review that misses something costs an operator a broken tool rather than their database.
+
+**Size:** M. **Depends on:** 17.109
+
+**Deliverables**
+
+- A panel tool runs in a frame of its own with no ambient authority: an origin of its own, no panel session and no cookies, a content security policy that refuses any origin its manifest did not declare, and no path to the admin API except the one below
+- One bridge out, and only one: a typed message channel where every call names a capability the manifest asked for and the operator granted, checked in the panel and again at the server, so a tool that forges a message is refused by the server that receives it rather than by the page that sent it
+- A capability list that is small, specific and readable, each entry a sentence an operator can judge, such as reading quests or writing quests. Nothing in it means call any admin route, and a capability amounting to that is not added
+- Every call a plugin makes is audited as the plugin rather than as the operator, so the activity log says which tool did a thing and under whose grant it did it
+- A capability can be withdrawn while the panel is running: the frame is told, later calls are refused, and a tool that handles refusal keeps working with less rather than breaking
+- The rule that the server never runs code a plugin shipped, enforced rather than promised: nothing in the install path can load a library, and a server module is source the operator builds through the module discovery the build already has
+
+**Acceptance**
+
+- [ ] A tool granted nothing reaches no route, cannot read the panel session, and its frame holds no cookie belonging to the panel
+- [ ] A tool granted a read capability is refused when it calls the matching write, at the server and not only in the panel
+- [ ] A forged bridge message naming a capability the operator never granted is refused by the server and audited as a refusal
+- [ ] Every accepted call appears in the activity log naming the plugin, the capability and the operator whose grant it used
+- [ ] Withdrawing a capability from a running panel takes effect on the next call without a reload, and the tool is told rather than left to guess
+- [ ] A plugin bundle carrying a shared library or an executable is refused on install, whatever its manifest says
+- [ ] The frame's content security policy refuses a request to an origin the manifest did not declare, and the refusal is visible to the operator
+
+## 17.111 Plugins ship with the panel, from this repository
+
+**Goal:** A plugin that is good enough lives in this repository, and an operator gets it by updating the panel. There is no separate store to host, sign or keep alive: the release an operator already trusts carries the plugins, and the review that let a plugin in is the review this project already does on everything else.
+
+**Size:** M. **Depends on:** 17.109, 17.110, 17.105
+
+Settled on 2026-09-23 at the maintainer's direction, and it is the reason a plugin store is safe to have here at all. The objection to a plugin API was that it is a remote code execution surface on a panel that fronts a game database. Shipping plugins in the repository answers most of it before 17.110 answers the rest: a plugin arrives by the same signed release as the panel itself, from a pull request a human reviewed, so there is no second trust root, no index to sign, no service to pay for, and nothing for an attacker to take over by taking over a registry.
+
+**Deliverables**
+
+- Plugins live in the repository under a folder of their own, one directory per plugin with its manifest, and the contributor track carries them the way it carries milestones, so submitting one is a pull request and the review is the ordinary one
+- The checks a plugin passes run in CI on every pull request and can be run locally before submitting: the manifest is well formed, every capability is declared and justified in words, no file came from a client install, no origin is contacted that the manifest did not declare, a licence is present, and a panel tool carries no library or executable
+- A release (17.105) carries the plugins that were in the repository when it was tagged, so updating the panel is what delivers new ones, and the tab says which release a plugin arrived in
+- The tab has two sources and tells them apart: the plugins that shipped with this panel, which an operator installs and enables without fetching anything, and a plugin installed from a file by an operator who does not want to wait for a release
+- Nothing is installed or enabled on the operator's behalf. A new plugin arriving in an update appears in the tab as available, never as running, and updating the panel never changes which plugins are enabled
+- A plugin withdrawn from the repository stops shipping in later releases and is marked withdrawn in the tab with its reason, and an operator running it keeps it until they remove it
+
+**Acceptance**
+
+- [ ] A plugin added to the repository appears in the tab of a panel built from that commit, marked as shipped with it and not enabled
+- [ ] Updating a panel to a release with new plugins leaves every enabled plugin exactly as it was, and adds the new ones as available only
+- [ ] The submission checks refuse, by name, a plugin with an undeclared capability, one carrying a client-derived file, one with no licence, and a panel tool carrying an executable
+- [ ] An author can run those checks locally and get the same answer CI gives
+- [ ] A plugin installed from a file is told apart in the tab from one that shipped, and survives a panel update
+- [ ] A withdrawn plugin shows as withdrawn with its reason, and nothing is removed from the operator's machine
