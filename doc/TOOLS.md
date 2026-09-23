@@ -29,6 +29,21 @@ Sources: the actools, anatomy, patchmod and renderers research results in the br
 
 ## Early
 
+### zone_extractor
+
+`zone_extractor` reads only the operator's own `Data/GameData/*.wad` files. It
+opens each archive, looks for `gamedata.bin`, and decodes the file-level
+versionable ObjectProperty payload with the type dump supplied by
+`--type-dump` or `AMBROSE_TYPE_DUMP_PATH`. The tool reports the derived zone
+path, root class, object count and every decode failure, then exits non-zero if
+any discovered payload failed. `--client` or `AMBROSE_CLIENT_DIR` names the
+install; `--dry-run` performs the scan without writing anything, while `--sql`
+writes runtime `zone_template`, `zone_location` and `zone_object` statements.
+The output is not client data and must remain outside the repository. The
+world-table schema and whether extracted rows belong in the shared world
+database or a local-only database remain the roadmap decision recorded in
+`doc/ROADMAP.md`.
+
 ### launcher (built in 3.25)
 
 Starts the user's own client against an Ambrose login server, on any machine that has a client, without ever running KingsIsle's launcher or writing inside the install. `launcher --help` lists its options. It finds the install the way the servers do, through `--client`, `ClientDir` in its own `launcher.conf`, `AMBROSE_CLIENT_DIR` or the discovery in `ClientLocator`, and builds a folder of its own for the client to run from, `client/<revision>` in the Ambrose data folder unless `--run-dir` names another, never the install or a folder inside it: `config.xml` and `preferences.xml` written on every run, from the files that folder already holds or else the install's own, with the window mode and size asked for and `SilentMetricsURL` emptied and every other byte left as the template has it, because the client ignores a configuration that has been parsed and written again, and copies of `revision.dat` and `data.dat`, the other files the client opens by relative name. The client always starts with `-L <host> <port>`, `-P 0`, `-A <locale>`, `-D <the install's data folder>` and `-G <log in the run folder>`, because the retail build starts KingsIsle's launcher when it sees none of its own options, and `--user` and `--character` pass the client's own automatic login and character options through for the 3.24 driver. `--dry-run` prints the run folder and the exact command and starts nothing, `--wait` returns the client's own exit code and ends the client if the launcher is stopped, and `--tail` prints the client's own log lines while it runs; without either the client is started detached. It exits 1, naming the cause, when no install is found, the client program is missing, patching is asked for, a login host or port is missing, a value begins with `-`, the run folder lies inside the install or cannot be written, the machine is not Windows and so cannot start the client, or the client cannot be started, and 2 on bad usage. Its tests run as `unit_tests --gtest_filter=Launcher*` and as the `Launcher` CTest, which runs the built program against a synthetic machine. doc/config/launcher.md documents every option. It replaces the development scripts of milestone 1.21, and milestone 16.13 grows a player launcher that patches its own copy of the install from an Ambrose patch server on top of it.
