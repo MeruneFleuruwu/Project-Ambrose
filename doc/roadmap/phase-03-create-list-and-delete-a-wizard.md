@@ -33,6 +33,7 @@
 | 3.25 | Ambrose client launcher | M | 3.22, 1.21 |
 | 3.26 | Launcher window | L | 3.25, 1.04, 17.73 |
 | 3.27 | Launcher as its own app | M | 3.26 |
+| 3.28 | A type dump from any client, not only the two we tried | M | 3.21 |
 
 ## Review notes for this phase
 
@@ -1153,3 +1154,27 @@ Added on 2026-09-17 at the maintainer's direction: the live client moves past r8
 - A revision watch on Bin/revision.dat and the executable's size and time, which triggers the live rebuild
 - The world name tables record their revision; a start or reload against a different revision re-extracts them
 - Tests keyed by the installed revision, with r806919-only facts kept as checks that apply only when that revision is installed
+
+## 3.28 A type dump from any client, not only the two we tried
+
+**Goal:** typeextract builds a dump from whichever Wizard101 client somebody has, old or new, by working out where the engine keeps its type data rather than by being told where it kept it in the two builds this project happened to test.
+
+**Size:** M. **Depends on:** 3.21
+
+Added on 2026-09-23 at the maintainer's direction, whose point is that a server should support any client, old or new. The server already does: it compiles against no revision, loads the dump and the protocol definitions at run time and drives the codec from the registry, which is recorded under Decisions, Data in doc/ARCHITECTURE.md. The place that does not is the tool that makes the dump. `ClientLayout` holds the field offsets of the engine's Type, PropertyList, Property, container and enum objects as found in r801440 and r806919, so a client that lays them out differently cannot be extracted at all, and the failure arrives as a wrong answer rather than as a refusal.
+
+**Deliverables**
+
+- The offsets derived from the running client instead of declared: the discovery that already votes on the type map head and the property list initializer is extended to vote on where each field sits, by driving the client's own code with values the extractor chose and seeing where they land
+- A layout that reports how it was reached and how sure it is, so an extraction from an unknown build says which offsets it worked out, which it assumed and what it checked them against, rather than presenting a guess as a reading
+- Refusal rather than a wrong answer: an offset that cannot be derived and has no safe default stops the extraction naming the field, because a dump built from a misread structure is worse than no dump, and every user of a dump believes it
+- The known builds kept as a check rather than as the source of truth: r801440 and r806919 still have their offsets written down, and the derivation is required to reproduce them exactly, so the mechanism is tested against answers already known to be right
+- A record of which clients have been extracted, kept with the tool rather than in somebody's memory: the revision, what was derived, what was assumed and whether the result matched a reference dump
+
+**Acceptance**
+
+- [ ] Deriving the layout against the pinned install reproduces the written offsets for r801440 and r806919 exactly, field by field
+- [ ] An extraction using derived offsets produces a dump identical to the one the written offsets produce, on the same install
+- [ ] A structure the derivation cannot place stops the extraction naming the field, and no dump is written
+- [ ] The extraction report says, for every offset, whether it was derived or assumed and what confirmed it
+- [ ] Client-gated: a client other than the pinned one extracts without its offsets being added to the tool by hand, or fails naming exactly which field it could not place
