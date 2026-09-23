@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * The panel's stylesheet: Tailwind with its own scales for the shadcn-svelte components, their animations, the vendored faces, the state hooks the components are written against mapped onto the attributes Bits UI sets, and shadcn's theme variables pointed at the Ambrose palette so every colour still comes from design/tokens.json.
+ * The panel's stylesheet: Tailwind with its own scales for the shadcn-svelte components, their animations, the vendored faces, the state hooks the components are written against mapped onto the attributes Bits UI sets, and shadcn's theme variables plus the log value ramp pointed at the Ambrose palette so every colour still comes from design/tokens.json.
  */
 
 @import "tailwindcss";
@@ -45,6 +45,9 @@
     --waiting: var(--ambrose-color-state-waiting);
     --unknown: var(--ambrose-color-state-unknown);
     --mine: var(--ambrose-color-mine);
+    --value-number: var(--ambrose-color-value-number);
+    --value-text: var(--ambrose-color-value-text);
+    --value-name: var(--ambrose-color-value-name);
     --border: var(--ambrose-color-edge-quiet);
     --input: var(--ambrose-color-edge-strong);
     --ring: var(--ambrose-color-focus-ring);
@@ -91,6 +94,9 @@
     --color-waiting: var(--waiting);
     --color-unknown: var(--unknown);
     --color-mine: var(--mine);
+    --color-value-number: var(--value-number);
+    --color-value-text: var(--value-text);
+    --color-value-name: var(--value-name);
     --color-border: var(--border);
     --color-input: var(--input);
     --color-ring: var(--ring);

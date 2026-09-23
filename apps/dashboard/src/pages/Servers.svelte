@@ -1,4 +1,4 @@
-<!-- Project Ambrose by Imjustchico: The servers page, live from the supervisor: every app with its state, process, place, build, uptime and crash count, start, stop, restart and kill each with a countdown where one applies and a confirmation for the ones that end a run, and the output the supervisor captured for this run and the one before, which is what an app with its admin API off still shows. -->
+<!-- Project Ambrose by Imjustchico: The servers page, live from the supervisor: every app with its state, process, place, build, uptime and crash count, start, stop, restart and kill each with a countdown where one applies and a confirmation for the ones that end a run, and the output the supervisor captured for this run and the one before, which is what an app with its admin API off still shows, drawn as the four columns doc/DESIGN.md settles so a level, a category and a value each read apart from the words around them. -->
 <script lang="ts">
     import * as Card from "$lib/components/ui/card/index.js";
     import * as Dialog from "$lib/components/ui/dialog/index.js";
@@ -12,6 +12,7 @@
     import { ApiError } from "$lib/api.svelte.js";
     import { formatUptime } from "$lib/format.js";
     import { live } from "$lib/status.svelte.js";
+    import LogView from "$lib/components/LogView.svelte";
     import { output, power, supervised, supervisorServes, type OutputRun, type PowerAction } from "$lib/supervision.svelte.js";
     import type { AppEntry, OutputAnswer } from "$lib/schemas.js";
     import EllipsisIcon from "@lucide/svelte/icons/ellipsis";
@@ -281,19 +282,7 @@
                         {run === "current" ? "Nothing captured for this run yet." : "There is no previous run."}
                     </p>
                 {:else}
-                    <div class="max-h-96 overflow-auto rounded-md border bg-muted/30 p-3 font-mono text-xs">
-                        {#each lines.lines as line (line.seq)}
-                            <div
-                                class={line.stream === "stderr"
-                                    ? "text-destructive"
-                                    : line.stream === "supervisor"
-                                      ? "text-mine"
-                                      : "text-foreground"}
-                            >
-                                {line.text}
-                            </div>
-                        {/each}
-                    </div>
+                    <LogView lines={lines.lines} label={`Output of ${app.name}`} />
                 {/if}
             </Card.Content>
         </Card.Root>
