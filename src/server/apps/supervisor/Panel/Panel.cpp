@@ -33,7 +33,7 @@ namespace
 }
 
 Panel::Panel(Log& log, std::filesystem::path dataFolder, std::filesystem::path configFolder)
-    : _log(log), _dataFolder(std::move(dataFolder)), _users(_store), _sessions(_store), _listener(log, "panel", _dataFolder, std::move(configFolder))
+    : _log(log), _dataFolder(std::move(dataFolder)), _users(_store), _sessions(_store), _errors(_store), _listener(log, "panel", _dataFolder, std::move(configFolder))
 {
     _listener.Routes().SetThrottle([this](AdminRequest const& request, uint32 cost) { return Throttle(request, cost); });
     _listener.SetSessionSource(&_sessions);
@@ -93,6 +93,7 @@ bool Panel::Start(ConfigMgr const& config, std::string& error)
     if (!_listener.Start(settings, error))
         return false;
     OfferTheOwnerLink();
+    StartGathering();
     return true;
 }
 
@@ -120,11 +121,111 @@ bool Panel::Reload(ConfigMgr const& config)
 
 void Panel::Stop()
 {
+    StopGathering();
     _listener.Stop();
     _rateLimit.Clear();
     std::lock_guard const lock(_storeMutex);
     _store.Close();
     _secure = false;
+}
+
+void Panel::SetErrorSource(std::function<std::vector<std::pair<std::string, std::string>>()> source)
+{
+    std::lock_guard const lock(_gatherMutex);
+    _errorSource = std::move(source);
+}
+
+void Panel::StartGathering()
+{
+    {
+        std::lock_guard const lock(_gatherMutex);
+        if (_gathering || !_errorSource)
+            return;
+        _gathering = true;
+    }
+    _gatherThread = std::thread([this]
+    {
+        std::unique_lock lock(_gatherMutex);
+        while (_gathering)
+        {
+            _gatherWake.wait_for(lock, GatherInterval, [this] { return !_gathering; });
+            if (!_gathering)
+                return;
+            lock.unlock();
+            GatherErrorsOnce();
+            lock.lock();
+        }
+    });
+}
+
+void Panel::StopGathering()
+{
+    {
+        std::lock_guard const lock(_gatherMutex);
+        if (!_gathering)
+            return;
+        _gathering = false;
+    }
+    _gatherWake.notify_all();
+    if (_gatherThread.joinable())
+        _gatherThread.join();
+}
+
+std::size_t Panel::GatherErrorsOnce()
+{
+    std::function<std::vector<std::pair<std::string, std::string>>()> source;
+    {
+        std::lock_guard const lock(_gatherMutex);
+        source = _errorSource;
+    }
+    if (!source)
+        return 0;
+
+    std::size_t recorded = 0;
+    for (auto const& [app, body] : source())
+    {
+        nlohmann::json const answer = nlohmann::json::parse(body, nullptr, false);
+        if (!answer.is_object() || !answer.contains("groups") || !answer["groups"].is_array())
+        {
+            AMBROSE_LOG(_log, LogLevel::Warn, PanelCategory, "{} answered its errors in a shape this panel does not read, so none were kept", app);
+            continue;
+        }
+        std::vector<PanelErrorGroup> groups;
+        for (nlohmann::json const& entry : answer["groups"])
+        {
+            if (!entry.is_object())
+                continue;
+            PanelErrorGroup group;
+            group.Category = entry.value("category", std::string());
+            group.File = entry.value("file", std::string());
+            group.Line = entry.value("line", 0u);
+            group.Function = entry.value("function", std::string());
+            group.Template = entry.value("template", std::string());
+            group.Level = entry.value("level", std::string("error"));
+            group.Revision = entry.value("revision", std::string());
+            group.Count = entry.value("count", uint64{ 0 });
+            group.FirstEpochMs = entry.value("first_epoch_ms", int64{ 0 });
+            group.LastEpochMs = entry.value("last_epoch_ms", int64{ 0 });
+            group.LastMessage = entry.value("last_message", std::string());
+            if (group.File.empty() || group.Template.empty())
+                continue;
+            groups.push_back(std::move(group));
+        }
+        if (groups.empty())
+            continue;
+
+        std::string error;
+        std::lock_guard const lock(_storeMutex);
+        if (!_store.IsOpen())
+            return recorded;
+        if (!_errors.Record(app, groups, error))
+        {
+            AMBROSE_LOG(_log, LogLevel::Warn, PanelCategory, "The errors {} reported could not be kept: {}", app, error);
+            continue;
+        }
+        recorded += groups.size();
+    }
+    return recorded;
 }
 
 bool Panel::Record(AuditEvent const& event, std::function<bool(std::string& error)> const& change, std::string& error)

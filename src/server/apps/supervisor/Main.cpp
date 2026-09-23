@@ -4,6 +4,7 @@
  */
 
 #include "AdminServer.h"
+#include "AdminStatus.h"
 #include "ChildProcess.h"
 #include "ClientLocator.h"
 #include "ClientSystem.h"
@@ -177,6 +178,12 @@ namespace
             LOG_INFO("server.supervisor", "Watching {} app(s), with their state in {} and their output in {}", apps.size(), ConfigMgr::PathToUtf8(settings.StateFile), ConfigMgr::PathToUtf8(settings.OutputFolder));
             RegisterStandardRoutes(_panel.Routes());
             _supervisor.Register(_panel.Routes(), [this] { return BuildStatus(); });
+            _panel.SetErrorSource([this]
+            {
+                std::vector<std::pair<std::string, std::string>> reports = _supervisor.CollectErrorReports();
+                reports.emplace_back(GetInfo().Name, AdminStatus::ErrorsJson(GetInfo().Name));
+                return reports;
+            });
             if (!_panel.Start(Config(), error))
             {
                 LOG_ERROR("server.panel", "{}", error);
