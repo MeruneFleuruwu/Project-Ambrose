@@ -398,12 +398,13 @@ TEST(DBUpdaterTest, EnforcesRehashRedundancyDeadReferenceAndPendingPolicies)
     DropDatabase(*info);
     ScopeExit const drop([&info] { DropDatabase(*info); });
     UpdaterSource source;
-    WriteFile(source.Updates() / "2026_03_01_00.sql", "CREATE TABLE `policy` (`value` INT NOT NULL);\nINSERT INTO `policy` VALUES (1);\n");
+    WriteFile(source.Base() / "policy.sql", "CREATE TABLE `policy` (`value` INT NOT NULL);\n");
+    WriteFile(source.Updates() / "2026_03_01_00.sql", "INSERT INTO `policy` VALUES (1);\n");
     UpdaterSettings settings;
     settings.SourceDirectory = source.Root();
     ASSERT_TRUE(DBUpdater::Run(*info, "test", settings));
 
-    WriteFile(source.Updates() / "2026_03_01_00.sql", "CREATE TABLE `policy` (`value` INT NOT NULL);\nINSERT INTO `policy` VALUES (2);\n");
+    WriteFile(source.Updates() / "2026_03_01_00.sql", "INSERT INTO `policy` VALUES (2);\n");
     EXPECT_FALSE(DBUpdater::Run(*info, "test", settings));
     settings.Redundancy = true;
     EXPECT_TRUE(DBUpdater::Run(*info, "test", settings));
