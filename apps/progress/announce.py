@@ -82,6 +82,14 @@ def embed(now, before):
     }
 
 
+def reason(failure):
+    try:
+        body = failure.read().decode("utf-8", "replace").strip()
+    except (OSError, AttributeError):
+        body = ""
+    return f"{failure} {body[:600]}" if body else str(failure)
+
+
 def post(url, payload, attachment=None, method="POST"):
     if attachment is None:
         request = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method=method,
@@ -168,6 +176,9 @@ def main(argv=None):
             print(f"{args.attach}: not found, posting without the card", file=sys.stderr)
             payload["embeds"][0].pop("image", None)
         message_id, status, what = send(url, payload, attachment, remembered(args.state))
+    except urllib.error.HTTPError as failure:
+        print(f"the webhook refused the post: {reason(failure)}", file=sys.stderr)
+        return 1
     except (urllib.error.URLError, OSError) as failure:
         print(f"the webhook refused the post: {failure}", file=sys.stderr)
         return 1

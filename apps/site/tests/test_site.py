@@ -77,10 +77,11 @@ class BoardTests(unittest.TestCase):
         self.assertTrue(find(built, "4.04")["claim"]["stale"])
 
     def test_a_claim_issue_counts_as_a_claim(self):
-        issue = {"number": 7, "title": "Claim: 16.01 FileBinary table codec", "author": {"login": "third"},
+        takeable = next(row["id"] for row in state()["milestones"] if row["status"] == "open")
+        issue = {"number": 7, "title": f"Claim: {takeable} something the track opens", "author": {"login": "third"},
                  "url": "https://example.invalid/7", "createdAt": "2026-09-22T10:00:00Z", "updatedAt": "2026-09-22T10:00:00Z"}
         built = state({"pulls": [], "issues": [issue]})
-        self.assertEqual(find(built, "16.01")["status"], "building")
+        self.assertEqual(find(built, takeable)["status"], "building")
 
     def test_a_branch_that_is_not_a_milestone_claims_nothing(self):
         snapshot = {"pulls": [{"number": 9, "headRefName": "contrib/C-60", "author": {"login": "a"}, "url": "u", "updatedAt": "2026-09-22T10:00:00Z"}], "issues": []}
