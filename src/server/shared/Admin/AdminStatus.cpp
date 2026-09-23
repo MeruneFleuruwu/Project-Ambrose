@@ -5,6 +5,9 @@
 
 #include "AdminStatus.h"
 #include "AdminRouter.h"
+#include "Log.h"
+#include "LogRedaction.h"
+#include "StringUtil.h"
 
 #include <nlohmann/json.hpp>
 
@@ -19,6 +22,12 @@ namespace
 std::vector<std::string> const& AdminStatus::StatusFields()
 {
     static std::vector<std::string> const fields{ "schema", "app", "role", "realm", "revision", "state", "uptime", "memory", "threads", "sessions", "tick", "stats", "problems" };
+    return fields;
+}
+
+std::vector<std::string> const& AdminStatus::ErrorFields()
+{
+    static std::vector<std::string> const fields{ "app", "revision", "level", "category", "file", "line", "function", "template", "count", "first_epoch_ms", "last_epoch_ms", "last_message" };
     return fields;
 }
 
@@ -87,6 +96,33 @@ std::string AdminStatus::AppsJson(AdminStatusSnapshot const& snapshot)
     return body.dump();
 }
 
+std::string AdminStatus::ErrorsJson(std::string const& appName)
+{
+    nlohmann::json groups = nlohmann::json::array();
+    for (LogErrorGroup const& group : sLog.GetErrors().Groups())
+    {
+        nlohmann::json entry;
+        entry["app"] = appName;
+        entry["revision"] = group.Revision;
+        entry["level"] = Ambrose::ToLower(std::string(Ambrose::Logging::GetLogLevelName(group.Level)));
+        entry["category"] = group.Category;
+        entry["file"] = group.File;
+        entry["line"] = group.Line;
+        entry["function"] = group.Function;
+        entry["template"] = group.Template;
+        entry["count"] = group.Count;
+        entry["first_epoch_ms"] = std::chrono::duration_cast<std::chrono::milliseconds>(group.FirstSeen.time_since_epoch()).count();
+        entry["last_epoch_ms"] = std::chrono::duration_cast<std::chrono::milliseconds>(group.LastSeen.time_since_epoch()).count();
+        entry["last_message"] = LogRedaction::Redact(group.LastMessage);
+        groups.push_back(std::move(entry));
+    }
+    nlohmann::json body;
+    body["schema"] = SchemaVersion;
+    body["groups"] = std::move(groups);
+    body["dropped"] = sLog.GetErrors().GetDropped();
+    return body.dump();
+}
+
 std::string AdminStatus::CapabilitiesJson()
 {
     nlohmann::json body;
@@ -106,4 +142,5 @@ void AdminStatus::Register(AdminRouter& router, Source source)
     router.Add("GET", "/api/status", [source](AdminRequest const&) { return AdminResponse::Json(200, StatusJson(source())); });
     router.Add("GET", "/api/apps", [source](AdminRequest const&) { return AdminResponse::Json(200, AppsJson(source())); });
     router.Add("GET", "/api/capabilities", [](AdminRequest const&) { return AdminResponse::Json(200, CapabilitiesJson()); });
+    router.Add("GET", "/api/errors", [source](AdminRequest const&) { return AdminResponse::Json(200, ErrorsJson(source().App.Name)); });
 }

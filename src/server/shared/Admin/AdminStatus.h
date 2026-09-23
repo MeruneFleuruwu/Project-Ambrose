@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * The status, capabilities and apps routes: the snapshot an app fills at request time, the JSON each route answers with, and the field lists a schema test holds so a field is only ever added and never renamed or removed.
+ * The status, capabilities, apps and errors routes: the snapshot an app fills at request time, the JSON each route answers with, and the field lists a schema test holds so a field is only ever added and never renamed or removed.
  */
 
 #ifndef AMBROSE_ADMINSTATUS_H
@@ -62,7 +62,9 @@ public:
     static std::string StatusJson(AdminStatusSnapshot const& snapshot);
     static std::string AppsJson(AdminStatusSnapshot const& snapshot);
     static std::string CapabilitiesJson();
+    static std::string ErrorsJson(std::string const& appName);
     static std::vector<std::string> const& StatusFields();
+    static std::vector<std::string> const& ErrorFields();
     static std::vector<std::string> const& AppFields();
     static std::vector<std::string> const& CapabilityFields();
 };

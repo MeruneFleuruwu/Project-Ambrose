@@ -8,6 +8,7 @@
 
 #include "AppenderRegistry.h"
 #include "LogCommon.h"
+#include "LogErrors.h"
 #include "LogConfig.h"
 #include "LogSite.h"
 
@@ -118,6 +119,8 @@ public:
     LogSettings GetSettings() const;
     uint64 GetGeneration() const noexcept;
     LogStreamHub& GetStreamHub() noexcept;
+    LogErrorStore& GetErrors() noexcept;
+    LogErrorStore const& GetErrors() const noexcept;
     ConsoleWriter& GetConsole() noexcept;
     LogStatistics GetStatistics() const;
 
@@ -143,6 +146,7 @@ private:
 
     ConsoleWriter& _console;
     std::unique_ptr<LogStreamHub> _streams;
+    LogErrorStore _errors;
     mutable std::mutex _stateMutex;
     std::shared_ptr<State const> _state;
     std::atomic<uint64> _generation{ 0 };

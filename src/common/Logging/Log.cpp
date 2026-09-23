@@ -431,6 +431,16 @@ LogStreamHub& Log::GetStreamHub() noexcept
     return *_streams;
 }
 
+LogErrorStore& Log::GetErrors() noexcept
+{
+    return _errors;
+}
+
+LogErrorStore const& Log::GetErrors() const noexcept
+{
+    return _errors;
+}
+
 ConsoleWriter& Log::GetConsole() noexcept
 {
     return _console;
@@ -557,6 +567,8 @@ void Log::Dispatch(std::shared_ptr<LogRouting const> const& routing, uint16 logg
     Logger const& logger = routing->GetLogger(loggerIndex);
     if (IsLevelEnabled(logger.GetLevel(), message.Level))
     {
+        if (message.Level >= LogLevel::Error && message.Level != LogLevel::Disabled)
+            _errors.Note(message);
         ++DispatchDepth;
         std::vector<std::shared_ptr<Appender>> const& appenders = routing->GetAppenders();
         for (uint16 const index : logger.GetAppenders())
