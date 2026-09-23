@@ -36,16 +36,6 @@ jobs:
             echo "present=no" >> "$GITHUB_OUTPUT"
             echo "No DISCORD_PROGRESS_WEBHOOK secret, so there is nothing to update." >> "$GITHUB_STEP_SUMMARY"
           fi
-      - uses: actions/setup-node@v6
-        if: steps.webhook.outputs.present == 'yes'
-        with:
-          node-version: "24"
-      - name: Render the card
-        if: steps.webhook.outputs.present == 'yes'
-        run: |
-          npm install --no-save --no-audit --no-fund playwright@1.63.0
-          npx playwright install --with-deps chromium
-          node apps/progress/render.mjs doc/progress/progress.svg progress.png
       - name: Read the remembered message
         if: steps.webhook.outputs.present == 'yes'
         run: |
@@ -61,7 +51,7 @@ jobs:
         if: steps.webhook.outputs.present == 'yes'
         env:
           WEBHOOK: ${{ secrets.DISCORD_PROGRESS_WEBHOOK }}
-        run: python apps/progress/announce.py --webhook-env WEBHOOK --attach progress.png --state remembered.json
+        run: python apps/progress/announce.py --webhook-env WEBHOOK --state remembered.json
       - name: Remember the message
         if: steps.webhook.outputs.present == 'yes'
         run: |

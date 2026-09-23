@@ -63,6 +63,15 @@ jobs:
           python -c "import json; snapshot=json.load(open('github.json')); print(len(snapshot['pulls']), 'open pull request(s),', len(snapshot['issues']), 'claim(s)')"
       - name: Build the board
         run: python apps/site/build.py --github github.json --out site
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Render the card the Discord message links to
+        run: |
+          npm install --no-save --no-audit --no-fund playwright@1.63.0
+          npx playwright install --with-deps chromium
+          node apps/progress/render.mjs doc/progress/progress.svg site/progress.png
+          ls -l site/progress.png
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

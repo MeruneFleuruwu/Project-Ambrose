@@ -1,24 +1,21 @@
 # Project Ambrose by Imjustchico
-# Keeps one Discord message up to date with the generated progress, replacing its card on every edit rather than adding one, because a message holds only ten attachments: it edits the message it posted last time, remembering its id in a state file, and posts a new one only when there is none or Discord says the old one is gone, as one embed carrying a rendered card and the headline percentage, the milestone and check counts, the contributor totals and the phases that moved since the previous commit, saying what it would post and exiting zero when no webhook is configured.
+# Keeps one Discord message up to date with the generated progress: it edits the message it posted last time, remembering its id in a state file, and posts a new one only when there is none or Discord says the old one is gone, as one embed whose card is the rendered image the work board publishes rather than an upload, because editing a message with a file adds an attachment rather than replacing it and ten of them fill a message.
 
 import argparse
 import json
 import os
 import subprocess
 import sys
-import mimetypes
-import secrets
 import urllib.error
 import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DATA = "doc/progress/progress.json"
-CARD_URL = "https://raw.githubusercontent.com/Justchicoo/Project-Ambrose/main/doc/progress/progress.svg"
-REPOSITORY_URL = "https://github.com/Justchicoo/Project-Ambrose"
 BOARD_URL = "https://justchicoo.github.io/Project-Ambrose/"
+CARD_URL = BOARD_URL + "progress.png"
+REPOSITORY_URL = "https://github.com/Justchicoo/Project-Ambrose"
 ROADMAP_URL = REPOSITORY_URL + "/blob/main/doc/ROADMAP.md"
 GOLD = 0xE4B457
-ATTACHMENT = "progress.png"
 NEWLINE = chr(10)
 
 
@@ -56,6 +53,12 @@ def stamp():
         return "counted from the roadmap itself"
 
 
+def card_url(now):
+    milestones = now["milestones"]
+    checks = now["checks"]
+    return f'{CARD_URL}?v={milestones["done"]}-{checks["done"]}'
+
+
 def embed(now, before):
     milestones = now["milestones"]
     checks = now["checks"]
@@ -79,7 +82,7 @@ def embed(now, before):
             "url": BOARD_URL,
             "description": (NEWLINE + NEWLINE).join(description),
             "color": GOLD,
-            "image": {"url": "attachment://" + ATTACHMENT},
+            "image": {"url": card_url(now)},
             "footer": {"text": stamp()},
         }],
     }
@@ -93,26 +96,9 @@ def reason(failure):
     return f"{failure} {body[:600]}" if body else str(failure)
 
 
-def post(url, payload, attachment=None, method="POST"):
-    if attachment is None:
-        request = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method=method,
-                                         headers={"Content-Type": "application/json", "User-Agent": "Project-Ambrose"})
-    else:
-        boundary = "ambrose" + secrets.token_hex(12)
-        kind = mimetypes.guess_type(attachment)[0] or "application/octet-stream"
-        with open(attachment, "rb") as handle:
-            blob = handle.read()
-        line = "\r\n"
-        head = (f"--{boundary}{line}"
-                f'Content-Disposition: form-data; name="payload_json"{line}'
-                f"Content-Type: application/json{line}{line}")
-        middle = (f"{line}--{boundary}{line}"
-                  f'Content-Disposition: form-data; name="files[0]"; filename="{ATTACHMENT}"{line}'
-                  f"Content-Type: {kind}{line}{line}")
-        tail = f"{line}--{boundary}--{line}"
-        parts = [head.encode("utf-8"), json.dumps(payload).encode("utf-8"), middle.encode("utf-8"), blob, tail.encode("utf-8")]
-        request = urllib.request.Request(url, data=b"".join(parts), method=method,
-                                         headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "User-Agent": "Project-Ambrose"})
+def post(url, payload, method="POST"):
+    request = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method=method,
+                                     headers={"Content-Type": "application/json", "User-Agent": "Project-Ambrose"})
     with urllib.request.urlopen(request, timeout=30) as answer:
         return answer.read().decode("utf-8", "replace"), answer.status
 
@@ -143,18 +129,15 @@ def carried(body):
         return 0
 
 
-def send(url, payload, attachment, message_id):
+def send(url, payload, message_id):
     if message_id:
-        edited = dict(payload)
-        if attachment is not None:
-            edited["attachments"] = [{"id": "0", "filename": ATTACHMENT}]
         try:
-            body, status = post(f"{url}/messages/{message_id}?wait=true", edited, attachment, method="PATCH")
+            body, status = post(f"{url}/messages/{message_id}?wait=true", payload, method="PATCH")
             return message_id, status, "edited", carried(body)
         except urllib.error.HTTPError as failure:
             if failure.code not in (404, 401, 403):
                 raise
-    body, status = post(f"{url}?wait=true", payload, attachment)
+    body, status = post(f"{url}?wait=true", payload)
     fresh = None
     try:
         fresh = json.loads(body).get("id")
@@ -168,7 +151,6 @@ def main(argv=None):
     parser.add_argument("--root", default=ROOT)
     parser.add_argument("--webhook-env", default="DISCORD_PROGRESS_WEBHOOK", help="the environment variable holding the Discord webhook URL")
     parser.add_argument("--state", default="doc/progress/discord-message.json", help="where the id of the message to keep updating is remembered")
-    parser.add_argument("--attach", help="a rendered PNG of the card to post with the embed")
     parser.add_argument("--dry-run", action="store_true", help="print the payload instead of posting it")
     args = parser.parse_args(argv)
     root = os.path.abspath(args.root)
@@ -184,11 +166,7 @@ def main(argv=None):
         print("the webhook must be a Discord webhook URL", file=sys.stderr)
         return 1
     try:
-        attachment = args.attach if args.attach and os.path.exists(args.attach) else None
-        if args.attach and attachment is None:
-            print(f"{args.attach}: not found, posting without the card", file=sys.stderr)
-            payload["embeds"][0].pop("image", None)
-        message_id, status, what, carried = send(url, payload, attachment, remembered(args.state))
+        message_id, status, what, held = send(url, payload, remembered(args.state))
     except urllib.error.HTTPError as failure:
         print(f"the webhook refused the post: {reason(failure)}", file=sys.stderr)
         return 1
@@ -197,10 +175,9 @@ def main(argv=None):
         return 1
     if message_id:
         remember(args.state, message_id)
-    print(f"{what} message {message_id}, Discord answered {status}, the message now carries {carried} attachment(s)")
-    if attachment is not None and carried != 1:
-        print(f"the message should carry exactly one card and carries {carried}: more than one means an edit added rather than "
-              "replaced, and none means the edit dropped the card it was uploading", file=sys.stderr)
+    print(f"{what} message {message_id}, Discord answered {status}, carrying {held} upload(s) and the card at {card_url(now)}")
+    if held:
+        print(f"the message still carries {held} upload(s) from when the card was attached rather than linked", file=sys.stderr)
         return 1
     return 0
 
