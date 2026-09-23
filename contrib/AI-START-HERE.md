@@ -94,7 +94,7 @@ A merged finding stays `claimed` and nothing is built on it until Ambrose re-der
 7. **A checker is worth only the broken input it rejects.** For every rule a validator states, make one copy of the fixture that breaks only that rule and show the validator failing on it. The C-59 validator called any gap followed by samples a restart, so it passed a series with no restart at all.
 8. Make a tool fail usefully. Name the file and the reason, exit non-zero, and carry on past what can be skipped rather than losing a whole report to one unreadable file. Say in its README what would make its output wrong.
 9. Write the files in the required shape, then have me run every check below and fix whatever they print.
-10. Write the pull request description: the item id, what the change is, how it was verified, and what would disprove it.
+10. Write the pull request description, replacing the template's own prompts rather than leaving them in place: the item id, what the change is, the commands run and what they printed, and what would disprove it. A description that is still the template tells a reviewer nothing and is the first thing they read.
 
 ## Before the pull request
 

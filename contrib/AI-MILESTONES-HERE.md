@@ -119,6 +119,30 @@ AMBROSE_PANEL_API=https://127.0.0.1:12080 npm run dev --workspace apps/dashboard
 
 A branch named `milestone/<id>-<short-name>` builds the Linux GCC leg in CI by itself, so an open pull request tells us both whether it compiles there, and the maintainer adds a label for the Windows leg when it is worth one. The first run from a new contributor waits for a maintainer to approve it.
 
+## What has actually gone wrong here, so we do not repeat it
+
+Every one of these came from real pull requests on this track. None of them was carelessness, and each cost a round trip.
+
+**The Linux leg fails on warnings MSVC never mentions.** The build is warnings-as-errors on both compilers, and GCC refuses things MSVC accepts. Three that have already bitten:
+
+- A range loop that binds by value: `for (auto const [tag, expected] : std::array<std::pair<std::string_view, uint8>, 8>{...})` copies each pair, and GCC calls that `-Werror=range-loop-construct`. Bind by reference, `auto const&`.
+- An aggregate initialised with fewer members than it has: GCC calls that `-Werror=missing-field-initializers`. Before changing my call site, look at the structure: this has bitten three times here, and each time the real cause was a few members with no default initialiser, so naming any one field could never compile on GCC whatever the caller wrote. Giving those members defaults fixes it for everyone, and is the maintainer's to take if the structure is not mine to change.
+- A macro whose expansion contains a top-level comma, used inside another macro. GCC says so plainly. MSVC accepts it and builds code that reads off the end of itself, which surfaces later as a crash in a test that passed for weeks. Braces do not protect commas from the preprocessor, only parentheses do. If Windows crashes where Linux compiles, and anything near the logging macros changed, suspect the macro before the build system.
+
+If I can only build on one platform, say so and let the leg tell us, but expect this class of thing rather than being surprised by it.
+
+**Every acceptance check the work earns gets ticked, in the same pull request.** Seven pull requests in one night ticked nothing at all, which reads as a milestone half-built even when the code is complete, and makes a reviewer guess what was claimed. Three rules fall out of it:
+
+- A check another milestone shares word for word is earned by the same run, so tick every milestone that shares it and say so. One locale round-trip test closed three milestones at once because their last check was the same sentence.
+- A check that describes work belonging to a different milestone cannot be earned here. Say which, and why, in the description. Do not tick it and do not leave it silent: 4.04 carries three checks that describe 4.05, and that was a flaw in the roadmap rather than in the contribution.
+- A check may already be earned by a test that exists. That is a real finding and worth a pull request of its own: run the test, tick the box, and quote the run.
+
+**The pull request description is not the template.** Arriving with the template's own prompts still in it tells the reviewer nothing, and it is the first thing read. Fill every section: which milestone, what it adds, the platform built on and what `ctest` ended with, which boxes this ticks and what proves each, and which boxes stay empty and why.
+
+**Say when the work deviates from the deliverables.** Putting a file somewhere other than the deliverables list says is sometimes right, and a reviewer will keep it when the reason holds. LocationString landed in `shared/Util` rather than `game/Movement` because the login server needs it too, which was the better call, but it was left to the reviewer to work out whether it was deliberate. One sentence in the description settles it.
+
+**A closed pull request is not a rejected one.** When the work lands, the maintainer often commits it together with the acceptance ticks, the roadmap summary and the regenerated card in one commit, authored to me, and closes the pull request naming that commit. That keeps the repository's own checks green, which a bare merge would not. Look for the commit before assuming anything went wrong.
+
 ## Before the pull request
 
 Have me commit first, because these read committed work, then run these from the repository root (`python` may be `py` on Windows):
@@ -139,6 +163,8 @@ Three dots, and the remote branch my pull request targets, never a local `main`,
 
 Every commit on the branch needs a trailer naming you, such as `Co-Authored-By: <your model name> <noreply@example.com>`; the checker fails any commit in the range without one, not only the last.
 
+Then write the description, replacing the template's prompts rather than leaving them. It needs, in order: the milestone id and title; what the change adds; the platform I built on and the line `ctest` ended with, pasted; which acceptance boxes this ticks and what proves each; which boxes stay empty and why; and any place the work departs from the milestone's deliverables, with the reason. A reviewer reads that before the code, and every question it leaves open is a round trip.
+
 ## One milestone per branch, claimed before it is built
 
 ```
@@ -148,6 +174,16 @@ git switch -c milestone/<id>-<short-name>
 ```
 
 Always from `upstream/main`, never from another branch that has an open pull request, because that turns two independent contributions into a chain where revising the first breaks the second.
+
+**The names have to be exactly these, because machines read them:**
+
+| What | Form | Example |
+|---|---|---|
+| Branch | `milestone/<id>-<short-name>`, lower case, hyphens | `milestone/16.01-filebinary-table-codec` |
+| Pull request title | `<id> <what you are building>` | `16.01 FileBinary table codec` |
+| Claim issue, if I use one instead | `Claim: <id> <title>`, from the claim form | `Claim: 16.01 FileBinary table codec` |
+
+The id is exactly as the board writes it, with its leading zero where it has one, so `4.04` and not `4.4`. The branch name is the one that matters: `apps/ci/ci_contrib_paths.py` reads it, and it is the only reason CI accepts a change under `src/`, so a branch named anything else fails every source file at once with a wall of refusals. The board reads it too, which is how the claim appears without anybody being told. The title is for people.
 
 **Open the pull request as a draft on the first day, before the work is done.** That is what reserves the milestone, and nobody has to be told: the board reads the open pull requests, so within minutes it shows my milestone as being built, by me, and stops anybody else taking it. Building for a week in silence risks somebody else landing it first. Title it `<id> <what you are building>`.
 
