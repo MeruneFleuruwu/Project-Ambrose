@@ -70,6 +70,9 @@ jobs:
       - name: Vendored icons
         if: ${{ !cancelled() }}
         run: python apps/designtokens/icons.py --check
+      - name: Progress announcer self-tests
+        if: ${{ !cancelled() }}
+        run: python apps/progress/tests/test_progress.py
       - name: Progress card
         if: ${{ !cancelled() }}
         run: python apps/progress/progress.py --check

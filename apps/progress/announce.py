@@ -1,5 +1,5 @@
 # Project Ambrose by Imjustchico
-# Keeps one Discord message up to date with the generated progress: it edits the message it posted last time, remembering its id in a state file, and posts a new one only when there is none or Discord says the old one is gone, as one embed carrying a rendered card and the headline percentage, the milestone and check counts, the contributor totals and the phases that moved since the previous commit, saying what it would post and exiting zero when no webhook is configured.
+# Keeps one Discord message up to date with the generated progress, replacing its card on every edit rather than adding one, because a message holds only ten attachments: it edits the message it posted last time, remembering its id in a state file, and posts a new one only when there is none or Discord says the old one is gone, as one embed carrying a rendered card and the headline percentage, the milestone and check counts, the contributor totals and the phases that moved since the previous commit, saying what it would post and exiting zero when no webhook is configured.
 
 import argparse
 import json
@@ -16,6 +16,7 @@ DATA = "doc/progress/progress.json"
 CARD_URL = "https://raw.githubusercontent.com/Justchicoo/Project-Ambrose/main/doc/progress/progress.svg"
 REPOSITORY_URL = "https://github.com/Justchicoo/Project-Ambrose"
 GOLD = 0xE4B457
+ATTACHMENT = "progress.png"
 
 
 def load(root):
@@ -76,7 +77,7 @@ def embed(now, before):
             "description": headline,
             "color": GOLD,
             "fields": fields,
-            "image": {"url": "attachment://progress.png"},
+            "image": {"url": "attachment://" + ATTACHMENT},
             "footer": {"text": stamp()},
         }],
     }
@@ -104,7 +105,7 @@ def post(url, payload, attachment=None, method="POST"):
                 f'Content-Disposition: form-data; name="payload_json"{line}'
                 f"Content-Type: application/json{line}{line}")
         middle = (f"{line}--{boundary}{line}"
-                  f'Content-Disposition: form-data; name="files[0]"; filename="progress.png"{line}'
+                  f'Content-Disposition: form-data; name="files[0]"; filename="{ATTACHMENT}"{line}'
                   f"Content-Type: {kind}{line}{line}")
         tail = f"{line}--{boundary}--{line}"
         parts = [head.encode("utf-8"), json.dumps(payload).encode("utf-8"), middle.encode("utf-8"), blob, tail.encode("utf-8")]
@@ -135,8 +136,11 @@ def remember(path, message_id):
 
 def send(url, payload, attachment, message_id):
     if message_id:
+        edited = dict(payload)
+        if attachment is not None:
+            edited["attachments"] = [{"id": 0, "filename": ATTACHMENT}]
         try:
-            body, status = post(f"{url}/messages/{message_id}?wait=true", payload, attachment, method="PATCH")
+            body, status = post(f"{url}/messages/{message_id}?wait=true", edited, attachment, method="PATCH")
             return message_id, status, "edited"
         except urllib.error.HTTPError as failure:
             if failure.code not in (404, 401, 403):
