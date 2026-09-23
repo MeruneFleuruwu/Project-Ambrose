@@ -29,6 +29,8 @@ enum class PanelUserResult : uint8
     PasswordIsTheName,
     UnknownUser,
     Disabled,
+    LastOwner,
+    Themselves,
     WrongPassword,
     HashFailed,
     StoreFailed
@@ -86,6 +88,10 @@ public:
     PanelUserResult Authenticate(std::string_view username, std::string_view password, PanelUser& user, std::string& error);
     PanelUserResult SetPassword(int64 id, std::string_view password, bool mustChange, std::string& error);
     bool SetDisabled(int64 id, bool disabled, std::string& error);
+    PanelUserResult SetRole(int64 id, PanelRole role, int64 byUserId, std::string& error);
+    PanelUserResult Remove(int64 id, std::string& error);
+    bool IsLastOwner(int64 id, std::string& error);
+    uint32 CountOwners(std::string& error);
     bool RecordSignIn(int64 id, std::string& error);
 
 private:

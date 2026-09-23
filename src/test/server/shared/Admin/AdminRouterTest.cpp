@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Tests admin API routing without sockets: authentication runs before the table, a wrong token is rate limited while the right one still answers, a request naming no caller address is refused, an oversized body is refused before the handler, a known method and path reaches its handler, another method answers 405, an unknown path answers 404, a handler that throws becomes a 500 problem, a host header is read down to its name and only an IP address, localhost or an allowed name is answered, every answer carries a request id and the security headers with the id in any error body, a 422 names each field, paths outside /api and public routes need no token, and a browser session authenticates by cookie with its origin and CSRF token checked where a request changes something or upgrades.
+ * Tests admin API routing without sockets: authentication runs before the table, a wrong token is rate limited while the right one still answers, a request naming no caller address is refused, an oversized body is refused before the handler, a known method and path reaches its handler, another method answers 405, an unknown path answers 404, a handler that throws becomes a 500 problem, a host header is read down to its name and only an IP address, localhost or an allowed name is answered, every answer carries a request id and the security headers with the id in any error body, a 422 names each field, paths outside /api and public routes need no token, and a browser session authenticates by cookie with its origin and CSRF token checked where a request changes something or upgrades, and that a route ships only when it says which permission it needs or that any signed-in member may call it, that one naming a permission nothing holds is never registered, and that a route without its permission answers 403 while one in a scope the caller cannot see answers 404 saying nothing about what was wanted.
  */
 
 #include "AdminAuth.h"
@@ -314,4 +314,53 @@ TEST(AdminRouterTest, ASessionCookieAuthenticatesWithItsOriginAndCsrfToken)
 
     sessions.CloseAll();
     EXPECT_EQ(router.Dispatch(read).Status, 401);
+}
+
+TEST(AdminRouterTest, EveryRouteSaysWhatItNeedsOrItIsNotServed)
+{
+    AdminAuth auth(10, 1.0);
+    auth.SetToken("a-token-for-the-registry");
+    AdminRouter routes(auth);
+    routes.SetPermissionKnown([](std::string_view permission) { return permission == "status.read" || permission == "console.write"; });
+
+    routes.AddPublic("POST", "/api/session", [](AdminRequest const&) { return AdminResponse::Json(200, "{}"); });
+    routes.AddOpen("GET", "/api/health", [](AdminRequest const&) { return AdminResponse::Json(200, "{}"); });
+    routes.AddGuarded("GET", "/api/status", "status.read", [](AdminRequest const&) { return AdminResponse::Json(200, "{}"); });
+    EXPECT_TRUE(routes.RouteProblems().empty());
+
+    routes.AddGuarded("POST", "/api/reveal", "settings.secrets.read", [](AdminRequest const&) { return AdminResponse::Json(200, "{}"); });
+    EXPECT_FALSE(routes.Has("POST", "/api/reveal")) << "a route asking for a key nothing holds is not registered at all";
+    EXPECT_TRUE(routes.RouteProblems().empty()) << "and so there is nothing left to report about it";
+
+    routes.Add("GET", "/api/quiet", [](AdminRequest const&) { return AdminResponse::Json(200, "{}"); });
+    std::vector<std::string> const problems = routes.RouteProblems();
+    ASSERT_EQ(problems.size(), 1u);
+    EXPECT_NE(problems[0].find("GET /api/quiet"), std::string::npos) << problems[0];
+}
+
+TEST(AdminRouterTest, ARouteAnswers403WithoutItsPermissionAnd404ForAScopeTheCallerCannotSee)
+{
+    AdminAuth auth(10, 1.0);
+    auth.SetToken("a-token-for-the-verdicts");
+    AdminRouter routes(auth);
+    routes.AddGuarded("POST", "/api/apps/gameserver/api/command", "console.write", [](AdminRequest const&) { return AdminResponse::Json(200, "{\"ran\":true}"); });
+
+    PermissionVerdict answer = PermissionVerdict::Allowed;
+    routes.SetPermissionCheck([&answer](AdminRequest const&, std::string_view) { return answer; });
+
+    AdminRequest request;
+    request.Method = "POST";
+    request.Path = "/api/apps/gameserver/api/command";
+    request.RemoteAddress = "127.0.0.1";
+    request.Authorization = "Bearer a-token-for-the-verdicts";
+
+    EXPECT_EQ(routes.Dispatch(request).Status, 200);
+
+    answer = PermissionVerdict::Forbidden;
+    EXPECT_EQ(routes.Dispatch(request).Status, 403);
+
+    answer = PermissionVerdict::OutOfScope;
+    AdminResponse const unseen = routes.Dispatch(request);
+    EXPECT_EQ(unseen.Status, 404);
+    EXPECT_EQ(unseen.Body.find("console.write"), std::string::npos) << "a refusal must not name what the caller would have needed";
 }

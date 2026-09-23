@@ -19,6 +19,9 @@ export const PanelUser = v.looseObject({
     username: v.string(),
     display_name: v.string(),
     owner: v.boolean(),
+    role: v.optional(v.string(), "viewer"),
+    permissions: v.optional(v.array(v.string()), []),
+    grants: v.optional(v.record(v.string(), v.array(v.string())), {}),
     must_change_password: v.boolean(),
 });
 

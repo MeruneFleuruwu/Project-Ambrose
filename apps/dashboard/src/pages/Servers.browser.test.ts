@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Tests the servers page in a real browser against a stubbed admin API: every supervised app shows its state, process and crashes with the buttons its state allows, a restart asks first and then sends the countdown that was typed, a start goes straight through, the captured output of the chosen app is shown with the supervisor's own notes apart from the app's, and a panel an app served itself says the supervisor is not serving it instead of offering power buttons.
+ * Tests the servers page in a real browser against a stubbed admin API: every supervised app shows its state, process and crashes with the buttons its state allows, a restart asks first and then sends the countdown that was typed, a start goes straight through, the captured output of the chosen app is shown with the supervisor's own notes apart from the app's, a panel an app served itself says the supervisor is not serving it instead of offering power buttons, and a viewer sees the apps and their state but none of the power buttons, while a sub-user granted a restart on one app sees that one button on that one app.
  */
 
 import { flushSync, mount, unmount } from "svelte";
@@ -109,6 +109,7 @@ beforeEach(() => {
 afterEach(() => {
     if (page) unmount(page);
     host.remove();
+    session.user = null;
     vi.unstubAllGlobals();
 });
 
@@ -169,5 +170,42 @@ describe("the servers page", () => {
         open();
         expect(host.textContent).toContain("The supervisor is not serving this panel");
         expect([...host.querySelectorAll("button")].some((button) => button.textContent?.trim().startsWith("Restart"))).toBe(false);
+    });
+});
+
+describe("the power buttons a viewer and a sub-user see", () => {
+    function signedInAs(role: string, permissions: string[], grants: Record<string, string[]> = {}) {
+        session.state = "signed-in";
+        session.user = {
+            id: 2,
+            username: "helper",
+            display_name: "helper",
+            owner: false,
+            role,
+            permissions,
+            grants,
+            must_change_password: false,
+        };
+    }
+
+    it("shows a viewer the apps and their state but no power button", async () => {
+        signedInAs("viewer", ["status.read"]);
+        open();
+        await vi.waitFor(() => expect(host.textContent).toContain("loginserver"));
+        expect(host.textContent).toContain("Running");
+        const buttons = [...host.querySelectorAll("button")].map((button) => button.textContent?.trim() ?? "");
+        expect(buttons.some((word) => word.startsWith("Restart"))).toBe(false);
+        expect(buttons.some((word) => word.startsWith("Stop"))).toBe(false);
+        expect(buttons.some((word) => word.startsWith("Start"))).toBe(false);
+    });
+
+    it("shows a sub-user the one button their grant names on the one app it names", async () => {
+        signedInAs("viewer", ["status.read"], { loginserver: ["power.restart"] });
+        open();
+        await vi.waitFor(() => expect(host.textContent).toContain("loginserver"));
+        const buttons = [...host.querySelectorAll("button")].map((button) => button.textContent?.trim() ?? "");
+        expect(buttons.filter((word) => word.startsWith("Restart")).length).toBe(1);
+        expect(buttons.some((word) => word.startsWith("Stop"))).toBe(false);
+        expect(buttons.some((word) => word.startsWith("Start"))).toBe(false);
     });
 });

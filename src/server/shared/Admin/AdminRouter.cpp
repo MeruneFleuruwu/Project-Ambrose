@@ -91,30 +91,66 @@ AdminRouter::AdminRouter(AdminAuth& auth) : _auth(auth)
 {
 }
 
-void AdminRouter::Put(std::string method, std::string path, Handler handler, bool isPublic, bool prefix, uint32 cost, std::string permission)
+void AdminRouter::Put(std::string method, std::string path, Handler handler, RouteAccess access, bool prefix, uint32 cost, std::string permission)
 {
     std::unique_lock const lock(_mutex);
+    if (access == RouteAccess::Permission && _known && !_known(permission))
+        return;
     std::string const upper = Ambrose::ToUpper(method);
     auto const existing = std::find_if(_routes.begin(), _routes.end(), [&](Route const& route) { return route.Method == upper && route.Path == path && route.Prefix == prefix; });
     if (existing != _routes.end())
     {
         existing->Run = std::move(handler);
-        existing->Public = isPublic;
+        existing->Access = access;
         existing->Cost = cost;
         existing->Permission = std::move(permission);
         return;
     }
-    _routes.push_back({ upper, std::move(path), std::move(handler), isPublic, prefix, cost, std::move(permission) });
+    _routes.push_back({ upper, std::move(path), std::move(handler), access, prefix, cost, std::move(permission) });
+}
+
+void AdminRouter::AddOpen(std::string method, std::string path, Handler handler)
+{
+    Put(std::move(method), std::move(path), std::move(handler), RouteAccess::AnyMember);
+}
+
+void AdminRouter::AddOpenPrefix(std::string method, std::string prefix, Handler handler)
+{
+    if (prefix.empty() || prefix.back() != '/')
+        prefix.push_back('/');
+    Put(std::move(method), std::move(prefix), std::move(handler), RouteAccess::AnyMember, true);
+}
+
+void AdminRouter::SetPermissionKnown(Known known)
+{
+    std::unique_lock const lock(_mutex);
+    _known = std::move(known);
+}
+
+std::vector<std::string> AdminRouter::RouteProblems() const
+{
+    std::shared_lock const lock(_mutex);
+    std::vector<std::string> problems;
+    for (Route const& route : _routes)
+    {
+        std::string const where = route.Method + " " + route.Path + (route.Prefix ? "*" : "");
+        if (route.Access == RouteAccess::Undeclared)
+            problems.push_back(where + " says neither which permission it needs nor that any signed-in member may call it");
+        else if (route.Access == RouteAccess::Permission && _known && !_known(route.Permission))
+            problems.push_back(where + " asks for " + route.Permission + ", which the catalog does not hold");
+    }
+    std::sort(problems.begin(), problems.end());
+    return problems;
 }
 
 void AdminRouter::AddGuarded(std::string method, std::string path, std::string permission, Handler handler)
 {
-    Put(std::move(method), std::move(path), std::move(handler), false, false, 0, std::move(permission));
+    Put(std::move(method), std::move(path), std::move(handler), RouteAccess::Permission, false, 0, std::move(permission));
 }
 
 void AdminRouter::AddGuardedPrefix(std::string method, std::string prefix, std::string permission, Handler handler)
 {
-    Put(std::move(method), std::move(prefix), std::move(handler), false, true, 0, std::move(permission));
+    Put(std::move(method), std::move(prefix), std::move(handler), RouteAccess::Permission, true, 0, std::move(permission));
 }
 
 PermissionVerdict AdminRouter::MayI(AdminRequest const& request, std::string_view permission) const
@@ -125,6 +161,16 @@ PermissionVerdict AdminRouter::MayI(AdminRequest const& request, std::string_vie
         check = _permission;
     }
     return check ? check(request, permission) : PermissionVerdict::Allowed;
+}
+
+bool AdminRouter::Holds(AdminRequest const& request, std::string_view permission) const
+{
+    PermissionCheck check;
+    {
+        std::shared_lock const lock(_mutex);
+        check = _permission;
+    }
+    return check && check(request, permission) == PermissionVerdict::Allowed;
 }
 
 void AdminRouter::SetPermissionCheck(PermissionCheck check)
@@ -139,19 +185,24 @@ std::vector<std::pair<std::string, std::string>> AdminRouter::DeclaredRoutes() c
     std::vector<std::pair<std::string, std::string>> declared;
     declared.reserve(_routes.size());
     for (Route const& route : _routes)
-        if (!route.Public)
+        if (!route.Public())
             declared.emplace_back(route.Method + " " + route.Path, route.Permission);
     return declared;
 }
 
 void AdminRouter::Add(std::string method, std::string path, Handler handler)
 {
-    Put(std::move(method), std::move(path), std::move(handler), false);
+    Put(std::move(method), std::move(path), std::move(handler), RouteAccess::Undeclared);
 }
 
-void AdminRouter::AddCosting(std::string method, std::string path, uint32 cost, Handler handler)
+void AdminRouter::AddCosting(std::string method, std::string path, std::string permission, uint32 cost, Handler handler)
 {
-    Put(std::move(method), std::move(path), std::move(handler), false, false, cost);
+    Put(std::move(method), std::move(path), std::move(handler), RouteAccess::Permission, false, cost, std::move(permission));
+}
+
+void AdminRouter::AddOpenCosting(std::string method, std::string path, uint32 cost, Handler handler)
+{
+    Put(std::move(method), std::move(path), std::move(handler), RouteAccess::AnyMember, false, cost);
 }
 
 void AdminRouter::SetThrottle(Throttle throttle)
@@ -179,12 +230,12 @@ void AdminRouter::AddPrefix(std::string method, std::string prefix, Handler hand
 {
     if (prefix.empty() || prefix.back() != '/')
         prefix.push_back('/');
-    Put(std::move(method), std::move(prefix), std::move(handler), false, true);
+    Put(std::move(method), std::move(prefix), std::move(handler), RouteAccess::Undeclared, true);
 }
 
 void AdminRouter::AddPublic(std::string method, std::string path, Handler handler)
 {
-    Put(std::move(method), std::move(path), std::move(handler), true);
+    Put(std::move(method), std::move(path), std::move(handler), RouteAccess::Public);
 }
 
 void AdminRouter::SetFiles(Handler files)
@@ -400,7 +451,7 @@ AdminResponse AdminRouter::Answer(AdminRequest& request) const
         std::string const method = Ambrose::ToUpper(request.Method);
         for (Route const& route : _routes)
         {
-            if (route.Public && !route.Prefix && route.Path == request.Path && route.Method == method)
+            if (route.Public() && !route.Prefix && route.Path == request.Path && route.Method == method)
             {
                 open = route.Run;
                 break;

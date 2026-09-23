@@ -19,6 +19,8 @@
 #include "PanelStore.h"
 #include "Types.h"
 
+#include <nlohmann/json_fwd.hpp>
+
 #include <chrono>
 #include <filesystem>
 #include <map>
@@ -88,6 +90,7 @@ private:
     AdminResponse SignOut(AdminRequest const& request);
     AdminResponse WhoAmI(AdminRequest const& request);
     std::optional<PanelUser> UserOf(AdminRequest const& request);
+    nlohmann::json UserAnswer(PanelUser const& user);
     std::optional<AdminResponse> Throttle(AdminRequest const& request, uint32 cost);
 
     Log& _log;

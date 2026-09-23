@@ -24,6 +24,11 @@ bool PanelGrants::Give(int64 userId, std::string_view app, std::string_view perm
         error = "a grant names the app it is for";
         return false;
     }
+    if (byUserId == userId)
+    {
+        error = "nobody gives themselves a grant";
+        return false;
+    }
     std::optional<PanelStore::Statement> insert = _store.Prepare(
         "INSERT OR IGNORE INTO panel_grant (user_id, app, permission, granted_epoch_ms, granted_by) VALUES (?1, ?2, ?3, ?4, ?5)", error);
     if (!insert)
@@ -36,18 +41,27 @@ bool PanelGrants::Give(int64 userId, std::string_view app, std::string_view perm
         insert->Bind(5, byUserId);
     else
         insert->BindNull(5);
-    return insert->Run(error);
+    if (!insert->Run(error))
+        return false;
+    return _store.Changed() == 0 || Bump(userId, error);
 }
 
-bool PanelGrants::Take(int64 userId, std::string_view app, std::string_view permission, std::string& error)
+bool PanelGrants::Take(int64 userId, std::string_view app, std::string_view permission, int64 byUserId, std::string& error)
 {
+    if (byUserId == userId)
+    {
+        error = "nobody takes away their own grant";
+        return false;
+    }
     std::optional<PanelStore::Statement> remove = _store.Prepare("DELETE FROM panel_grant WHERE user_id = ?1 AND app = ?2 AND permission = ?3", error);
     if (!remove)
         return false;
     remove->Bind(1, userId);
     remove->Bind(2, app);
     remove->Bind(3, permission);
-    return remove->Run(error);
+    if (!remove->Run(error))
+        return false;
+    return _store.Changed() == 0 || Bump(userId, error);
 }
 
 bool PanelGrants::TakeAll(int64 userId, std::string& error)
@@ -56,7 +70,18 @@ bool PanelGrants::TakeAll(int64 userId, std::string& error)
     if (!remove)
         return false;
     remove->Bind(1, userId);
-    return remove->Run(error);
+    if (!remove->Run(error))
+        return false;
+    return _store.Changed() == 0 || Bump(userId, error);
+}
+
+bool PanelGrants::Bump(int64 userId, std::string& error)
+{
+    std::optional<PanelStore::Statement> bump = _store.Prepare("UPDATE panel_user SET generation = generation + 1 WHERE id = ?1", error);
+    if (!bump)
+        return false;
+    bump->Bind(1, userId);
+    return bump->Run(error);
 }
 
 std::vector<PanelGrant> PanelGrants::Of(int64 userId, std::string& error) const

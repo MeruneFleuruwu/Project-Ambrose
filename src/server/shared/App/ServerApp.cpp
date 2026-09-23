@@ -275,7 +275,7 @@ bool ServerApp::StartAdminApi()
     _logStream = std::make_unique<LogStreamService>(_log.GetStreamHub());
     _logStream->Start();
     _admin->AddSocket(_logStream->MakeSocketRoute("/api/logs"));
-    _admin->Routes().AddPrefix("GET", "/api/logs/after/", [this](AdminRequest const& request)
+    _admin->Routes().AddGuardedPrefix("GET", "/api/logs/after/", "console.read", [this](AdminRequest const& request)
     {
         std::string_view tail(request.Path);
         tail.remove_prefix(std::string_view("/api/logs/after/").size());
@@ -308,7 +308,7 @@ void ServerApp::RegisterStandardRoutes(AdminRouter& routes)
     AdminStatus::Register(routes, [this] { return BuildStatus(); });
     AdminConfigView::Register(routes, _config, GetRestartRequiredOptions());
     AdminCommand::Register(routes, _commands, _info.Name, CommandAuditFile());
-    routes.Add("POST", "/api/shutdown", [this](AdminRequest const& request)
+    routes.AddGuarded("POST", "/api/shutdown", "power.stop", [this](AdminRequest const& request)
     {
         nlohmann::json const body = request.Body.empty() ? nlohmann::json::object() : nlohmann::json::parse(request.Body, nullptr, false);
         if (!body.is_object())

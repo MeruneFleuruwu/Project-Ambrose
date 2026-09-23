@@ -314,7 +314,7 @@ AdminServer::AdminServer(Log& log, std::string appName, std::filesystem::path da
     : _log(log), _appName(std::move(appName)), _dataFolder(std::move(dataFolder)), _configFolder(std::move(configFolder)), _auth(ListenerSettings{}.AuthFailureBurst, ListenerSettings{}.AuthFailuresPerSecond), _router(_auth)
 {
     _router.SetMaxBodyBytes(ListenerSettings{}.MaxRequestBytes);
-    _router.Add("GET", "/api/health", [this](AdminRequest const&)
+    _router.AddOpen("GET", "/api/health", [this](AdminRequest const&)
     {
         if (!_health)
             return AdminResponse::Problem(503, "not_ready", "The admin API has no health source yet");
@@ -367,7 +367,7 @@ AdminServer::AdminServer(Log& log, std::string appName, std::filesystem::path da
         }
         return AdminResponse::Json(200, body.dump());
     });
-    _router.Add("DELETE", "/api/session", [this](AdminRequest const& request)
+    _router.AddOpen("DELETE", "/api/session", [this](AdminRequest const& request)
     {
         if (_sessionSource != nullptr)
             return AdminResponse::Problem(404, "no_token_sign_in", "This listener signs in with its own accounts rather than with an admin token");

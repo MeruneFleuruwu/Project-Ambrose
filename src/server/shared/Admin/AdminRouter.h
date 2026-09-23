@@ -65,12 +65,21 @@ enum class PermissionVerdict : uint8
     OutOfScope
 };
 
+enum class RouteAccess : uint8
+{
+    Undeclared,
+    Public,
+    AnyMember,
+    Permission
+};
+
 class AdminRouter
 {
 public:
     using Handler = std::function<AdminResponse(AdminRequest const&)>;
     using PermissionCheck = std::function<PermissionVerdict(AdminRequest const&, std::string_view permission)>;
     using ProblemLog = std::function<void(AdminRequest const&, AdminResponse const&)>;
+    using Known = std::function<bool(std::string_view permission)>;
 
     static constexpr std::string_view SecurityPolicy =
         "default-src 'none'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; "
@@ -86,7 +95,12 @@ public:
     void Add(std::string method, std::string path, Handler handler);
     void AddGuarded(std::string method, std::string path, std::string permission, Handler handler);
     void AddGuardedPrefix(std::string method, std::string prefix, std::string permission, Handler handler);
-    void AddCosting(std::string method, std::string path, uint32 cost, Handler handler);
+    void AddOpen(std::string method, std::string path, Handler handler);
+    void AddOpenPrefix(std::string method, std::string prefix, Handler handler);
+    void SetPermissionKnown(Known known);
+    std::vector<std::string> RouteProblems() const;
+    void AddCosting(std::string method, std::string path, std::string permission, uint32 cost, Handler handler);
+    void AddOpenCosting(std::string method, std::string path, uint32 cost, Handler handler);
     void SetThrottle(Throttle throttle);
     uint32 CostOf(std::string_view method, std::string_view path) const;
     void AddPublic(std::string method, std::string path, Handler handler);
@@ -108,6 +122,7 @@ public:
     AdminResponse Dispatch(AdminRequest const& request) const;
     void SetPermissionCheck(PermissionCheck check);
     PermissionVerdict MayI(AdminRequest const& request, std::string_view permission) const;
+    bool Holds(AdminRequest const& request, std::string_view permission) const;
     std::vector<std::pair<std::string, std::string>> DeclaredRoutes() const;
     void Finish(AdminRequest const& request, AdminResponse& response) const;
     std::optional<std::string> SessionSecret(AdminRequest const& request) const;
@@ -124,17 +139,20 @@ private:
         std::string Method;
         std::string Path;
         Handler Run;
-        bool Public = false;
+        RouteAccess Access = RouteAccess::Undeclared;
         bool Prefix = false;
         uint32 Cost = 0;
         std::string Permission;
+
+        bool Public() const { return Access == RouteAccess::Public; }
     };
 
     AdminResponse Answer(AdminRequest& request) const;
     AdminResponse Serve(AdminRequest const& request) const;
-    void Put(std::string method, std::string path, Handler handler, bool isPublic, bool prefix = false, uint32 cost = 0, std::string permission = {});
+    void Put(std::string method, std::string path, Handler handler, RouteAccess access, bool prefix = false, uint32 cost = 0, std::string permission = {});
 
     PermissionCheck _permission;
+    Known _known;
 
     AdminAuth& _auth;
     std::atomic<std::size_t> _maxBodyBytes{ 0 };

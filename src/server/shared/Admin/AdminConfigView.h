@@ -23,7 +23,7 @@ public:
     AdminConfigView() = delete;
 
     static std::string_view LayerName(ConfigSourceKind kind) noexcept;
-    static std::string SettingsJson(ConfigMgr const& config, std::span<RestartRequiredOption const> restartRequired = {});
+    static std::string SettingsJson(ConfigMgr const& config, std::span<RestartRequiredOption const> restartRequired, bool revealSecrets);
     static void Register(AdminRouter& router, ConfigMgr const& config, std::vector<RestartRequiredOption> restartRequired = {});
 };
 

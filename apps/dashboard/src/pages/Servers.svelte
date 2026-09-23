@@ -1,4 +1,4 @@
-<!-- Project Ambrose by Imjustchico: The servers page, live from the supervisor: every app with its state, process, place, build, uptime and crash count, start, stop, restart and kill each with a countdown where one applies and a confirmation for the ones that end a run, and the output the supervisor captured for this run and the one before, which is what an app with its admin API off still shows, drawn as the four columns doc/DESIGN.md settles so a level, a category and a value each read apart from the words around them. -->
+<!-- Project Ambrose by Imjustchico: The servers page, live from the supervisor: every app with its state, process, place, build, uptime and crash count, start, stop, restart and kill each with a countdown where one applies and a confirmation for the ones that end a run, and the output the supervisor captured for this run and the one before, which is what an app with its admin API off still shows, drawn as the four columns doc/DESIGN.md settles so a level, a category and a value each read apart from the words around them. Each power control is there only for an operator the server would let use it, hidden by the same permission it checks, so the page never offers what would come back refused. -->
 <script lang="ts">
     import * as Card from "$lib/components/ui/card/index.js";
     import * as Dialog from "$lib/components/ui/dialog/index.js";
@@ -13,6 +13,7 @@
     import { formatUptime } from "$lib/format.js";
     import { live } from "$lib/status.svelte.js";
     import LogView from "$lib/components/LogView.svelte";
+    import { may } from "$lib/permission.svelte.js";
     import { output, power, supervised, supervisorServes, type OutputRun, type PowerAction } from "$lib/supervision.svelte.js";
     import type { AppEntry, OutputAnswer } from "$lib/schemas.js";
     import EllipsisIcon from "@lucide/svelte/icons/ellipsis";
@@ -193,20 +194,24 @@
                         <Table.Cell class="pr-6">
                             <div class="flex items-center justify-end gap-2">
                                 {#if alive}
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        disabled={working !== ""}
-                                        onclick={() => begin(entry.name, "restart")}><RotateCcwIcon />Restart</Button
-                                    >
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        class="text-destructive hover:text-destructive"
-                                        disabled={working !== ""}
-                                        onclick={() => begin(entry.name, "stop")}><PowerIcon />Stop</Button
-                                    >
-                                {:else}
+                                    {#if may("power.restart", entry.name)}
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            disabled={working !== ""}
+                                            onclick={() => begin(entry.name, "restart")}><RotateCcwIcon />Restart</Button
+                                        >
+                                    {/if}
+                                    {#if may("power.stop", entry.name)}
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            class="text-destructive hover:text-destructive"
+                                            disabled={working !== ""}
+                                            onclick={() => begin(entry.name, "stop")}><PowerIcon />Stop</Button
+                                        >
+                                    {/if}
+                                {:else if may("power.start", entry.name)}
                                     <Button size="sm" disabled={working !== ""} onclick={() => begin(entry.name, "start")}
                                         ><PlayIcon />Start</Button
                                     >

@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Tests the panel's own listener and what it holds: it serves nothing until Panel.Enable is set, it opens its store with the panel tables before it listens, it answers its own routes on a loopback port with its own token, a bind beyond this machine with no certificate is refused with the Panel option names in the message, the plain-HTTP opt-in lifts that refusal, a certificate and key are served over TLS with the fingerprint the files hold, a route that declares a cost is held back with a retry hint while an uncosted route from the same caller still answers, one audit row records the throttling however many requests are refused in that minute, and a change whose audit row cannot be written is not applied, the plain-HTTP opt-in lets it reach beyond this machine with the risk said out loud, a reload that would leave the bind unsafe is refused while the old listener goes on serving, and a replaced certificate is served after a reload on the same port.
+ * Tests the panel's own listener and what it holds: it serves nothing until Panel.Enable is set, it opens its store with the panel tables before it listens, it answers its own routes on a loopback port with its own token, a bind beyond this machine with no certificate is refused with the Panel option names in the message, the plain-HTTP opt-in lifts that refusal, a certificate and key are served over TLS with the fingerprint the files hold, a route that declares a cost is held back with a retry hint while an uncosted route from the same caller still answers, one audit row records the throttling however many requests are refused in that minute, and a change whose audit row cannot be written is not applied, the plain-HTTP opt-in lets it reach beyond this machine with the risk said out loud, a reload that would leave the bind unsafe is refused while the old listener goes on serving, and a replaced certificate is served after a reload on the same port, and it refuses to start at all when a route says neither which permission it needs nor that any signed-in member may call it, or names a permission the catalog does not hold.
  */
 
 #include "AdminClient.h"
@@ -48,7 +48,7 @@ namespace
 
         void AddPing(Panel& panel)
         {
-            panel.Routes().Add("GET", "/api/panel/ping", [](AdminRequest const&)
+            panel.Routes().AddOpen("GET", "/api/panel/ping", [](AdminRequest const&)
             {
                 return AdminResponse::Json(200, "{\"pong\":true}");
             });
@@ -147,7 +147,7 @@ TEST_F(PanelTest, HoldsBackACostlyRouteAndRecordsItOnceAMinute)
 {
     Panel panel = Make();
     AddPing(panel);
-    panel.Routes().AddCosting("POST", "/api/panel/work", 1, [](AdminRequest const&)
+    panel.Routes().AddOpenCosting("POST", "/api/panel/work", 1, [](AdminRequest const&)
     {
         return AdminResponse::Json(200, "{\"done\":true}");
     });
@@ -229,7 +229,7 @@ TEST_F(PanelTest, AChangeWhoseRecordCannotBeWrittenIsNotApplied)
 TEST_F(PanelTest, AForwardedHeaderChangesNothingWithNoTrustedProxies)
 {
     Panel panel = Make();
-    panel.Routes().AddCosting("POST", "/api/panel/work", 200, [](AdminRequest const&)
+    panel.Routes().AddOpenCosting("POST", "/api/panel/work", 200, [](AdminRequest const&)
     {
         return AdminResponse::Json(200, "{\"done\":true}");
     });
@@ -352,5 +352,31 @@ TEST_F(PanelTest, GatheringKeepsWhatAnAppReportedAndIgnoresAnAnswerItCannotRead)
     EXPECT_EQ(panel.GatherErrorsOnce(), 1u);
     EXPECT_EQ(panel.Errors().List(error).size(), 1u) << "the same report twice is still one group";
     EXPECT_EQ(panel.Errors().List(error)[0].TotalCount, 3u) << "and the count is not doubled by reading it again";
+    panel.Stop();
+}
+
+TEST_F(PanelTest, APanelWillNotServeARouteThatSaysNothingAboutWhatItNeeds)
+{
+    ConfigMgr& config = Configured("Panel.Enable = 1\nPanel.Port = 0\n");
+    Panel panel = Make();
+    panel.Routes().Add("GET", "/api/panel/quiet", [](AdminRequest const&) { return AdminResponse::Json(200, "{}"); });
+
+    std::string error;
+    EXPECT_FALSE(panel.Start(config, error));
+    EXPECT_NE(error.find("/api/panel/quiet"), std::string::npos) << error;
+}
+
+TEST_F(PanelTest, ARouteNamingAPermissionTheCatalogDoesNotHoldIsNeverRegistered)
+{
+    ConfigMgr& config = Configured("Panel.Enable = 1\nPanel.Port = 0\n");
+    Panel panel = Make();
+    panel.Routes().AddGuarded("GET", "/api/panel/invented", "console.everything", [](AdminRequest const&) { return AdminResponse::Json(200, "{}"); });
+    EXPECT_FALSE(panel.Routes().Has("GET", "/api/panel/invented"));
+
+    panel.Routes().AddGuarded("GET", "/api/panel/real", "status.read", [](AdminRequest const&) { return AdminResponse::Json(200, "{}"); });
+    EXPECT_TRUE(panel.Routes().Has("GET", "/api/panel/real"));
+
+    std::string error;
+    EXPECT_TRUE(panel.Start(config, error)) << error;
     panel.Stop();
 }

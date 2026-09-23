@@ -1259,13 +1259,13 @@ Done on 2026-09-22. The supervisor is a fourth executable in `src/server/apps/su
 
 **Acceptance**
 
-- [ ] A viewer can read an app's status but gets 403 on a command through 17.05 and on a restart through 17.08, and the dashboard hides both controls
-- [ ] A sub-user granted only `power.restart` on gameserver can restart gameserver and nothing else, and gets 404 for an app they hold nothing on
-- [ ] A route registered without a permission fails the route registry test, and so does a route naming a key the catalog does not hold
-- [ ] `GET /api/panel/permissions` lists every group, key, description, danger flag and scope the routes reference
-- [ ] Demoting or deleting the last owner is refused
-- [ ] A caller without `settings.secrets.read` receives the masked value, and the same route with the permission returns the value and writes an audit row
-- [ ] A grant change ends nothing for other users but bumps the affected user's session generation within one second
+- [x] A viewer can read an app's status but gets 403 on a command through 17.05 and on a restart through 17.08, and the dashboard hides both controls
+- [x] A sub-user granted only `power.restart` on gameserver can restart gameserver and nothing else, and gets 404 for an app they hold nothing on
+- [x] A route registered without a permission fails the route registry test, and so does a route naming a key the catalog does not hold
+- [x] `GET /api/panel/permissions` lists every group, key, description, danger flag and scope the routes reference
+- [x] Demoting or deleting the last owner is refused
+- [x] A caller without `settings.secrets.read` receives the masked value, and the same route with the permission returns the value and writes an audit row
+- [x] A grant change ends nothing for other users but bumps the affected user's session generation within one second
 
 ## 17.49 Panel audit scope, app relay and command history
 

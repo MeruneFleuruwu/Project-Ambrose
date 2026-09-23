@@ -48,6 +48,7 @@ Panel::Panel(Log& log, std::filesystem::path dataFolder, std::filesystem::path c
     {
         return _authorization->Decide(request, permission);
     });
+    _listener.Routes().SetPermissionKnown([](std::string_view permission) { return PanelPermissions::Holds(permission); });
     RegisterSignIn();
 }
 
@@ -101,6 +102,13 @@ bool Panel::Start(ConfigMgr const& config, std::string& error)
     _sessionIdle = std::chrono::minutes(settings.SessionIdleMinutes);
     _sessionLifetime = std::chrono::hours(settings.SessionLifetimeHours);
     _sessions.SetLifetimes(_sessionIdle, _sessionLifetime);
+    if (std::vector<std::string> const undeclared = _listener.Routes().RouteProblems(); !undeclared.empty())
+    {
+        error = "the panel will not serve routes that do not say what they need:";
+        for (std::string const& undeclaredRoute : undeclared)
+            error += " " + undeclaredRoute + ";";
+        return false;
+    }
     if (!_listener.Start(settings, error))
         return false;
     OfferTheOwnerLink();
@@ -287,9 +295,9 @@ void Panel::RegisterSignIn()
     routes.AddPublic("GET", "/api/panel/session", [this](AdminRequest const& request) { return Probe(request); });
     routes.AddPublic("GET", "/api/session", [this](AdminRequest const& request) { return Probe(request); });
     routes.AddPublic("POST", "/api/panel/reset", [this](AdminRequest const& request) { return Reset(request); });
-    routes.Add("DELETE", "/api/panel/session", [this](AdminRequest const& request) { return SignOut(request); });
-    routes.Add("GET", "/api/panel/me", [this](AdminRequest const& request) { return WhoAmI(request); });
-    routes.Add("GET", "/api/panel/permissions", [](AdminRequest const&) { return AdminResponse::Json(200, PanelPermissions::CatalogJson()); });
+    routes.AddOpen("DELETE", "/api/panel/session", [this](AdminRequest const& request) { return SignOut(request); });
+    routes.AddOpen("GET", "/api/panel/me", [this](AdminRequest const& request) { return WhoAmI(request); });
+    routes.AddOpen("GET", "/api/panel/permissions", [](AdminRequest const&) { return AdminResponse::Json(200, PanelPermissions::CatalogJson()); });
 }
 
 std::optional<PanelUser> Panel::UserOf(AdminRequest const& request)
@@ -319,6 +327,19 @@ namespace
         body["signed_in"] = user.SignedInEpochMs ? nlohmann::json(*user.SignedInEpochMs) : nlohmann::json(nullptr);
         return body;
     }
+}
+
+nlohmann::json Panel::UserAnswer(PanelUser const& user)
+{
+    nlohmann::json body = UserJson(user);
+    nlohmann::json grants = nlohmann::json::object();
+    std::string error;
+    for (PanelGrant const& grant : _grants.Of(user.Id, error))
+        grants[grant.App].push_back(grant.Permission);
+    if (!error.empty())
+        AMBROSE_LOG(_log, LogLevel::Error, PanelCategory, "The panel could not read {}'s grants: {}", user.Username, error);
+    body["grants"] = std::move(grants);
+    return body;
 }
 
 AdminResponse Panel::SignIn(AdminRequest const& request)
@@ -407,7 +428,7 @@ AdminResponse Panel::WhoAmI(AdminRequest const& request)
     std::optional<PanelUser> const user = UserOf(request);
     if (!user)
         return AdminResponse::Problem(404, "not_a_panel_user", "This request is not carrying a panel user's session");
-    nlohmann::json answer = UserJson(*user);
+    nlohmann::json answer = UserAnswer(*user);
     answer["csrf"] = request.SessionCsrf.value_or(std::string());
     return AdminResponse::Json(200, answer.dump());
 }
@@ -464,7 +485,7 @@ AdminResponse Panel::OpenFor(PanelUser const& user, AdminRequest const& request,
 
     nlohmann::json answer;
     answer["csrf"] = opened->Csrf;
-    answer["user"] = UserJson(user);
+    answer["user"] = UserAnswer(user);
     AdminResponse response = AdminResponse::Json(200, answer.dump());
     response.Headers.emplace_back("Set-Cookie", _listener.MakeSessionCookie(opened->Secret, false));
     return response;
@@ -543,7 +564,7 @@ AdminResponse Panel::Probe(AdminRequest const& request)
     answer["csrf"] = user ? nlohmann::json(csrf) : nlohmann::json(nullptr);
     answer["idle_seconds"] = _sessionIdle.count();
     answer["lifetime_seconds"] = _sessionLifetime.count();
-    answer["user"] = user ? UserJson(*user) : nlohmann::json(nullptr);
+    answer["user"] = user ? UserAnswer(*user) : nlohmann::json(nullptr);
     {
         std::lock_guard const lock(_claimMutex);
         answer["needs_owner"] = !user && !_claimToken.empty() && std::chrono::steady_clock::now() < _claimExpires;
