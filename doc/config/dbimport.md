@@ -21,6 +21,10 @@ dbimport creates and updates the databases `Updates.EnableDatabases` selects, op
 | `Updates.EnableDatabases` | uint32 | `7` | `AMBROSE_UPDATES_ENABLE_DATABASES` | Bitmask of databases to create and update: 1 login, 2 characters, 4 world; a missing key means 0, none |
 | `Updates.AutoSetup` | bool | `1` | `AMBROSE_UPDATES_AUTO_SETUP` | Create a missing database with utf8mb4; an empty database always gets its base imported |
 | `Updates.SourcePath` | string | empty | `AMBROSE_UPDATES_SOURCE_PATH` | The Project Ambrose folder that holds `data/sql`; empty uses the folder dbimport was built from, then `share/ambrose` next to an installed `bin` |
+| `Updates.Redundancy` | bool | `0` | `AMBROSE_UPDATES_REDUNDANCY` | At each updater run | Re-apply an already recorded update whose non-empty hash changed; when disabled, the updater reports the edited file as an error |
+| `Updates.AllowRehash` | bool | `0` | `AMBROSE_UPDATES_ALLOW_REHASH` | At each updater run | Fill an empty recorded hash from the file on disk; it never overwrites a non-empty hash |
+| `Updates.CleanDeadRefMaxCount` | int32 | `3` | `AMBROSE_UPDATES_CLEAN_DEAD_REF_MAX_COUNT` | At each updater run | Delete missing applied-file rows when their count is at most this value; `0` keeps them and `-1` allows any count, while exceeding a positive limit errors without deleting |
+| `Updates.AllowPending` | bool | `0` | `AMBROSE_UPDATES_ALLOW_PENDING` | At each updater run | In development only, include `pending_db_<name>` files named `rev_<unix-timestamp>_<slug>.sql` and record them as `PENDING` |
 | `Log.Async.Enable` | bool | `0` | `AMBROSE_LOG_ASYNC_ENABLE` | Write log lines on a dedicated thread |
 | `Log.Utc` | bool | `0` | `AMBROSE_LOG_UTC` | Timestamps and file names in UTC |
 | `Console.Colors` | uint8 | `1` | `AMBROSE_CONSOLE_COLORS` | 0 never, 1 when stdout is a terminal, 2 always |
