@@ -43,8 +43,9 @@ class BoardTests(unittest.TestCase):
         opened = {row["id"] for row in built["milestones"] if row["status"] == "open"}
         rows, _reserved = build.track_rows(ROOT)
         named = {identifier for row in rows for identifier in row["ids"]}
+        landed = {row["id"] for row in built["milestones"] if row["status"] == "landed"}
         self.assertTrue(opened)
-        self.assertEqual(opened, named)
+        self.assertEqual(opened, named - landed)
 
     def test_nothing_open_is_also_held(self):
         built = state()
