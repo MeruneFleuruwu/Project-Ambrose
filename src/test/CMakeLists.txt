@@ -41,6 +41,7 @@ target_link_libraries(unit_tests
         globals
         scripts
         world
+        chat
         nlohmann_json::nlohmann_json
         GTest::gmock)
 

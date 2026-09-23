@@ -15,5 +15,6 @@ target_link_libraries(scripts
     PUBLIC
         ambrose-compile-options
         scripting
+        chat
         world
         globals)

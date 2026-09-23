@@ -9,7 +9,9 @@
 #include "CharacterNameExtractor.h"
 #include "CharacterNameMgr.h"
 #include "CharacterNameScript.h"
+#include "AccountMgr.h"
 #include "ClientSetup.h"
+#include "CommandMgr.h"
 #include "ConfigMgr.h"
 #include "DatabaseEnv.h"
 #include "DatabaseLoader.h"
@@ -31,6 +33,7 @@
 #include <filesystem>
 #include <iostream>
 #include <memory>
+#include <map>
 #include <optional>
 #include <string>
 #include <vector>
@@ -159,6 +162,7 @@ namespace
             AppenderDB::Enable(Logger(), Config().GetOption<uint32>("RealmID", 1, true));
             sScriptMgr.LoadScripts(&AddScripts);
             sScriptMgr.OnConfigLoad(false);
+            LoadCommands();
             sScriptMgr.OnStartup();
             return true;
         }
@@ -208,9 +212,51 @@ namespace
             return true;
         }
 
+        void LoadCommands()
+        {
+            sCommandMgr.SetPrefix(Config().GetOption<std::string>("GM.CommandPrefix", std::string(CommandMgr::DefaultPrefix), true));
+            sCommandMgr.SetLogging(Config().GetOption<bool>("GM.LogCommands", true, true));
+            sCommandMgr.Load(sScriptMgr.GetCommands());
+            std::map<std::string, uint8, std::less<>> overrides;
+            if (WorldDatabase.IsOpen())
+            {
+                if (QueryResult rows = WorldDatabase.Query("SELECT command, security_level FROM command_security"))
+                {
+                    do
+                    {
+                        Field const* row = rows->Fetch();
+                        overrides.emplace(row[0].Get<std::string>(), row[1].Get<uint8>());
+                    } while (rows->NextRow());
+                }
+            }
+            if (!overrides.empty())
+                LOG_INFO("server.commands", "{} command(s) have a level from command_security", overrides.size());
+            sCommandMgr.SetOverrides(std::move(overrides));
+            RegisterCommandConsole();
+            LOG_INFO("server.commands", "{} command(s) are ready, typed after {}", sCommandMgr.GetCommandCount(), sCommandMgr.GetPrefix());
+        }
+
+        void RegisterCommandConsole()
+        {
+            for (std::string const& line : sCommandMgr.Describe(SEC_CONSOLE, true))
+            {
+                std::string const name = line.substr(0, line.find(" - "));
+                Commands().Register({ name, "", line.find(" - ") == std::string::npos ? std::string() : line.substr(line.find(" - ") + 3), false,
+                    [name](std::vector<std::string> const& arguments, ConsoleCommandTable::Reply const& reply)
+                    {
+                        std::string line = name;
+                        for (std::string const& argument : arguments)
+                            line += " " + argument;
+                        ConsoleCaller caller([&reply](std::string_view text) { reply(text); });
+                        return sCommandMgr.Execute(caller, line) != CommandResult::Empty;
+                    } });
+            }
+        }
+
         void OnStop() override
         {
             sWorld.Clear();
+            sCommandMgr.Clear();
             sScriptMgr.OnShutdown();
             sScriptMgr.Unload();
             AppenderDB::Disable(Logger());

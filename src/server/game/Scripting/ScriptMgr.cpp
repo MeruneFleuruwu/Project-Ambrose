@@ -7,9 +7,15 @@
 #include "Log.h"
 
 #include <exception>
+#include <iterator>
 #include <utility>
 
 WorldScript::WorldScript(std::string name) : ScriptObject(std::move(name))
+{
+    sScriptMgr.Register(this);
+}
+
+CommandScript::CommandScript(std::string name) : ScriptObject(std::move(name))
 {
     sScriptMgr.Register(this);
 }
@@ -30,6 +36,27 @@ void ScriptMgr::Register(WorldScript* script)
     _worldScripts.push_back(script);
 }
 
+void ScriptMgr::Register(CommandScript* script)
+{
+    _commandScripts.push_back(script);
+}
+
+std::vector<ChatCommand> ScriptMgr::CollectCommands() const
+{
+    std::vector<ChatCommand> commands;
+    for (CommandScript const* script : _commandScripts)
+    {
+        std::vector<ChatCommand> offered = script->GetCommands();
+        commands.insert(commands.end(), std::make_move_iterator(offered.begin()), std::make_move_iterator(offered.end()));
+    }
+    return commands;
+}
+
+std::vector<ChatCommand> ScriptMgr::GetCommands() const
+{
+    return CollectCommands();
+}
+
 void ScriptMgr::LoadScripts(ScriptLoader loader)
 {
     if (_loaded)
@@ -45,19 +72,24 @@ void ScriptMgr::Unload()
     for (WorldScript* script : _worldScripts)
         delete script;
     _worldScripts.clear();
+    for (CommandScript* script : _commandScripts)
+        delete script;
+    _commandScripts.clear();
     _loaded = false;
 }
 
 std::size_t ScriptMgr::GetScriptCount() const
 {
-    return _worldScripts.size();
+    return _worldScripts.size() + _commandScripts.size();
 }
 
 std::vector<std::string> ScriptMgr::GetScriptNames() const
 {
     std::vector<std::string> names;
-    names.reserve(_worldScripts.size());
+    names.reserve(GetScriptCount());
     for (WorldScript const* script : _worldScripts)
+        names.push_back(script->GetName());
+    for (CommandScript const* script : _commandScripts)
         names.push_back(script->GetName());
     return names;
 }

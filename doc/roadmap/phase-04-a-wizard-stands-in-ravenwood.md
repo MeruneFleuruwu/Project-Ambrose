@@ -56,9 +56,9 @@ The roadmap critic flagged these. Resolve each one before or while implementing 
 
 **Acceptance**
 
-- [ ] PLAYER level running a GAMEMASTER command gets 'no such command'
-- [ ] '.character gold 500' parses into (character, gold, [500])
-- [ ] Console `server info` works
+- [x] PLAYER level running a GAMEMASTER command gets 'no such command'. `CommandMgrTest.AnAccountBelowACommandsLevelIsToldThereIsNoSuchCommand` shows nothing runs, and `ARefusalReadsExactlyLikeACommandThatDoesNotExist` shows the words are the same as for a command that is not there, so the table gives nothing away
+- [x] '.character gold 500' parses into (character, gold, [500]). `CommandMgrTest.ACommandIsTheDeepestNameThatMatchesAndTheRestAreArguments` reads the name as `character gold` with `500` left over, and `TheClientsPrefixIsTakenOffBeforeTheWordsAreRead` shows the same line works with and without the prefix
+- [x] Console `server info` works. Run against a real game server on the maintainer's machine: `6 command(s) are ready, typed after .`, then `Project Ambrose de63e83 on land-panel2` and `The world has ticked 0 time(s) and holds 0 session(s)`. `CommandMgrTest.TheCommandsTheScriptsShipAreFoundByTheNamesAnOperatorTypes` holds it in the suite
 
 ### Detailed spec from WIZ-5: Account security levels and GM command framework
 
@@ -85,10 +85,10 @@ An account's security level decides which chat-prefixed GM commands it may run, 
 
 **Acceptance**
 
-- [ ] Unit test: a PLAYER-level account running a GAMEMASTER command gets 'no such command' and nothing executes
-- [ ] Unit test: the command table parses '.character gold 500' into (character, gold, [500])
-- [ ] Unit test: a command_security row raising a command to ADMINISTRATOR refuses a GAMEMASTER account
-- [ ] Real client, GM account: typing '.help' shows the command list in the chat window, and nearby players see no bubble. The same text from a player account shows up as normal chat or is refused, depending on config.
+- [x] Unit test: a PLAYER-level account running a GAMEMASTER command gets 'no such command' and nothing executes. `CommandMgrTest.AnAccountBelowACommandsLevelIsToldThereIsNoSuchCommand`
+- [x] Unit test: the command table parses '.character gold 500' into (character, gold, [500]). `CommandMgrTest.ACommandIsTheDeepestNameThatMatchesAndTheRestAreArguments`
+- [x] Unit test: a command_security row raising a command to ADMINISTRATOR refuses a GAMEMASTER account. `CommandMgrTest.ACommandSecurityRowOverridesTheLevelTheScriptGave`, and `AChildIsNeverEasierToReachThanItsGroup` shows raising a group carries its commands with it
+- [ ] Real client, GM account: typing '.help' shows the command list in the chat window, and nearby players see no bubble. The same text from a player account shows up as normal chat or is refused, depending on config. This one waits on more than the maintainer's machine: nothing carries a typed line from the client to CommandMgr until the game server has its message handlers in 4.05, so the table, the levels and the parsing are built and tested while the path a client's words take to them is not.
 
 **Risks**
 
