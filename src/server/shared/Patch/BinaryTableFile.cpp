@@ -73,7 +73,7 @@ BinaryTableFile BinaryTableFile::Read(std::span<uint8 const> bytes)
         uint8 const service = input.Read<uint8>();
         uint8 const order = input.Read<uint8>();
         uint16 const dictLength = input.Read<uint16>();
-        if (service != DictService || order != DictOrder || dictLength < 4 || dictLength - 4 > input.GetRemaining())
+        if (service != DictService || order != DictOrder || dictLength < 4 || static_cast<std::size_t>(dictLength - 4) > input.GetRemaining())
             throw std::invalid_argument("FileBinary dictionary header is invalid");
         std::vector<uint8> dictBytes;
         dictBytes.reserve(dictLength);
@@ -114,7 +114,7 @@ BinaryTableFile BinaryTableFile::Read(std::span<uint8 const> bytes)
             uint8 const recordService = input.Read<uint8>();
             uint8 const recordOrder = input.Read<uint8>();
             uint16 const recordLength = input.Read<uint16>();
-            if (recordService != DictService || recordOrder != RecordOrder || recordLength < 4 || recordLength - 4 > input.GetRemaining())
+            if (recordService != DictService || recordOrder != RecordOrder || recordLength < 4 || static_cast<std::size_t>(recordLength - 4) > input.GetRemaining())
                 throw std::invalid_argument("FileBinary record header is invalid");
             std::span<uint8 const> const recordBody = input.ReadBytes(recordLength - 4);
             ByteBuffer record(recordBody);
