@@ -37,9 +37,20 @@ void RealmLoader::Configure(RealmLoaderSettings settings)
 
 void RealmLoader::LoadNow()
 {
-    std::unique_ptr<PreparedStatement<LoginDatabaseConnection>> statement = LoginDatabase.GetPreparedStatement(LOGIN_SEL_REALMLIST);
-    PreparedQueryResult result = LoginDatabase.Query(*statement);
     _since = std::chrono::milliseconds::zero();
+    std::unique_ptr<PreparedStatement<LoginDatabaseConnection>> statement = LoginDatabase.IsOpen() ? LoginDatabase.GetPreparedStatement(LOGIN_SEL_REALMLIST) : nullptr;
+    if (!statement)
+    {
+        if (_loads == 0)
+        {
+            sRealmList.Replace({});
+            LOG_WARN("server.loginserver", "there is no login database to read the realm list from, so no player can be sent to a gameserver");
+            ++_loads;
+        }
+        return;
+    }
+
+    PreparedQueryResult result = LoginDatabase.Query(*statement);
 
     if (!result)
     {
