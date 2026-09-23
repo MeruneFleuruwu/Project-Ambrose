@@ -86,6 +86,15 @@ export const AppEntry = v.looseObject({
 
 export const AppList = v.array(AppEntry);
 
+export const CommandAnswer = v.looseObject({
+    command: v.string(),
+    success: v.boolean(),
+    refused: v.boolean(),
+    reason: v.string(),
+    request_id: v.string(),
+    lines: v.array(v.string()),
+});
+
 export const Problem = v.looseObject({
     code: v.string(),
     message: v.string(),
