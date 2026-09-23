@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Encodes and decodes property objects in the compact ObjectProperty format the client uses inside messages, a class hash per object then the properties the mask selects in id order with no headers, and in the versionable format its data files use, where every object and property carries its size in bits and every property its hash, so unknown or unselected ones are skipped and reported and a clean dirty-encoded property is left out; bits pack least significant first, lengths are fixed-width or compact, every decode is bounded by depth, object, list, memory and inflation limits read from live settings, the root is optionally held to a set of classes or to the rules of the message field it came from, and every failure names the property path it happened at.
+ * Encodes and decodes property objects in the compact ObjectProperty format the client uses inside messages, a class hash per object then the properties the mask selects in id order with no headers, and in the versionable format its data files use, where every object and property carries its size in bits and every property its hash, so unknown or unselected ones are skipped and reported and a clean dirty-encoded property is left out; bits pack least significant first, lengths are fixed-width or compact, every decode is bounded by depth, object, list, memory and inflation limits read from live settings, the root is optionally held to a set of classes or to the rules of the message field it came from, and every failure names the property path it happened at. Every field of the option and issue structures carries a default, so naming only the fields a caller cares about is the intended way to build one rather than an omission GCC refuses.
  */
 
 #ifndef AMBROSE_OBJECTSERIALIZER_H
@@ -97,12 +97,12 @@ struct SerializerOptions
 
     uint32 Mask = TransmitMask;
     SerializerFlag Flags = SerializerFlag::None;
-    std::optional<SerializerLimits> Limits;
+    std::optional<SerializerLimits> Limits = {};
     bool Versionable = false;
     bool AllowTrailingBytes = false;
     bool AllowNullRoot = true;
-    std::vector<ClassInfo const*> RootClasses;
-    std::function<bool(PropertyObject const& object, PropertyInfo const& property)> IsDirty;
+    std::vector<ClassInfo const*> RootClasses = {};
+    std::function<bool(PropertyObject const& object, PropertyInfo const& property)> IsDirty = {};
 };
 
 struct DecodeIssue
@@ -110,8 +110,8 @@ struct DecodeIssue
     DecodeIssueKind Kind = DecodeIssueKind::UnknownClass;
     uint32 Hash = 0;
     uint64 Bits = 0;
-    std::string Path;
-    std::string Detail;
+    std::string Path = {};
+    std::string Detail = {};
 };
 
 struct DecodeResult
