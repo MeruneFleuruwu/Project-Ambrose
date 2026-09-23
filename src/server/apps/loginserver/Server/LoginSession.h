@@ -42,6 +42,7 @@ public:
     void HandleWebValidate(LoginMessages::WebValidate& message);
     void HandleLoginNotAfk(LoginMessages::LoginNotAfk& message);
     void HandleRequestCharacterList(LoginMessages::RequestCharacterList& message);
+    void HandleRequestServerList(LoginMessages::RequestServerList& message);
 
 protected:
     void OnAccepted() override;

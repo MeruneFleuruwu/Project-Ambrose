@@ -3,6 +3,9 @@
  * Game server entry point: runs setup in Setup.Mode for the install and type dump, stopping cleanly when a stop arrives meanwhile, loads the type dump and the locale text of the install's Root.wad in Locale.Default, brings the login, characters and world databases current and opens them, which the admin API reports, lists the updates of and applies data-only updates to while the server runs, reloading the character name tables after the world database takes one, loads the character name tables when the world database is open and, when they are empty, extracts them from the install and reloads them, automatically in auto mode, after a yes in ask mode and never in off mode, loads the scripts and tells them the server has started, then runs the world update tick whose interval follows World.UpdateInterval live and carries every script's OnUpdate, and tells them it is shutting down before the databases close.
  */
 
+#include "TypeDumpCache.h"
+#include "RealmHeartbeat.h"
+#include "RealmList.h"
 #include "AdminDatabaseView.h"
 #include "AdminServer.h"
 #include "AppenderDB.h"
@@ -103,8 +106,9 @@ namespace
                 LOG_WARN("server.gameserver", "No type dump is in use, so ObjectProperty data cannot be read or written: {}", setup.TypeDumpError);
             else
             {
-                std::filesystem::path binary = *setup.TypeDump;
-                binary.replace_extension(".bin");
+                std::filesystem::path const binary = TypeDumpCache::FastCopyOf(*setup.TypeDump);
+                if (std::string fastCopyError; !TypeDumpCache::EnsureFastCopy(*setup.TypeDump, fastCopyError))
+                    LOG_WARN("server.worldserver", "The type dump's fast copy could not be built, so it is read from JSON this time: {}", fastCopyError);
                 bool loaded = false;
                 if (std::filesystem::exists(binary))
                     loaded = sTypeRegistry.LoadBinary(binary, *setup.TypeDump, setup.Install ? setup.Install->Revision : std::string_view{});
@@ -174,6 +178,17 @@ namespace
             sScriptMgr.OnConfigLoad(false);
             LoadCommands();
             sScriptMgr.OnStartup();
+            _heartbeat.Configure(RealmHeartbeatSettings::Load(Config()),
+                [](std::string const& realm, uint32 population, int64 heartbeat, bool online)
+                {
+                    std::unique_ptr<PreparedStatement<LoginDatabaseConnection>> beat = LoginDatabase.GetPreparedStatement(LOGIN_UPD_REALM_HEARTBEAT);
+                    beat->SetData(0, population);
+                    beat->SetData(1, static_cast<uint64>(heartbeat));
+                    beat->SetData(2, online ? uint32{ 0 } : uint32{ REALM_FLAG_OFFLINE });
+                    beat->SetData(3, realm);
+                    LoginDatabase.DirectExecute(*beat);
+                },
+                [] { return static_cast<uint32>(sWorld.GetSessionCount()); });
             return true;
         }
 
@@ -265,6 +280,7 @@ namespace
 
         void OnStop() override
         {
+            _heartbeat.Stop();
             sWorld.Clear();
             sCommandMgr.Clear();
             sScriptMgr.OnShutdown();
@@ -285,10 +301,12 @@ namespace
         void OnUpdate(std::chrono::milliseconds diff) override
         {
             sWorld.Update(diff);
+            _heartbeat.Update(diff);
         }
 
     private:
         mutable std::atomic<uint32> _reportedInterval{ 0 };
+        RealmHeartbeat _heartbeat;
         DatabaseLoader _databases;
         AdminDatabaseView _databaseView;
     };

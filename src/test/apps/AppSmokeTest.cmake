@@ -1,5 +1,5 @@
 # Project Ambrose by Imjustchico
-# Runs a built server executable to check --version, a missing config, and --check with a copy of its shipped .conf.dist in the work folder, so no saved choice in the build folder's conf.d applies, where neither that run nor a run in Setup.Mode ask with ClientDir and TypeDumpPath empty and unlocked, an empty input file and a machine holding a synthetic install may print any text of a setup question to either output, the game and login servers must log that install as found with the advice for a run without a terminal, and no choice is saved; with AMBROSE_TEST_DB the game server and the login server, with its login and characters databases, create, update, open and close uniquely named databases that are dropped afterwards, the login server runs account commands piped into its console input, a bad login database string exits 1, and the supervisor's --check names every app it would run and starts none of them, with its admin API on a port of its own choosing and its token in the work folder.
+# Runs a built server executable to check --version, a missing config, and --check with a copy of its shipped .conf.dist in the work folder, so no saved choice in the build folder's conf.d applies, where neither that run nor a run in Setup.Mode ask with ClientDir and TypeDumpPath empty and unlocked, an empty input file and a machine holding a synthetic install may print any text of a setup question to either output, the game and login servers must log that install as found with the advice for a run without a terminal, and no choice is saved; with AMBROSE_TEST_DB the game server and the login server, with its login and characters databases, create, update, open and close uniquely named databases that are dropped afterwards, the login server runs account commands piped into its console input, a bad login database string exits 1, the game server beats for the realm it was named as and leaves it offline when it stops, and the supervisor's --check names every app it would run and starts none of them, with its admin API on a port of its own choosing and its token in the work folder.
 if(NOT APP OR NOT NAME OR NOT WORKDIR)
     message(FATAL_ERROR "APP, NAME and WORKDIR must be set")
 endif()
@@ -112,6 +112,19 @@ if(NAME STREQUAL "loginserver" AND DEFINED ENV{AMBROSE_TEST_DB} AND NOT "$ENV{AM
     endif()
 endif()
 
+function(ambrose_realm_step databaseInfo realmName testName what)
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env "AMBROSE_TEST_DB=${databaseInfo}" "AMBROSE_REALM_NAME=${realmName}" "AMBROSE_REALM_MAX_AGE=180"
+            "${UNIT_TESTS}" --gtest_also_run_disabled_tests "--gtest_filter=RealmHeartbeatIntegration.${testName}"
+        RESULT_VARIABLE stepResult OUTPUT_VARIABLE stepOutput ERROR_VARIABLE stepError TIMEOUT 120)
+    if(NOT stepResult EQUAL 0)
+        ambrose_test_fail("the realm heartbeat check failed ${what} (${stepResult}): ${stepOutput}${stepError}")
+    endif()
+    if(NOT stepOutput MATCHES "PASSED[^
+]*1 test")
+        ambrose_test_fail("the realm heartbeat check did not run ${what}: ${stepOutput}${stepError}")
+    endif()
+endfunction()
+
 if(NAME STREQUAL "gameserver" AND DEFINED ENV{AMBROSE_TEST_DB} AND NOT "$ENV{AMBROSE_TEST_DB}" STREQUAL "")
     set(realmOptions)
     foreach(database IN ITEMS Login Character World)
@@ -124,6 +137,24 @@ if(NAME STREQUAL "gameserver" AND DEFINED ENV{AMBROSE_TEST_DB} AND NOT "$ENV{AMB
         WORKING_DIRECTORY "${WORKDIR}" RESULT_VARIABLE realmResult OUTPUT_VARIABLE realmOutput ERROR_VARIABLE realmError TIMEOUT 120)
     if(NOT realmResult EQUAL 0)
         ambrose_test_fail("gameserver --check on empty databases exited ${realmResult}: ${realmOutput}${realmError}")
+    endif()
+
+    if(UNIT_TESTS AND EXISTS "${UNIT_TESTS}")
+        list(GET realmOptions 0 loginOption)
+        string(REPLACE "--set=LoginDatabaseInfo=" "" loginInfo "${loginOption}")
+        string(REPLACE "\;" ";" loginInfo "${loginInfo}")
+        set(realmName "AmbroseSmoke")
+        ambrose_realm_step("${loginInfo}" "${realmName}" DISABLED_AddTheRealmTheServerWillBeatFor "putting the realm in before the server ran")
+        execute_process(COMMAND "${APP}" --check --config "${appDir}/${NAME}.conf.dist" ${quietOptions} ${realmOptions} --set Appender.DB=4,2,0
+                "--set=Realm.Name=${realmName}"
+            WORKING_DIRECTORY "${WORKDIR}" RESULT_VARIABLE beatResult OUTPUT_VARIABLE beatOutput ERROR_VARIABLE beatError TIMEOUT 120)
+        if(NOT beatResult EQUAL 0)
+            ambrose_test_fail("gameserver --check as realm ${realmName} exited ${beatResult}: ${beatOutput}${beatError}")
+        endif()
+        if(NOT beatOutput MATCHES "Realm ${realmName} says it is alive")
+            ambrose_test_fail("gameserver as realm ${realmName} did not say it beats: ${beatOutput}${beatError}")
+        endif()
+        ambrose_realm_step("${loginInfo}" "${realmName}" DISABLED_TheRealmBeatWhileItRanAndIsOfflineNow "reading the realm back after the server stopped")
     endif()
     foreach(expected IN ITEMS "Created database ambrose_smoke_login_" "Created database ambrose_smoke_character_" "Created database ambrose_smoke_world_"
             "The login database is up to date|Applied [0-9]+ update\\(s\\) to the login database"

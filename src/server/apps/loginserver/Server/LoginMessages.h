@@ -163,6 +163,22 @@ namespace LoginMessages
         static constexpr auto Fields() { return std::tuple<>{}; }
     };
 
+    struct RequestServerList
+    {
+        static constexpr uint8 ServiceId = LoginService;
+        static constexpr std::string_view Tag = "MSG_REQUESTSERVERLIST";
+
+        static constexpr auto Fields() { return std::tuple<>{}; }
+    };
+
+    struct ServerList
+    {
+        static constexpr uint8 ServiceId = LoginService;
+        static constexpr std::string_view Tag = "MSG_SERVERLIST";
+
+        static constexpr auto Fields() { return std::tuple<>{}; }
+    };
+
     struct StartCharacterList
     {
         static constexpr uint8 ServiceId = LoginService;
