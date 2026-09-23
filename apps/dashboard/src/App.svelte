@@ -17,7 +17,7 @@
     import LogOutIcon from "@lucide/svelte/icons/log-out";
     import RotateCcwIcon from "@lucide/svelte/icons/rotate-ccw";
     import SearchIcon from "@lucide/svelte/icons/search";
-    import { onMount } from "svelte";
+    import { onMount, untrack } from "svelte";
     import { toast } from "svelte-sonner";
     import CommandPalette from "./components/CommandPalette.svelte";
     import StatusBadge from "./components/StatusBadge.svelte";
@@ -49,7 +49,7 @@
 
     $effect(() => {
         if (session.state !== "signed-in") return;
-        watch();
+        untrack(() => watch());
         return () => stop();
     });
 

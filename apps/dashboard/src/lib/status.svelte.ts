@@ -99,6 +99,13 @@ function schedule(delay: number) {
     timer = setTimeout(() => void poll(), delay);
 }
 
+function describe(failure: unknown): ApiError {
+    if (failure instanceof DOMException && failure.name === "AbortError")
+        return new ApiError(0, "timed_out", `The server did not answer within ${(3 * IntervalMs) / 1000} seconds`, "");
+    const said = failure instanceof Error ? `${failure.name}: ${failure.message}` : String(failure);
+    return new ApiError(0, "poll_failed", `Reading the server's state failed with ${said}`, "");
+}
+
 async function poll() {
     if (!watching || inFlight) return;
     const controller = new AbortController();
@@ -123,8 +130,7 @@ async function poll() {
         schedule(IntervalMs);
     } catch (failure) {
         if (!watching) return;
-        const error =
-            failure instanceof ApiError ? failure : new ApiError(0, "timed_out", "The server did not answer within three seconds", "");
+        const error = failure instanceof ApiError ? failure : describe(failure);
         live.error = error;
         if (error.status === 401) {
             live.connection = "disconnected";
