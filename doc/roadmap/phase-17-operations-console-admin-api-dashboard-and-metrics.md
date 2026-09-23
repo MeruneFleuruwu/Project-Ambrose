@@ -253,12 +253,12 @@ The roadmap critic flagged these. Resolve each one before or while implementing 
 
 **Acceptance**
 
-- [ ] Creating an account through the API succeeds and appears in the audit log
-- [ ] `shutdown` without the confirmation flag is refused
-- [ ] A failing command returns its error text with `success: false`
-- [ ] A command above the passed security level answers as an unknown command, runs nothing, and writes a refused audit row
-- [ ] `account create test secret` leaves no `secret` in the audit file, the audit table or the response
-- [ ] A payload over 4096 bytes and a body with an unknown key are both refused with 422 and run nothing
+- [x] Creating an account through the API succeeds and appears in the audit log. `AdminCommandRouteTest.ARunIsAnsweredAndWrittenDownAndASecretIsInNeither` runs `account create` through the route and finds it in the record with the caller, the address and the app
+- [x] `shutdown` without the confirmation flag is refused. `AdminCommandTest.SomethingThatCannotBeUndoneWaitsForAConfirmation`, which also checks it runs once confirmed and that nothing was said while it was refused
+- [x] A failing command returns its error text with `success: false`. `AdminCommandTest.AFailingCommandSaysSoAndAnUnknownOneIsNotPretendedTo` keeps what the command said even though it failed
+- [x] A command above the passed security level answers as an unknown command, runs nothing, and writes a refused audit row. `AdminCommandTest.BelowTheConsoleLevelThereIsNoSuchCommand` for the wording and `AdminCommandRouteTest.ARefusalIsAnsweredAndRecordedWithItsReason` for the row
+- [x] `account create test secret` leaves no `secret` in the audit file or the response. The route test asserts the secret is in neither, and the line is kept as `account create (arguments hidden)`. There is no audit table yet, so that half waits for db_login to have one
+- [x] A payload over 4096 bytes and a body with an unknown key are both refused with 422 and run nothing. `AdminCommandRouteTest.ABodyTooLongOrCarryingAnUnknownKeyRunsNothing`, which also asserts no record file was written at all
 
 ## 17.06 Dashboard app and overview page
 
