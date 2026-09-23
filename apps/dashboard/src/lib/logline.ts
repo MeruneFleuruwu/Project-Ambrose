@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Reads one captured line into the parts doc/DESIGN.md colours: the time, the level word, the category and the message, and inside the message the runs that carry a value rather than a word, which are quoted text, a number with a unit, an address with or without a port, a path, a connection string, a version, a digest and a dotted or underscored identifier. Ordinary words are left alone, a bare count with no unit is never a value, and no line marks more than eight runs, both rules straight from the design, because a line holding twenty numbers is a rainbow.
+ * Reads one captured line into the parts doc/DESIGN.md colours: the time, the level word, the category and the message, and inside the message the runs that carry a value rather than a word, which are quoted text, a number with a unit, a URL, an address with or without a port, a path, a connection string, a version, a digest and a dotted or underscored identifier. Ordinary words are left alone, a bare count with no unit is never a value, and no line marks more than eight runs, both rules straight from the design, because a line holding twenty numbers is a rainbow.
  */
 
 export type ValueKind = "number" | "text" | "name" | "plain";
@@ -21,6 +21,7 @@ const UNITS = "ms|us|ns|s|min|h|d|MiB|GiB|KiB|TiB|MB|GB|KB|B|%";
 
 const RUNS: { kind: ValueKind; pattern: RegExp }[] = [
     { kind: "text", pattern: /"[^"]*"/y },
+    { kind: "name", pattern: /[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s,;]+/y },
     { kind: "name", pattern: /[A-Za-z0-9_.+-]+@[^\s,;]+/y },
     { kind: "name", pattern: /(?:[A-Za-z]:[\\/]|\/)[^\s,;]+/y },
     { kind: "name", pattern: /\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?/y },

@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Tests what a log line is read into, against lines the servers actually wrote: the time, level, category and message come apart, an address with a port, a connection string, a path, a version, a digest, a quoted string and a number with a unit are each marked as values, ordinary words and bare counts are left plain, no line marks more than eight runs, and a line that is not a record is not pretended to be one.
+ * Tests what a log line is read into, against lines the servers actually wrote: the time, level, category and message come apart, an address with a port, a connection string, a URL, a path, a version, a digest, a quoted string and a number with a unit are each marked as values, ordinary words and bare counts are left plain, no line marks more than eight runs, and a line that is not a record is not pretended to be one.
  */
 
 import { describe, expect, it } from "vitest";
@@ -31,6 +31,11 @@ describe("reading a log line", () => {
         expect(readLine("Started loginserver as process 10992")).toBeNull();
         expect(readLine("loginserver is ready: it printed its ready line")).toBeNull();
         expect(readLine("")).toBeNull();
+    });
+
+    it("marks a URL whole rather than splitting it at the slashes", () => {
+        expect(kindsOf("The admin API is listening on http://127.0.0.1:12012").name).toContain("http://127.0.0.1:12012");
+        expect(kindsOf("fetched https://example.test/a/b?c=1 today").name).toContain("https://example.test/a/b?c=1");
     });
 
     it("marks an address with its port", () => {
