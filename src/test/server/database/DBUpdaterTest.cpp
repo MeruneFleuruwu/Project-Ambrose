@@ -313,13 +313,14 @@ TEST(DBUpdaterTest, AnUpdateThatAddsAFolderHasItsFilesAppliedInTheSameRun)
     WriteFile(source.Updates() / "2026_01_01_00.sql",
         "INSERT INTO `updates_include` (`path`, `state`) VALUES ('$/data/sql/updates/pending_db_test', 'PENDING');\n"
         "CREATE TABLE `sequence` (`id` INT AUTO_INCREMENT PRIMARY KEY, `step` INT NOT NULL);\n");
-    WriteFile(source.Root() / "data" / "sql" / "updates" / "pending_db_test" / "2026_02_01_00.sql", "INSERT INTO `sequence` (`step`) VALUES (7);\n");
+    WriteFile(source.Root() / "data" / "sql" / "updates" / "pending_db_test" / "rev_1767225600_sequence.sql", "INSERT INTO `sequence` (`step`) VALUES (7);\n");
 
     CapturedLog log;
     UpdaterSettings settings;
     settings.SourceDirectory = source.Root();
+    settings.AllowPending = true;
     ASSERT_TRUE(DBUpdater::Run(*info, "test", settings));
-    EXPECT_EQ(Count(*info, "SELECT COUNT(*) FROM `updates` WHERE `name` = '2026_02_01_00.sql' AND `state` = 'PENDING'"), 1u);
+    EXPECT_EQ(Count(*info, "SELECT COUNT(*) FROM `updates` WHERE `name` = 'rev_1767225600_sequence.sql' AND `state` = 'PENDING'"), 1u);
     EXPECT_EQ(Count(*info, "SELECT COUNT(*) FROM `sequence`"), 1u);
     EXPECT_TRUE(log.Contains("Applied 2 update(s) to the test database"));
     EXPECT_FALSE(log.Contains("The test database is up to date"));

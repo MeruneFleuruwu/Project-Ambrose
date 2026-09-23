@@ -397,7 +397,6 @@ UpdateSummary UpdateFetcher::Update(std::string_view databaseLabel, AdmitFunctio
 
 UpdateSummary UpdateFetcher::Pass(std::string_view databaseLabel, std::set<std::string, std::less<>>& warned, AdmitFunction const& admit)
 {
-    (void)warned;
     UpdateSummary summary;
     auto const fail = [&summary, databaseLabel](std::string failure, std::string file = {})
     {
@@ -442,7 +441,8 @@ UpdateSummary UpdateFetcher::Pass(std::string_view databaseLabel, std::set<std::
         if (auto const renamed = vanishedByHash.find(hash); renamed != vanishedByHash.end())
             deadNames.erase(renamed->second);
     for (std::string const& name : deadNames)
-        LOG_WARN("sql.updates", "{} was applied to the {} database but is no longer present on disk", name, databaseLabel);
+        if (warned.insert(name).second)
+            LOG_WARN("sql.updates", "{} was applied to the {} database but is no longer present on disk", name, databaseLabel);
     if (_settings.CleanDeadRefMaxCount > 0 && deadNames.size() > static_cast<std::size_t>(_settings.CleanDeadRefMaxCount))
         return fail(fmt::format("{} applied update references are missing from disk (limit {})", deadNames.size(), _settings.CleanDeadRefMaxCount));
     if (_settings.CleanDeadRefMaxCount != 0)
@@ -452,9 +452,6 @@ UpdateSummary UpdateFetcher::Pass(std::string_view databaseLabel, std::set<std::
 
     for (UpdateFile const& file : files)
     {
-        std::string contents;
-        if (!ReadFile(file.Path, contents, error))
-            return fail(std::move(error), file.Name);
         std::string const hash = fileHashes.at(file.Name);
         bool reapply = false;
         if (auto const found = applied.find(file.Name); found != applied.end())
@@ -492,6 +489,9 @@ UpdateSummary UpdateFetcher::Pass(std::string_view databaseLabel, std::set<std::
             continue;
         }
 
+        std::string contents;
+        if (!ReadFile(file.Path, contents, error))
+            return fail(std::move(error), file.Name);
         if (admit && !admit(file, contents))
         {
             summary.StoppedAt = file.Name;
