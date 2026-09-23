@@ -144,13 +144,15 @@ PanelUser PanelUsers::Read(PanelStore::Statement const& row)
     user.PasswordSetEpochMs = row.Int64(9);
     if (!row.IsNull(10))
         user.SignedInEpochMs = row.Int64(10);
+    if (!PanelPermissions::ParseRole(row.Text(11), user.Role))
+        user.Role = user.IsOwner ? PanelRole::Owner : PanelRole::Viewer;
     return user;
 }
 
 namespace
 {
     constexpr std::string_view UserColumns =
-        "id, username, COALESCE(display_name, ''), COALESCE(email, ''), generation, disabled, must_change, is_owner, created_epoch_ms, password_set_epoch_ms, signed_in_epoch_ms";
+        "id, username, COALESCE(display_name, ''), COALESCE(email, ''), generation, disabled, must_change, is_owner, created_epoch_ms, password_set_epoch_ms, signed_in_epoch_ms, role";
 }
 
 bool PanelUsers::IsEmpty(std::string& error)
@@ -216,7 +218,7 @@ PanelUserResult PanelUsers::Create(std::string_view username, std::string_view p
         return PanelUserResult::HashFailed;
 
     std::optional<PanelStore::Statement> insert = _store.Prepare(
-        "INSERT INTO panel_user (username, username_folded, password_hash, password_set_epoch_ms, must_change, is_owner, created_epoch_ms) VALUES (?, ?, ?, ?, ?, ?, ?)", error);
+        "INSERT INTO panel_user (username, username_folded, password_hash, password_set_epoch_ms, must_change, is_owner, created_epoch_ms, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", error);
     if (!insert)
         return PanelUserResult::StoreFailed;
     int64 const now = PanelStore::NowEpochMs();
@@ -227,6 +229,7 @@ PanelUserResult PanelUsers::Create(std::string_view username, std::string_view p
     insert->Bind(5, mustChange ? int64{ 1 } : int64{ 0 });
     insert->Bind(6, owner ? int64{ 1 } : int64{ 0 });
     insert->Bind(7, now);
+    insert->Bind(8, PanelPermissions::NameOf(owner ? PanelRole::Owner : PanelRole::Viewer));
     if (!insert->Run(error))
         return PanelUserResult::StoreFailed;
     if (id)

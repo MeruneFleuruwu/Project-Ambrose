@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Reads the Panel options into a listener of the same shape as an app's admin API, opens the store before the listener so nothing serves without somewhere to write, names the certificate and key in Panel option names when the bind rule refuses them, and starts, reloads and stops the listener beside the supervisor's own; a reload that would leave the bind unsafe or the certificate unservable is refused and the old listener keeps serving.
+ * Reads the Panel options into a listener of the same shape as an app's admin API, opens the store before the listener so nothing serves without somewhere to write, names the certificate and key in Panel option names when the bind rule refuses them, and starts, reloads and stops the listener beside the supervisor's own; a reload that would leave the bind unsafe or the certificate unservable is refused and the old listener keeps serving. Signing in also says which role the operator holds and every permission that role allows, so the pages a person cannot use are never drawn for them and the panel never has to ask again what somebody is allowed to do.
  */
 
 #include "Panel.h"
@@ -278,6 +278,7 @@ void Panel::RegisterSignIn()
     routes.AddPublic("POST", "/api/panel/reset", [this](AdminRequest const& request) { return Reset(request); });
     routes.Add("DELETE", "/api/panel/session", [this](AdminRequest const& request) { return SignOut(request); });
     routes.Add("GET", "/api/panel/me", [this](AdminRequest const& request) { return WhoAmI(request); });
+    routes.Add("GET", "/api/panel/permissions", [](AdminRequest const&) { return AdminResponse::Json(200, PanelPermissions::CatalogJson()); });
 }
 
 std::optional<PanelUser> Panel::UserOf(AdminRequest const& request)
@@ -301,6 +302,8 @@ namespace
         body["username"] = user.Username;
         body["display_name"] = user.DisplayName.empty() ? user.Username : user.DisplayName;
         body["owner"] = user.IsOwner;
+        body["role"] = PanelPermissions::NameOf(user.Role);
+        body["permissions"] = PanelPermissions::KeysOf(user.Role);
         body["must_change_password"] = user.MustChange;
         body["signed_in"] = user.SignedInEpochMs ? nlohmann::json(*user.SignedInEpochMs) : nlohmann::json(nullptr);
         return body;

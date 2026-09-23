@@ -8,6 +8,7 @@
 
 #include "AccountText.h"
 #include "PanelStore.h"
+#include "PanelPermissions.h"
 #include "Types.h"
 
 #include <optional>
@@ -43,6 +44,7 @@ struct PanelUser
     bool Disabled = false;
     bool MustChange = false;
     bool IsOwner = false;
+    PanelRole Role = PanelRole::Viewer;
     int64 CreatedEpochMs = 0;
     int64 PasswordSetEpochMs = 0;
     std::optional<int64> SignedInEpochMs;
