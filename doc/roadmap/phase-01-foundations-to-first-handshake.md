@@ -269,7 +269,7 @@ Bounds-checked little-endian primitives cover every DML field type in the client
 - [x] BitWriter write(0b101,3), write(0x7F,7), realign produces the expected bytes; BitReader reads the same values; s24 sign-extends -1 (delivered in 1.07)
 - [x] UTF-8 'Wizardé\U0001F600' -> UTF-16LE -> UTF-8 is identical; an unpaired surrogate is replaced or rejected (documented) (delivered in 1.08)
 - [x] Base64 matches RFC 4648 vectors (delivered in 1.08)
-- [ ] Optional integration test (skipped unless AMBROSE_CLIENT_DIR is set): decode the UTF-16 text of one Locale/*.lang entry from the user's Root.wad without error (moved to 1.13, which adds the archive reader)
+- [x] Optional integration test: `ClientDataTest.LocaleLangEntryDecodesAsUtf16` decodes one `Locale/*.lang` entry from the user's Root.wad without error (`client_tests.exe --gtest_filter=ClientDataTest.LocaleLangEntryDecodesAsUtf16`, Windows/MSVC, 2026-09-23)
 - [x] Real client: n/a
 
 **Risks**
