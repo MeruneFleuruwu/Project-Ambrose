@@ -168,7 +168,7 @@ private:
 #define AMBROSE_LOG(log, level, filter, ...) \
     do \
     { \
-        static constinit LogSite const ambroseLogSite_{ (filter) }; \
+        static constinit LogSite const ambroseLogSite_((filter), AMBROSE_LOG_SOURCE); \
         if ((log).ShouldLog(ambroseLogSite_, (level))) \
             (log).Write(ambroseLogSite_, (level), __VA_ARGS__); \
     } while (false)

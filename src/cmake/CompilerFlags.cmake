@@ -4,6 +4,8 @@ add_library(ambrose-compile-options INTERFACE)
 
 target_compile_features(ambrose-compile-options INTERFACE cxx_std_20)
 
+target_compile_definitions(ambrose-compile-options INTERFACE AMBROSE_SOURCE_ROOT="${CMAKE_SOURCE_DIR}/")
+
 if(MSVC)
     target_compile_options(ambrose-compile-options INTERFACE
         /W4
@@ -24,7 +26,8 @@ else()
     target_compile_options(ambrose-compile-options INTERFACE
         -Wall
         -Wextra
-        -Wpedantic)
+        -Wpedantic
+        "-fmacro-prefix-map=${CMAKE_SOURCE_DIR}/=")
     if(AMBROSE_WARNINGS_AS_ERRORS)
         target_compile_options(ambrose-compile-options INTERFACE -Werror)
     endif()

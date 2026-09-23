@@ -369,6 +369,8 @@ AdminServer::AdminServer(Log& log, std::string appName, std::filesystem::path da
     });
     _router.Add("DELETE", "/api/session", [this](AdminRequest const& request)
     {
+        if (_sessionSource != nullptr)
+            return AdminResponse::Problem(404, "no_token_sign_in", "This listener signs in with its own accounts rather than with an admin token");
         if (!request.SessionCsrf)
             return AdminResponse::Problem(400, "no_session", "Only a browser session signs out; a bearer token has no session to end");
         if (std::optional<std::string> const secret = _router.SessionSecret(request))
@@ -383,6 +385,8 @@ AdminServer::AdminServer(Log& log, std::string appName, std::filesystem::path da
 
 AdminResponse AdminServer::SignIn(AdminRequest const& request)
 {
+    if (_sessionSource != nullptr)
+        return AdminResponse::Problem(404, "no_token_sign_in", "This listener signs in with its own accounts rather than with an admin token");
     if (!Ambrose::EqualsIgnoreCase(request.Origin, _router.ExpectedOrigin(request)))
         return AdminRouter::Refused(AdminAuthResult::Forbidden);
 
