@@ -41,7 +41,7 @@ class AnnouncerTests(unittest.TestCase):
         call = announce.post.calls[0]
         self.assertEqual(call["method"], "PATCH")
         self.assertIn("/messages/1552", call["url"])
-        self.assertEqual(call["payload"]["attachments"], [{"id": 0, "filename": announce.ATTACHMENT}])
+        self.assertEqual(call["payload"]["attachments"], [{"id": "0", "filename": announce.ATTACHMENT}])
 
     def test_editing_without_a_card_declares_no_attachments(self):
         announce.post = FakePost()

@@ -147,7 +147,7 @@ def send(url, payload, attachment, message_id):
     if message_id:
         edited = dict(payload)
         if attachment is not None:
-            edited["attachments"] = [{"id": 0, "filename": ATTACHMENT}]
+            edited["attachments"] = [{"id": "0", "filename": ATTACHMENT}]
         try:
             body, status = post(f"{url}/messages/{message_id}?wait=true", edited, attachment, method="PATCH")
             return message_id, status, "edited", carried(body)
@@ -198,8 +198,9 @@ def main(argv=None):
     if message_id:
         remember(args.state, message_id)
     print(f"{what} message {message_id}, Discord answered {status}, the message now carries {carried} attachment(s)")
-    if carried > 1:
-        print("the message carries more than one card, which means an edit did not replace the one before it", file=sys.stderr)
+    if attachment is not None and carried != 1:
+        print(f"the message should carry exactly one card and carries {carried}: more than one means an edit added rather than "
+              "replaced, and none means the edit dropped the card it was uploading", file=sys.stderr)
         return 1
     return 0
 
