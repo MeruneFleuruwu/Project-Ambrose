@@ -5,4 +5,5 @@ ambrose_add_library(world "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(world
     PUBLIC
         gameserver-sessions
+        movement
         scripting)
