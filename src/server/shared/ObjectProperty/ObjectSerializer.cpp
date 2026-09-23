@@ -323,7 +323,7 @@ namespace
 
             PropertyObjectPtr object = PropertyObject::CreateBlank(_key, _catalog, *type);
             std::vector<PropertyValue>& values = object->GetValues(_key);
-            if (_versionable ? !ReadVersionableProperties(*type, values, depth, objectEnd) : !ReadCompactProperties(*type, values, depth))
+            if (_versionable ? !ReadVersionableProperties(*type, *object, values, depth, objectEnd) : !ReadCompactProperties(*type, values, depth))
                 return false;
             out = std::move(object);
             return true;
@@ -377,7 +377,7 @@ namespace
             return true;
         }
 
-        bool ReadVersionableProperties(ClassInfo const& type, std::vector<PropertyValue>& values, uint32 depth, std::size_t objectEnd)
+        bool ReadVersionableProperties(ClassInfo const& type, PropertyObject& object, std::vector<PropertyValue>& values, uint32 depth, std::size_t objectEnd)
         {
             std::size_t const outerLimit = _reader.GetLimit();
             _reader.SetLimit(objectEnd);
@@ -407,6 +407,7 @@ namespace
                 }
                 uint32 const ordinal = found->second;
                 PropertyInfo const& property = type.Properties[ordinal];
+                object.MarkPresent(ordinal, _key);
                 if (!ObjectSerializer::IsSelected(property, _options.Mask))
                 {
                     std::string what = property.HasFlag(PropertyFlag::Deprecated) ? fmt::format("holds {}, which is deprecated", property.Name)
@@ -776,7 +777,18 @@ namespace
             std::size_t const objectStart = _writer.GetBitPosition();
             if (_versionable)
                 _writer.Write<uint32>(0);
-            for (std::size_t ordinal = 0; ordinal < type.Properties.size(); ++ordinal)
+            std::vector<std::size_t> const fallbackOrder = [&type]
+            {
+                std::vector<std::size_t> order;
+                order.reserve(type.Properties.size());
+                for (std::size_t ordinal = 0; ordinal < type.Properties.size(); ++ordinal)
+                    order.push_back(ordinal);
+                return order;
+            }();
+            std::vector<std::size_t> const& writeOrder = _versionable && object->HasPreservedOrder() && !object->GetPresentOrder().empty()
+                ? object->GetPresentOrder()
+                : fallbackOrder;
+            for (std::size_t ordinal : writeOrder)
             {
                 PropertyInfo const& property = type.Properties[ordinal];
                 if (!ObjectSerializer::IsSelected(property, _options.Mask))
