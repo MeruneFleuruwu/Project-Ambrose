@@ -402,7 +402,47 @@ std::optional<LogStreamRequest> LogStreamService::ParseRequest(std::string const
     return request;
 }
 
+namespace
+{
+    nlohmann::json RecordObject(LogMessage const& record);
+}
+
 std::string LogStreamService::EncodeRecord(LogMessage const& record)
+{
+    return RecordObject(record).dump();
+}
+
+std::string LogStreamService::BacklogJson(LogStreamHub const& hub, uint64 after, std::size_t max)
+{
+    std::vector<std::shared_ptr<LogMessage const>> const backlog = hub.GetBacklog();
+    uint64 const oldest = backlog.empty() ? 0 : backlog.front()->Sequence;
+    uint64 const latest = backlog.empty() ? 0 : backlog.back()->Sequence;
+
+    nlohmann::json records = nlohmann::json::array();
+    for (std::shared_ptr<LogMessage const> const& record : backlog)
+    {
+        if (record->Sequence <= after)
+            continue;
+        if (records.size() >= max)
+            break;
+        records.push_back(RecordObject(*record));
+    }
+
+    nlohmann::json body;
+    body["schema"] = 1;
+    body["oldest"] = oldest;
+    body["latest"] = latest;
+    body["records"] = std::move(records);
+    if (after != 0 && oldest > 0 && after + 1 < oldest)
+        body["dropped"] = { { "from", after + 1 }, { "to", oldest - 1 }, { "count", oldest - after - 1 } };
+    else
+        body["dropped"] = nullptr;
+    return body.dump();
+}
+
+namespace
+{
+nlohmann::json RecordObject(LogMessage const& record)
 {
     nlohmann::json body;
     body["type"] = "record";
@@ -418,7 +458,8 @@ std::string LogStreamService::EncodeRecord(LogMessage const& record)
     else
         body["source"] = nullptr;
     body["template"] = record.Template;
-    return body.dump();
+    return body;
+}
 }
 
 std::string LogStreamService::EncodeDropped(uint64 from, uint64 to, uint64 count)

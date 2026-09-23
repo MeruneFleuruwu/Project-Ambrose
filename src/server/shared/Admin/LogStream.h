@@ -86,6 +86,7 @@ public:
 
     static std::optional<LogStreamRequest> ParseRequest(std::string const& text, std::string& error);
     static std::string EncodeRecord(LogMessage const& record);
+    static std::string BacklogJson(LogStreamHub const& hub, uint64 after, std::size_t max);
     static std::string EncodeDropped(uint64 from, uint64 to, uint64 count);
     static std::string EncodeHello(uint64 latest, uint64 oldest, std::size_t backlog);
     static std::string EncodeProblem(std::string const& code, std::string const& message);
