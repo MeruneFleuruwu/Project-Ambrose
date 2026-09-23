@@ -6,9 +6,9 @@
     "percent": 13.1
   },
   "checks": {
-    "done": 497,
+    "done": 501,
     "total": 2362,
-    "percent": 21.0
+    "percent": 21.2
   },
   "contributor_track": {
     "merged": 71,
@@ -36,7 +36,7 @@
       "title": "Create list and delete a wizard",
       "milestones_done": 14,
       "milestones_total": 27,
-      "checks_done": 111,
+      "checks_done": 115,
       "checks_total": 173
     },
     {

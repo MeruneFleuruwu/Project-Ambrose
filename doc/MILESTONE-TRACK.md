@@ -91,7 +91,6 @@ Then one of four things happens, each with one message saying which and why: it 
 
 | ID | Milestone | Size | What you need | Why it is a good one to take |
 |---|---|---|---|---|
-| 3.18 | Updater part 2: rehash, rename, dead refs, pending, modules | M | A build and a MySQL or MariaDB | Needs no client at all. Four unit and integration checks about the SQL updater's own behaviour, each one a named case with the expected error |
 | 4.04 | World wire math and LocationString | S | A build; one check reads your client's XML | Self-contained maths and parsing with eleven checks that say the exact numbers. Everything the world phase does with positions rests on it |
 | 4.08 | Zone extractor part 1: WizZoneData | M | Your own client installation | The largest one open, and the one that unblocks most: zone templates, locations and objects read out of your own install into the world database. Its phase file calls it oversized, so landing the extractor and its reporting first, with the row checks after, is expected |
 | 5.07 | Binary type-registry cache | S | Your own client installation | A converter and a loader that make startup fast, with a stale cache rejected. Three checks, all mechanical |
@@ -120,10 +119,9 @@ Everything not in the table above, including every milestone whose dependencies 
 
 ## In flight
 
-Nothing yet.
-
 | ID | Who | Pull request | What is left |
 |---|---|---|---|
+| 3.18 | MeruneFleuruwu | [#127](https://github.com/Justchicoo/Project-Ambrose/pull/127) | The four acceptance checks are earned and ticked, but the deliverable asking for unit tests of the decision logic against an in-memory applied set, with no database, is not delivered: the three cases it names are covered by an integration test that skips wherever no database is configured. ARCHIVED files and module includes are also still to come |
 
 ## Landed
 

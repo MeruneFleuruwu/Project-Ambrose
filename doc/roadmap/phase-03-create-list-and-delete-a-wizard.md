@@ -804,10 +804,10 @@ A player can delete one of their own wizards from the select screen, and the dat
 
 **Acceptance**
 
-- [ ] applied {A:h1}, disk {B:h1} is a rename with 0 applies
-- [ ] Changed hash with Redundancy=0 errors
-- [ ] 4 dead refs with CleanDeadRefMaxCount=3 errors
-- [ ] AllowPending=1 applies pending_db_world as PENDING
+- [x] applied {A:h1}, disk {B:h1} is a rename with 0 applies. `DBUpdaterTest.FreshDatabaseImportsBaseAppliesUpdatesInOrderAndThenIsUpToDate` renames a file on disk and the run records the new name without applying anything
+- [x] Changed hash with Redundancy=0 errors. `DBUpdaterTest.EnforcesRehashRedundancyDeadReferenceAndPendingPolicies` edits an applied file and the run fails, then passes with Redundancy on and the row is re-applied
+- [x] 4 dead refs with CleanDeadRefMaxCount=3 errors. The same test deletes four applied files and the run fails with all four rows still in `updates`, so the limit refuses rather than deletes
+- [x] AllowPending=1 applies pending_db_world as PENDING. The same test runs the pending folder with the setting off and nothing is recorded, then on and `rev_1767225600_policy.sql` is recorded as PENDING
 
 ### Detailed spec from FND-18: database/Updater part 2: rehash, rename, redundancy, dead references, pending_ and module includes
 
