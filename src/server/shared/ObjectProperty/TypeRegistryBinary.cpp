@@ -8,11 +8,14 @@
 #include "Hex.h"
 #include "SHA256.h"
 
+#include <nlohmann/json.hpp>
+
 #include <algorithm>
 #include <array>
 #include <fstream>
 #include <limits>
 #include <span>
+#include <vector>
 
 namespace
 {
@@ -73,17 +76,29 @@ bool TypeRegistryBinary::Write(std::filesystem::path const& output, std::string_
         return false;
     }
 
-    std::string const hash = Hex::Encode(SHA256::GetDigestOf(std::span<uint8 const>(reinterpret_cast<uint8 const*>(json.data()), json.size())));
+    nlohmann::json parsed;
+    try
+    {
+        parsed = nlohmann::json::parse(json);
+    }
+    catch (nlohmann::json::exception const& exception)
+    {
+        error = "the type dump is not valid JSON: " + std::string(exception.what());
+        return false;
+    }
+    std::string const canonical = parsed.dump();
+    std::vector<uint8> const payload = nlohmann::json::to_cbor(parsed);
+    std::string const hash = Hex::Encode(SHA256::GetDigestOf(std::span<uint8 const>(reinterpret_cast<uint8 const*>(canonical.data()), canonical.size())));
     std::string bytes;
-    bytes.reserve(Magic.size() + 4 + 4 + 8 + 4 + revision.size() + hash.size() + json.size());
+    bytes.reserve(Magic.size() + 4 + 4 + 8 + 4 + revision.size() + hash.size() + payload.size());
     bytes.append(Magic.data(), Magic.size());
     AppendU32(bytes, Version);
     AppendU32(bytes, static_cast<uint32>(revision.size()));
-    AppendU64(bytes, json.size());
+    AppendU64(bytes, payload.size());
     AppendU32(bytes, HashBytes);
     bytes.append(revision);
     bytes.append(hash);
-    bytes.append(json);
+    bytes.append(reinterpret_cast<char const*>(payload.data()), payload.size());
 
     std::ofstream stream(output, std::ios::binary | std::ios::trunc);
     if (!stream || !stream.write(bytes.data(), static_cast<std::streamsize>(bytes.size())))
@@ -134,7 +149,8 @@ bool TypeRegistryBinary::Read(std::filesystem::path const& input, std::string_vi
         return false;
     }
     std::string storedHash;
-    if (!ReadString(bytes, offset, revisionLength, revision) || !ReadString(bytes, offset, hashLength, storedHash) || !ReadString(bytes, offset, payloadLength, json) ||
+    std::string payload;
+    if (!ReadString(bytes, offset, revisionLength, revision) || !ReadString(bytes, offset, hashLength, storedHash) || !ReadString(bytes, offset, payloadLength, payload) ||
         offset != bytes.size())
     {
         error = "the binary type-registry cache is truncated";
@@ -145,6 +161,17 @@ bool TypeRegistryBinary::Read(std::filesystem::path const& input, std::string_vi
         error = "the binary type-registry cache is for revision " + revision + ", expected " + std::string(expectedRevision);
         return false;
     }
+    nlohmann::json decoded;
+    try
+    {
+        decoded = nlohmann::json::from_cbor(std::vector<uint8>(payload.begin(), payload.end()));
+    }
+    catch (nlohmann::json::exception const& exception)
+    {
+        error = "the binary type-registry cache payload is invalid CBOR: " + std::string(exception.what());
+        return false;
+    }
+    json = decoded.dump();
     std::string const actualHash = Hex::Encode(SHA256::GetDigestOf(std::span<uint8 const>(reinterpret_cast<uint8 const*>(json.data()), json.size())));
     if (storedHash != actualHash)
     {
