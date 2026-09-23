@@ -131,8 +131,10 @@ def carried(body):
 
 def send(url, payload, message_id):
     if message_id:
+        edited = dict(payload)
+        edited["attachments"] = []
         try:
-            body, status = post(f"{url}/messages/{message_id}?wait=true", payload, method="PATCH")
+            body, status = post(f"{url}/messages/{message_id}?wait=true", edited, method="PATCH")
             return message_id, status, "edited", carried(body)
         except urllib.error.HTTPError as failure:
             if failure.code not in (404, 401, 403):

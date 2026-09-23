@@ -67,6 +67,12 @@ class AnnouncerTests(unittest.TestCase):
         self.assertEqual((identifier, status, what, held), ("1552", 200, "edited", 0))
         self.assertEqual(announce.post.calls[0]["method"], "PATCH")
         self.assertIn("/messages/1552", announce.post.calls[0]["url"])
+        self.assertEqual(announce.post.calls[0]["payload"]["attachments"], [])
+
+    def test_a_post_declares_nothing_to_clear(self):
+        announce.post = FakePost()
+        announce.send("https://discord.invalid/hook", self.payload, None)
+        self.assertNotIn("attachments", announce.post.calls[0]["payload"])
 
     def test_the_first_post_is_a_post_and_its_id_comes_back(self):
         announce.post = FakePost()
