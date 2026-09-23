@@ -16,6 +16,11 @@ namespace
     constexpr uint8 DictOrder = 1;
     constexpr uint8 RecordOrder = 2;
 
+    bool IsRecordField(BinaryTableFile::Field const& field)
+    {
+        return field.Name != "_TargetTable";
+    }
+
     uint8 TypeCode(DmlType type)
     {
         switch (type)
@@ -116,7 +121,8 @@ BinaryTableFile BinaryTableFile::Read(std::span<uint8 const> bytes)
             Record values;
             values.reserve(table.Fields.size());
             for (Field const& field : table.Fields)
-                values.push_back(Dml::ReadValue(record, field.Type));
+                if (IsRecordField(field))
+                    values.push_back(Dml::ReadValue(record, field.Type));
             if (record.GetRemaining() != 0)
                 throw std::invalid_argument("FileBinary record has trailing bytes");
             table.Records.push_back(std::move(values));
@@ -146,11 +152,17 @@ std::vector<uint8> BinaryTableFile::Write() const
         output.WriteBytes(dict.GetData());
         for (Record const& record : table.Records)
         {
-            if (record.size() != table.Fields.size())
+            std::size_t recordFieldCount = 0;
+            for (Field const& field : table.Fields)
+                if (IsRecordField(field))
+                    ++recordFieldCount;
+            if (record.size() != recordFieldCount)
                 throw std::invalid_argument("FileBinary record field count does not match its dictionary");
             ByteBuffer body;
+            std::size_t recordIndex = 0;
             for (std::size_t i = 0; i < table.Fields.size(); ++i)
-                Dml::WriteValue(body, table.Fields[i].Type, record[i]);
+                if (IsRecordField(table.Fields[i]))
+                    Dml::WriteValue(body, table.Fields[i].Type, record[recordIndex++]);
             WriteMessageHeader(output, RecordOrder, body.GetSize());
             output.WriteBytes(body.GetData());
         }

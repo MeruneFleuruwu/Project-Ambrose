@@ -7,6 +7,10 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdlib>
+#include <fstream>
+#include <iterator>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -19,9 +23,9 @@ namespace
         table.Name = "_TableList";
         table.Fields = { { "Name", DmlType::Str, 0x28 }, { "_TargetTable", DmlType::Str, 0x28 } };
         table.Records = {
-            { std::string("Base"), std::string("_TableList") },
-            { std::string("About"), std::string("_TableList") },
-            { std::string("PatchClient"), std::string("_TableList") }
+            { std::string("Base") },
+            { std::string("About") },
+            { std::string("PatchClient") }
         };
         file.Tables.push_back(std::move(table));
         return file;
@@ -33,12 +37,12 @@ TEST(BinaryTableFileTest, SyntheticTableRoundTrips)
     BinaryTableFile source = TableList();
     source.Tables.push_back(BinaryTableFile::Table{
         "About",
-        { { "Version", DmlType::Uint, 0x28 } },
+        { { "Version", DmlType::Uint, 0x28 }, { "_TargetTable", DmlType::Str, 0x28 } },
         { { uint32(1) } }
     });
     source.Tables.push_back(BinaryTableFile::Table{
         "Base",
-        { { "SrcFileName", DmlType::Str, 0x28 }, { "Size", DmlType::Uint, 0x28 } },
+        { { "SrcFileName", DmlType::Str, 0x28 }, { "Size", DmlType::Uint, 0x28 }, { "_TargetTable", DmlType::Str, 0x28 } },
         {
             { std::string("Bin/a.dll"), uint32(12) },
             { std::string("Bin/b.dll"), uint32(34) }
@@ -61,12 +65,53 @@ TEST(BinaryTableFileTest, SyntheticTableRoundTrips)
             EXPECT_EQ(actual.Fields[field].Flag, expected.Fields[field].Flag);
         }
         for (std::size_t row = 0; row < expected.Records.size(); ++row)
-            for (std::size_t field = 0; field < expected.Fields.size(); ++field)
-                if (expected.Fields[field].Type == DmlType::Str)
-                    EXPECT_EQ(std::get<std::string>(actual.Records[row][field]), std::get<std::string>(expected.Records[row][field]));
-                else
-                    EXPECT_EQ(std::get<uint32>(actual.Records[row][field]), std::get<uint32>(expected.Records[row][field]));
+        {
+            std::size_t recordField = 0;
+            for (BinaryTableFile::Field const& field : expected.Fields)
+                if (field.Name != "_TargetTable")
+                {
+                    if (field.Type == DmlType::Str)
+                        EXPECT_EQ(std::get<std::string>(actual.Records[row][recordField]), std::get<std::string>(expected.Records[row][recordField]));
+                    else
+                        EXPECT_EQ(std::get<uint32>(actual.Records[row][recordField]), std::get<uint32>(expected.Records[row][recordField]));
+                    ++recordField;
+                }
+        }
     }
+}
+
+std::optional<std::string> ReferencePath()
+{
+#if defined(_WIN32)
+    char* value = nullptr;
+    std::size_t size = 0;
+    if (_dupenv_s(&value, &size, "AMBROSE_REFERENCE_LIST") != 0 || value == nullptr)
+        return std::nullopt;
+    std::string path(value, size > 0 ? size - 1 : 0);
+    std::free(value);
+    return path;
+#else
+    char const* const value = std::getenv("AMBROSE_REFERENCE_LIST");
+    return value == nullptr || *value == '\0' ? std::nullopt : std::optional<std::string>(value);
+#endif
+}
+
+TEST(BinaryTableFileTest, ReferenceListRoundTripsWhenConfigured)
+{
+    std::optional<std::string> const referencePath = ReferencePath();
+    if (!referencePath)
+        GTEST_SKIP() << "AMBROSE_REFERENCE_LIST is not set";
+
+    std::ifstream input(*referencePath, std::ios::binary);
+    ASSERT_TRUE(input) << "Could not open " << *referencePath;
+    std::vector<uint8> const original(
+        (std::istreambuf_iterator<char>(input)),
+        (std::istreambuf_iterator<char>()));
+    ASSERT_EQ(original.size(), 1144891u);
+
+    BinaryTableFile const decoded = BinaryTableFile::Read(original);
+    EXPECT_EQ(decoded.Tables.size(), 3592u);
+    EXPECT_EQ(decoded.Write(), original);
 }
 
 TEST(BinaryTableFileTest, TableListPrefixMatchesRetailDictionary)
