@@ -27,7 +27,6 @@ namespace
     constexpr int Success = 0;
     constexpr int Failure = 1;
     constexpr int BadUsage = 2;
-    constexpr uint32 AllProperties = 0xFFFFFFFFu;
 
     constexpr std::string_view Usage = R"(Usage: zone_extractor [options]
 
@@ -173,6 +172,67 @@ cannot be read or decoded, and 2 on bad usage.
         return SqlText(PropertyJson::Dump(value->AsObject(), -1));
     }
 
+    bool NumberEquals(PropertyValue const* value, uint32 expected)
+    {
+        if (!value)
+            return false;
+        if (auto const number = value->GetIf<uint32>())
+            return *number == expected;
+        if (auto const number = value->GetIf<int32>())
+            return *number >= 0 && static_cast<uint32>(*number) == expected;
+        if (auto const number = value->GetIf<uint64>())
+            return *number == expected;
+        if (auto const number = value->GetIf<int64>())
+            return *number >= 0 && static_cast<uint64>(*number) == expected;
+        return false;
+    }
+
+    bool NestedNumberEquals(PropertyObject const& object, std::initializer_list<std::string_view> names, uint32 expected)
+    {
+        for (std::string_view const name : names)
+        {
+            PropertyValue const* value = object.Get(name);
+            if (NumberEquals(value, expected))
+                return true;
+            if (NumberEquals(object.Get(fmt::format("{}.m_full", name)), expected))
+                return true;
+            if (value)
+                if (PropertyObject const* nested = value->AsObject())
+                    if (NumberEquals(Find(*nested, { "m_full", "m_value", "m_id" }), expected))
+                        return true;
+        }
+        return false;
+    }
+
+    std::size_t CountTemplate(PropertyValue const* objectsValue, uint32 expected)
+    {
+        PropertyValue::List const* objects = objectsValue ? objectsValue->GetList() : nullptr;
+        if (!objects)
+            return 0;
+        return static_cast<std::size_t>(std::count_if(objects->begin(), objects->end(), [expected](PropertyValue const& value)
+        {
+            PropertyObject const* object = value.AsObject();
+            return object && NestedNumberEquals(*object, { "m_templateID", "m_templateId", "m_templateIDHash" }, expected);
+        }));
+    }
+
+    std::vector<std::string> LocationNames(PropertyValue const* locationsValue)
+    {
+        std::vector<std::string> names;
+        PropertyValue::List const* locations = locationsValue ? locationsValue->GetList() : nullptr;
+        if (!locations)
+            return names;
+        for (PropertyValue const& value : *locations)
+        {
+            PropertyObject const* location = value.AsObject();
+            PropertyValue const* name = location ? Find(*location, { "m_locName", "m_name", "m_locationName", "m_key" }) : nullptr;
+            if (name)
+                if (std::string const* text = name->GetIf<std::string>())
+                    names.push_back(*text);
+        }
+        return names;
+    }
+
     void WriteRows(std::ostream& output, std::string_view zone, PropertyObject const& root)
     {
         output << fmt::format("INSERT INTO zone_template (zone_path, display_name_key, far_clip, healing_per_minute, soft_limit, hard_limit, no_mounts) VALUES ({}, {}, {}, {}, {}, {}, {});\n",
@@ -194,7 +254,7 @@ cannot be read or decoded, and 2 on bad usage.
                     continue;
                 output << fmt::format("INSERT INTO zone_location (zone_path, name, location, direction) VALUES ({}, {}, {}, {});\n",
                     SqlText(zone),
-                    SqlString(Find(*location, { "m_name", "m_locationName", "m_key" })),
+                    SqlString(Find(*location, { "m_locName", "m_name", "m_locationName", "m_key" })),
                     ObjectJson(Find(*location, { "m_location", "m_position" })),
                     ObjectJson(Find(*location, { "m_direction", "m_orientation" })));
             }
@@ -210,11 +270,11 @@ cannot be read or decoded, and 2 on bad usage.
                 continue;
             output << fmt::format("INSERT INTO zone_object (zone_path, template_id, object_id, location, orientation, scale, zone_tag, start_state, loading_type, spawn_requirements) VALUES ({}, {}, {}, {}, {}, {}, {}, {}, {}, {});\n",
                 SqlText(zone),
-                SqlNumber(Find(*object, { "m_templateID", "m_templateId", "m_templateIDHash" })),
-                SqlNumber(Find(*object, { "m_objectID", "m_objectId", "nObjectID" })),
+                SqlNumber(Find(*object, { "m_templateID.m_full", "m_templateID", "m_templateId", "m_templateIDHash" })),
+                SqlNumber(Find(*object, { "m_nObjectID", "m_objectID", "m_objectId", "nObjectID" })),
                 ObjectJson(Find(*object, { "m_location", "m_position" })),
                 ObjectJson(Find(*object, { "m_orientation", "m_direction" })),
-                SqlNumber(Find(*object, { "m_scale" })),
+                SqlNumber(Find(*object, { "m_fScale", "m_scale" })),
                 SqlString(Find(*object, { "m_zoneTag" })),
                 SqlNumber(Find(*object, { "m_startState", "m_initialState" })),
                 SqlNumber(Find(*object, { "m_loadingType" })),
@@ -269,7 +329,7 @@ cannot be read or decoded, and 2 on bad usage.
         SerializerOptions options;
         options.Versionable = true;
         options.Flags = SerializerFlag::None;
-        options.Mask = AllProperties;
+        options.Mask = 0;
         options.AllowNullRoot = false;
         options.AllowTrailingBytes = false;
         std::size_t withData = 0;
@@ -304,6 +364,22 @@ cannot be read or decoded, and 2 on bad usage.
                 if (PropertyValue::List const* list = objects->GetList())
                     objectCount = list->size();
             std::cout << fmt::format("{}: {} root, {} objects\n", zone, result.Object->GetClass().Name, objectCount);
+            if (zone == "WizardCity/WC_Hub" || zone == "WizardCity/WC_Ravenwood")
+            {
+                std::vector<std::string> const names = LocationNames(Find(*result.Object, { "m_locationList", "m_locations", "m_locationTemplates" }));
+                std::cout << fmt::format("{}: display={}, locations={}, templates 38232={}, 38230={}, 81102={}, 1451035={}, 39088={}\n",
+                    zone,
+                    SqlString(Find(*result.Object, { "m_zoneDisplayName", "m_displayName", "m_displayNameKey" })),
+                    names.size(),
+                    CountTemplate(Find(*result.Object, { "m_objectList", "m_objects" }), 38232),
+                    CountTemplate(Find(*result.Object, { "m_objectList", "m_objects" }), 38230),
+                    CountTemplate(Find(*result.Object, { "m_objectList", "m_objects" }), 81102),
+                    CountTemplate(Find(*result.Object, { "m_objectList", "m_objects" }), 1451035),
+                    CountTemplate(Find(*result.Object, { "m_objectList", "m_objects" }), 39088));
+                for (std::string const& name : names)
+                    if (name == "Start" || name.find("Target location") != std::string::npos)
+                        std::cout << fmt::format("{}: location {}\n", zone, name);
+            }
             if (sql)
                 WriteRows(sql, zone, *result.Object);
         }
