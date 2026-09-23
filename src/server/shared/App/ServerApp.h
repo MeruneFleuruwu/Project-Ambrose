@@ -80,6 +80,7 @@ public:
     AdminServer* GetAdminApi() const noexcept { return _admin.get(); }
     bool ReloadAdminApi();
     void RegisterStandardRoutes(AdminRouter& routes);
+    std::filesystem::path CommandAuditFile() const;
 
     void SetListener(std::string address, uint16 port);
     void SetClientSetup(bool installFound, bool typeDumpInUse, bool typeDumpStale, std::string typeDumpError);

@@ -5,6 +5,7 @@
 
 #include "ServerApp.h"
 #include "AdminCapabilities.h"
+#include "AdminCommand.h"
 #include "AdminConfigView.h"
 #include "AdminServer.h"
 #include "ListenerSettings.h"
@@ -282,10 +283,17 @@ bool ServerApp::StartAdminApi()
     return false;
 }
 
+std::filesystem::path ServerApp::CommandAuditFile() const
+{
+    std::filesystem::path const folder = _config.GetFilename().parent_path();
+    return folder / "audit" / (_info.Name + "-commands.jsonl");
+}
+
 void ServerApp::RegisterStandardRoutes(AdminRouter& routes)
 {
     AdminStatus::Register(routes, [this] { return BuildStatus(); });
     AdminConfigView::Register(routes, _config, GetRestartRequiredOptions());
+    AdminCommand::Register(routes, _commands, _info.Name, CommandAuditFile());
     routes.Add("POST", "/api/shutdown", [this](AdminRequest const& request)
     {
         nlohmann::json const body = request.Body.empty() ? nlohmann::json::object() : nlohmann::json::parse(request.Body, nullptr, false);
