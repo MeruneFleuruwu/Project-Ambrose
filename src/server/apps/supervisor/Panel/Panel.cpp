@@ -33,10 +33,21 @@ namespace
 }
 
 Panel::Panel(Log& log, std::filesystem::path dataFolder, std::filesystem::path configFolder)
-    : _log(log), _dataFolder(std::move(dataFolder)), _users(_store), _sessions(_store), _errors(_store), _listener(log, "panel", _dataFolder, std::move(configFolder))
+    : _log(log), _dataFolder(std::move(dataFolder)), _users(_store), _sessions(_store), _errors(_store), _grants(_store), _listener(log, "panel", _dataFolder, std::move(configFolder))
 {
     _listener.Routes().SetThrottle([this](AdminRequest const& request, uint32 cost) { return Throttle(request, cost); });
     _listener.SetSessionSource(&_sessions);
+    _authorization = std::make_unique<PanelAuthorization>(_grants,
+        [this](AdminRequest const& request) { return UserOf(request); },
+        [this](AdminRequest const& request, std::string_view permission, std::string_view app, bool allowed)
+        {
+            AMBROSE_LOG(_log, LogLevel::Info, PanelCategory, "{} {} {}{} (request {})", request.Principal.empty() ? std::string("somebody") : request.Principal,
+                allowed ? "used" : "was refused", permission, app.empty() ? std::string() : " on " + std::string(app), request.Id);
+        });
+    _listener.Routes().SetPermissionCheck([this](AdminRequest const& request, std::string_view permission)
+    {
+        return _authorization->Decide(request, permission);
+    });
     RegisterSignIn();
 }
 

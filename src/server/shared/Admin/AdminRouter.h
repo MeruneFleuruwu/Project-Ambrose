@@ -58,10 +58,18 @@ struct AdminBrowserAccess
     bool Secure = false;
 };
 
+enum class PermissionVerdict : uint8
+{
+    Allowed,
+    Forbidden,
+    OutOfScope
+};
+
 class AdminRouter
 {
 public:
     using Handler = std::function<AdminResponse(AdminRequest const&)>;
+    using PermissionCheck = std::function<PermissionVerdict(AdminRequest const&, std::string_view permission)>;
     using ProblemLog = std::function<void(AdminRequest const&, AdminResponse const&)>;
 
     static constexpr std::string_view SecurityPolicy =
@@ -76,6 +84,8 @@ public:
     using Throttle = std::function<std::optional<AdminResponse>(AdminRequest const&, uint32 cost)>;
 
     void Add(std::string method, std::string path, Handler handler);
+    void AddGuarded(std::string method, std::string path, std::string permission, Handler handler);
+    void AddGuardedPrefix(std::string method, std::string prefix, std::string permission, Handler handler);
     void AddCosting(std::string method, std::string path, uint32 cost, Handler handler);
     void SetThrottle(Throttle throttle);
     uint32 CostOf(std::string_view method, std::string_view path) const;
@@ -96,6 +106,9 @@ public:
     std::string ExpectedOrigin(AdminRequest const& request) const;
     AdminAuthResult Authenticate(AdminRequest& request) const;
     AdminResponse Dispatch(AdminRequest const& request) const;
+    void SetPermissionCheck(PermissionCheck check);
+    PermissionVerdict MayI(AdminRequest const& request, std::string_view permission) const;
+    std::vector<std::pair<std::string, std::string>> DeclaredRoutes() const;
     void Finish(AdminRequest const& request, AdminResponse& response) const;
     std::optional<std::string> SessionSecret(AdminRequest const& request) const;
     AdminBrowserAccess GetBrowserAccess() const;
@@ -114,11 +127,14 @@ private:
         bool Public = false;
         bool Prefix = false;
         uint32 Cost = 0;
+        std::string Permission;
     };
 
     AdminResponse Answer(AdminRequest& request) const;
     AdminResponse Serve(AdminRequest const& request) const;
-    void Put(std::string method, std::string path, Handler handler, bool isPublic, bool prefix = false, uint32 cost = 0);
+    void Put(std::string method, std::string path, Handler handler, bool isPublic, bool prefix = false, uint32 cost = 0, std::string permission = {});
+
+    PermissionCheck _permission;
 
     AdminAuth& _auth;
     std::atomic<std::size_t> _maxBodyBytes{ 0 };
