@@ -21,6 +21,8 @@
         number: "text-value-number",
         text: "text-value-text",
         name: "text-value-name",
+        address: "text-value-address",
+        setting: "text-value-setting",
         plain: "",
     };
 

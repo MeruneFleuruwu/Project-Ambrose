@@ -12,6 +12,11 @@ const lines = [
     { seq: 1, stream: "stdout", text: "2026-09-22_20:13:45.901 INFO  [server.admin] The admin API is listening on http://127.0.0.1:12012" },
     { seq: 2, stream: "stdout", text: "2026-09-22_20:13:45.902 WARN  [server.loading] Loading took 184 ms" },
     { seq: 3, stream: "stdout", text: "2026-09-22_20:13:46.010 ERROR [server.database] Connection to ambrose@127.0.0.1:3307 failed" },
+    {
+        seq: 5,
+        stream: "stdout",
+        text: '2026-09-22_20:13:46.100 INFO  [accounts] set Account.VerifierKeys on ambrose_panel_login saying "ready"',
+    },
     { seq: 4, stream: "supervisor", text: "Started loginserver as process 10992" },
 ];
 
@@ -61,7 +66,18 @@ describe("captured output on screen", () => {
         expect(colourOf("http://127.0.0.1:12012")).not.toBe(words);
         expect(colourOf("184 ms")).not.toBe(words);
         expect(colourOf("ambrose@127.0.0.1:3307")).not.toBe(words);
-        expect(colourOf("http://127.0.0.1:12012")).not.toBe(colourOf("184 ms"));
+    });
+
+    it("gives every kind of value a colour of its own, which is the point of the ramp", () => {
+        const kinds = {
+            address: colourOf("http://127.0.0.1:12012"),
+            number: colourOf("184 ms"),
+            setting: colourOf("Account.VerifierKeys"),
+            name: colourOf("ambrose_panel_login"),
+            text: colourOf('"ready"'),
+        };
+        expect(new Set(Object.values(kinds)).size).toBe(5);
+        expect(colourOf("ambrose@127.0.0.1:3307")).toBe(kinds.address);
     });
 
     it("leaves a line that is not a record whole and in its own colour", () => {

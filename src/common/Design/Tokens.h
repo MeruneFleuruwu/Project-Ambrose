@@ -22,7 +22,7 @@ struct TerminalColor
     std::uint8_t Index16;
 };
 
-inline constexpr std::array<TerminalColor, 21> DarkTokens = {{
+inline constexpr std::array<TerminalColor, 23> DarkTokens = {{
     TerminalColor{"surface-page", "#0B1020", 11, 16, 32, 233, 0},
     TerminalColor{"surface-card", "#131B31", 19, 27, 49, 235, 0},
     TerminalColor{"surface-sunken", "#0E1527", 14, 21, 39, 234, 0},
@@ -30,9 +30,11 @@ inline constexpr std::array<TerminalColor, 21> DarkTokens = {{
     TerminalColor{"edge-quiet", "#1B2540", 27, 37, 64, 236, 8},
     TerminalColor{"edge-strong", "#22304F", 34, 48, 79, 237, 8},
     TerminalColor{"edge-control", "#546AA5", 84, 106, 165, 61, 4},
-    TerminalColor{"value-number", "#72BCFA", 114, 188, 250, 75, 12},
-    TerminalColor{"value-text", "#5BA2EC", 91, 162, 236, 74, 12},
-    TerminalColor{"value-name", "#4887DC", 72, 135, 220, 68, 4},
+    TerminalColor{"value-number", "#D1988F", 209, 152, 143, 174, 1},
+    TerminalColor{"value-text", "#B4A5FB", 180, 165, 251, 147, 4},
+    TerminalColor{"value-name", "#8EE4A1", 142, 228, 161, 115, 10},
+    TerminalColor{"value-address", "#28BDFA", 40, 189, 250, 39, 12},
+    TerminalColor{"value-setting", "#E07AAE", 224, 122, 174, 175, 5},
     TerminalColor{"fg-body", "#F2E8D5", 242, 232, 213, 7, 15},
     TerminalColor{"fg-muted", "#A8B6D4", 168, 182, 212, 146, 7},
     TerminalColor{"fg-faint", "#8798BC", 135, 152, 188, 103, 8},
@@ -46,7 +48,7 @@ inline constexpr std::array<TerminalColor, 21> DarkTokens = {{
     TerminalColor{"focus-ring", "#E4B457", 228, 180, 87, 179, 11},
 }};
 
-inline constexpr std::array<TerminalColor, 21> LightTokens = {{
+inline constexpr std::array<TerminalColor, 23> LightTokens = {{
     TerminalColor{"surface-page", "#F4EAD5", 244, 234, 213, 224, 15},
     TerminalColor{"surface-card", "#FFFDF7", 255, 253, 247, 15, 15},
     TerminalColor{"surface-sunken", "#EADFC4", 234, 223, 196, 253, 7},
@@ -54,9 +56,11 @@ inline constexpr std::array<TerminalColor, 21> LightTokens = {{
     TerminalColor{"edge-quiet", "#D9CBAB", 217, 203, 171, 187, 7},
     TerminalColor{"edge-strong", "#C3AE86", 195, 174, 134, 144, 7},
     TerminalColor{"edge-control", "#546AA5", 84, 106, 165, 61, 4},
-    TerminalColor{"value-number", "#233E5A", 35, 62, 90, 17, 4},
-    TerminalColor{"value-text", "#2D5075", 45, 80, 117, 23, 4},
-    TerminalColor{"value-name", "#376390", 55, 99, 144, 24, 4},
+    TerminalColor{"value-number", "#521915", 82, 25, 21, 52, 1},
+    TerminalColor{"value-text", "#172075", 23, 32, 117, 17, 4},
+    TerminalColor{"value-name", "#043415", 4, 52, 21, 234, 2},
+    TerminalColor{"value-address", "#00435C", 0, 67, 92, 17, 4},
+    TerminalColor{"value-setting", "#5B013A", 91, 1, 58, 52, 5},
     TerminalColor{"fg-body", "#1B1608", 27, 22, 8, 233, 0},
     TerminalColor{"fg-muted", "#4A3F28", 74, 63, 40, 237, 8},
     TerminalColor{"fg-faint", "#5F5238", 95, 82, 56, 58, 8},
@@ -95,7 +99,7 @@ inline constexpr std::uint32_t DurationHoverMs = 120;
 inline constexpr std::uint32_t DurationPanelMs = 200;
 inline constexpr std::uint32_t DurationScreenMs = 320;
 
-constexpr TerminalColor const* Find(std::array<TerminalColor, 21> const& tokens, std::string_view name)
+constexpr TerminalColor const* Find(std::array<TerminalColor, 23> const& tokens, std::string_view name)
 {
     for (TerminalColor const& token : tokens)
     {

@@ -48,6 +48,8 @@
     --value-number: var(--ambrose-color-value-number);
     --value-text: var(--ambrose-color-value-text);
     --value-name: var(--ambrose-color-value-name);
+    --value-address: var(--ambrose-color-value-address);
+    --value-setting: var(--ambrose-color-value-setting);
     --border: var(--ambrose-color-edge-quiet);
     --input: var(--ambrose-color-edge-strong);
     --ring: var(--ambrose-color-focus-ring);
@@ -97,6 +99,8 @@
     --color-value-number: var(--value-number);
     --color-value-text: var(--value-text);
     --color-value-name: var(--value-name);
+    --color-value-address: var(--value-address);
+    --color-value-setting: var(--value-setting);
     --color-border: var(--border);
     --color-input: var(--input);
     --color-ring: var(--ring);

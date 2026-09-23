@@ -113,6 +113,7 @@
 | 17.105 | Releases: the launcher and the panel as downloadable builds | M | 3.27, 17.24, 17.14 |
 | 17.106 | Error reports: source locations, grouping and a report file | M | 17.04, 17.08, 17.14 |
 | 17.107 | A value in a log line is a place you can go | M | 17.07, 17.76, 17.106 |
+| 17.108 | A panel nobody has to click past a warning to use | M | 17.14, 17.24 |
 
 ## Review notes for this phase
 
@@ -2613,3 +2614,30 @@ Added on 2026-09-22 at the maintainer's direction: a colored run should be a lin
 - [ ] Clicking a setting's name opens the settings page at that option, and clicking a category opens the log viewer filtered to it
 - [ ] A run the resolver does not recognize is drawn in its color and is not clickable, and a path outside the file roots is not a link
 - [ ] The same line read on the captured output, the log viewer and the error reports page offers the same links
+
+
+## 17.108 A panel nobody has to click past a warning to use
+
+**Goal:** Somebody who installs Ambrose reaches their panel without a browser telling them it is unsafe, whichever of the three situations they are in, and without being taught what a certificate is. What they are asked for is the situation, not the cryptography.
+
+**Size:** M. **Depends on:** 17.14, 17.24
+
+Added on 2026-09-22 at the maintainer's direction, from running the panel: 17.14 gives the panel TLS and writes it a certificate that signed itself, which is correct and which every browser calls not secure, so every operator meets a warning on their first visit and the connections a page makes behind itself can be refused outright. Deciding what a certificate should be is settled; getting a trusted one into an operator's hands is not, and that is what this milestone is.
+
+**Deliverables**
+
+- Loopback served over plain HTTP by default, because a browser already treats `http://127.0.0.1` as a secure context, so the commonest case, a panel on the machine it manages, has no warning and no certificate at all; TLS stays required the moment the bind leaves loopback, which is the rule 17.14 settled, and the option that chooses is one the operator reads as a situation rather than a protocol
+- A name the operator owns, answered by ACME: they give the hostname, the panel obtains and renews its certificate with no further action, renews early enough to survive a failed attempt, keeps serving the old one until the new one is in hand, and says on the panel what the state of it is
+- No name and not loopback, which is a private network: the certificate that signed itself stays, and the operator is walked through trusting it once, with the fingerprint shown on the page, in the log and in the launcher, and the same fingerprint checked after
+- The trusting done by the desktop app of 17.24, which is already on the operator's machine and can ask properly: it names the store it will write to, asks once, writes only the panel's own certificate to the current user rather than the machine, and can undo it, with the command printed for anyone who would rather run it themselves
+- The panel saying which of the three it is on its settings page, with what to do next when the answer is the warning, so nobody has to find this out from a log line
+- Nothing weakened to make this easy: no trust added without being asked, no key written where another user can read it, no certificate accepted because it merely matches a name, and a fingerprint checked before trust is granted rather than after
+
+**Acceptance**
+
+- [ ] A first start bound to loopback serves the panel with no certificate and no browser warning, and the same configuration bound beyond loopback refuses to start until TLS is configured
+- [ ] Given a hostname that resolves to the machine, the panel obtains a certificate, serves it, and renews it in a test that moves the clock, keeping the old one serving until the new one is in hand
+- [ ] A failed renewal keeps the old certificate serving, says so on the panel, and retries rather than falling back to one that signed itself
+- [ ] The desktop app names the store, asks once, and after the operator agrees the browser reaches the panel with no warning; refusing leaves the store untouched
+- [ ] The fingerprint on the page, in the log and in the desktop app are the same string, and it is the certificate actually served
+- [ ] Undoing the trust removes exactly the one certificate it added and nothing else

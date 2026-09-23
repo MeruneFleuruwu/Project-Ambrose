@@ -1,13 +1,13 @@
 /*
  * Project Ambrose by Imjustchico
- * Tests what a log line is read into, against lines the servers actually wrote: the time, level, category and message come apart, an address with a port, a connection string, a URL, a path, a version, a digest, a quoted string and a number with a unit are each marked as values, ordinary words and bare counts are left plain, no line marks more than eight runs, and a line that is not a record is not pretended to be one.
+ * Tests what a log line is read into, against lines the servers actually wrote: the time, level, category and message come apart, and each run is sorted into the kind whose colour says what it is, so an address, a setting, a name, a number and quoted text are told apart rather than all being marked as a value. Ordinary words and bare counts are left plain, a hyphenated word is a word, no line marks more than eight runs, and a line that is not a record is not pretended to be one.
  */
 
 import { describe, expect, it } from "vitest";
 import { readLine, readValues, type LinePart } from "./logline";
 
 function kindsOf(message: string): Record<string, string[]> {
-    const found: Record<string, string[]> = { number: [], text: [], name: [], plain: [] };
+    const found: Record<string, string[]> = { number: [], text: [], name: [], address: [], setting: [], plain: [] };
     for (const part of readValues(message)) found[part.kind].push(part.text);
     return found;
 }
@@ -34,26 +34,27 @@ describe("reading a log line", () => {
     });
 
     it("marks a URL whole rather than splitting it at the slashes", () => {
-        expect(kindsOf("The admin API is listening on http://127.0.0.1:12012").name).toContain("http://127.0.0.1:12012");
-        expect(kindsOf("fetched https://example.test/a/b?c=1 today").name).toContain("https://example.test/a/b?c=1");
+        expect(kindsOf("The admin API is listening on http://127.0.0.1:12012").address).toContain("http://127.0.0.1:12012");
+        expect(kindsOf("fetched https://example.test/a/b?c=1 today").address).toContain("https://example.test/a/b?c=1");
     });
 
     it("marks an address with its port", () => {
-        expect(kindsOf("Listening on 127.0.0.1:12001 with 1 network thread(s)").name).toContain("127.0.0.1:12001");
-        expect(kindsOf("bound 10.0.0.5 today").name).toContain("10.0.0.5");
+        expect(kindsOf("Listening on 127.0.0.1:12001 with 1 network thread(s)").address).toContain("127.0.0.1:12001");
+        expect(kindsOf("bound 10.0.0.5 today").address).toContain("10.0.0.5");
     });
 
     it("marks a connection string whole rather than in pieces", () => {
         const found = kindsOf("Connected to ambrose@127.0.0.1:3307/ambrose_panel_login running 10.11.14-MariaDB-0ubuntu0.24.04.1");
-        expect(found.name).toContain("ambrose@127.0.0.1:3307/ambrose_panel_login");
+        expect(found.address).toContain("ambrose@127.0.0.1:3307/ambrose_panel_login");
         expect(found.name).toContain("10.11.14-MariaDB-0ubuntu0.24.04.1");
     });
 
     it("marks a path, a digest and a quoted string", () => {
-        expect(kindsOf("reading C:/Users/someone/panel.crt now").name).toContain("C:/Users/someone/panel.crt");
-        expect(kindsOf("wrote /var/log/ambrose.log here").name).toContain("/var/log/ambrose.log");
+        expect(kindsOf("reading C:/Users/someone/panel.crt now").address).toContain("C:/Users/someone/panel.crt");
+        expect(kindsOf("wrote /var/log/ambrose.log here").address).toContain("/var/log/ambrose.log");
         expect(kindsOf("Project Ambrose rev de63e83 (land-panel2) 2026-09-22").name).toContain("de63e83");
-        expect(kindsOf('the option "Panel.Port" was read').text).toContain('"Panel.Port"');
+        expect(kindsOf('the option "Panel.Port" was read').setting).toContain('"Panel.Port"');
+        expect(kindsOf('it said "nothing to do" once').text).toContain('"nothing to do"');
     });
 
     it("marks a number that carries a unit and leaves a bare count alone", () => {
@@ -74,6 +75,20 @@ describe("reading a log line", () => {
         expect(kindsOf("reloading server.loginserver now").name).toContain("server.loginserver");
         expect(kindsOf("the table ambrose_panel_login is up to date").name).toContain("ambrose_panel_login");
         expect(kindsOf("this is a plain sentence").name).toEqual([]);
+    });
+
+    it("tells a configuration option from an identifier by its capitals", () => {
+        const found = kindsOf("set Account.VerifierKeys and Account.VerifierActiveKey to encrypt them at rest");
+        expect(found.setting).toEqual(["Account.VerifierKeys", "Account.VerifierActiveKey"]);
+        expect(kindsOf("reloading server.loginserver now").setting).toEqual([]);
+        expect(kindsOf("TypeDumpPath is not set, and Setup.Mode is off").setting).toContain("Setup.Mode");
+    });
+
+    it("leaves a hyphenated word a word", () => {
+        const found = kindsOf("An AI-built Wizard101 server: loginserver");
+        expect(found.name).toEqual([]);
+        expect(found.setting).toEqual([]);
+        expect(found.plain.join("")).toBe("An AI-built Wizard101 server: loginserver");
     });
 
     it("marks no more than eight runs on one line", () => {

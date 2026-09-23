@@ -1,9 +1,9 @@
 /*
  * Project Ambrose by Imjustchico
- * Reads one captured line into the parts doc/DESIGN.md colours: the time, the level word, the category and the message, and inside the message the runs that carry a value rather than a word, which are quoted text, a number with a unit, a URL, an address with or without a port, a path, a connection string, a version, a digest and a dotted or underscored identifier. Ordinary words are left alone, a bare count with no unit is never a value, and no line marks more than eight runs, both rules straight from the design, because a line holding twenty numbers is a rainbow.
+ * Reads one captured line into the parts doc/DESIGN.md colours: the time, the level word, the category and the message, and inside the message the runs that carry a value rather than a word, sorted into the kinds the value ramp names. An address is anything that says where, which is a URL, a host and port, a path and a connection target; a setting is a configuration option, told from an identifier by its capitals; a name is an app, a database, a category, a version or a digest; a number is a quantity carrying a unit; and quoted text is itself, unless what is quoted is a setting. Ordinary words are left alone, a hyphenated word such as AI-built is a word and not an identifier, a bare count with no unit is never a value, and no line marks more than eight runs, both rules straight from the design, because a line holding twenty numbers is a rainbow.
  */
 
-export type ValueKind = "number" | "text" | "name" | "plain";
+export type ValueKind = "number" | "text" | "name" | "address" | "setting" | "plain";
 
 export type LinePart = { text: string; kind: ValueKind };
 
@@ -19,17 +19,20 @@ const RECORD = /^(?:\d{4}-\d{2}-\d{2}[_ ])?(\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?)\s+(
 
 const UNITS = "ms|us|ns|s|min|h|d|MiB|GiB|KiB|TiB|MB|GB|KB|B|%";
 
+const SETTING = /^[A-Z][A-Za-z0-9]*(?:\.[A-Za-z0-9]+)+$|^[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]*)+$/;
+
 const RUNS: { kind: ValueKind; pattern: RegExp }[] = [
     { kind: "text", pattern: /"[^"]*"/y },
-    { kind: "name", pattern: /[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s,;]+/y },
-    { kind: "name", pattern: /[A-Za-z0-9_.+-]+@[^\s,;]+/y },
-    { kind: "name", pattern: /(?:[A-Za-z]:[\\/]|\/)[^\s,;]+/y },
-    { kind: "name", pattern: /\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?/y },
-    { kind: "name", pattern: /\[[0-9a-fA-F:]+\](?::\d+)?/y },
+    { kind: "address", pattern: /[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s,;]+/y },
+    { kind: "address", pattern: /[A-Za-z0-9_.+-]+@[^\s,;]+/y },
+    { kind: "address", pattern: /(?:[A-Za-z]:[\\/]|\/)[^\s,;]+/y },
+    { kind: "address", pattern: /\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?/y },
+    { kind: "address", pattern: /\[[0-9a-fA-F:]+\](?::\d+)?/y },
     { kind: "number", pattern: new RegExp(String.raw`\d[\d.,]*\s?(?:${UNITS})(?![A-Za-z0-9])`, "y") },
     { kind: "name", pattern: /\d+(?:\.\d+){2,}[A-Za-z0-9.-]*/y },
     { kind: "name", pattern: /[0-9a-f]{7,}(?![A-Za-z0-9])/y },
-    { kind: "name", pattern: /[A-Za-z][A-Za-z0-9]*(?:[._-][A-Za-z0-9]+)+/y },
+    { kind: "setting", pattern: /[A-Z][A-Za-z0-9]*(?:\.[A-Za-z0-9]+)+(?![A-Za-z0-9._])/y },
+    { kind: "name", pattern: /[A-Za-z][A-Za-z0-9]*(?:[._][A-Za-z0-9]+)+/y },
 ];
 
 const MaxRuns = 8;
@@ -37,6 +40,10 @@ const MaxRuns = 8;
 function startsARun(text: string, at: number): boolean {
     const before = at === 0 ? "" : text[at - 1];
     return before === "" || !/[A-Za-z0-9_]/.test(before);
+}
+
+function quotedKind(run: string): ValueKind {
+    return SETTING.test(run.slice(1, -1)) ? "setting" : "text";
 }
 
 export function readValues(message: string): LinePart[] {
@@ -59,7 +66,7 @@ export function readValues(message: string): LinePart[] {
                 run.pattern.lastIndex = at;
                 const match = run.pattern.exec(message);
                 if (match && match[0].length > 0) {
-                    taken = { text: match[0], kind: run.kind };
+                    taken = { text: match[0], kind: run.kind === "text" ? quotedKind(match[0]) : run.kind };
                     break;
                 }
             }
