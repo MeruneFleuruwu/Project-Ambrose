@@ -303,6 +303,7 @@ void LoginSession::CompleteAuthentication(std::shared_ptr<AuthAttempt> const& at
     _failedResponses = 0;
     _accountName = attempt->Username;
     _accountId.store(attempt->AccountId, std::memory_order_relaxed);
+    _machineId = attempt->MachineId;
     SetStatus(SessionStatus::Authenticated);
 
     LoginMessages::UserAuthenRsp response;

@@ -38,4 +38,5 @@ void LoginDatabaseConnection::DoPrepareStatements()
     PrepareStatement(LOGIN_SEL_REALMLIST, "LOGIN_SEL_REALMLIST", "SELECT `id`, `name`, `address`, `local_address`, `port`, `flags`, `population`, `player_limit`, `last_heartbeat` FROM `realmlist` ORDER BY `name`", ConnectionFlags::Both);
     PrepareStatement(LOGIN_INS_REALM, "LOGIN_INS_REALM", "INSERT IGNORE INTO `realmlist` (`name`, `address`, `local_address`, `port`, `flags`) VALUES (?, ?, ?, ?, 1)", ConnectionFlags::Both);
     PrepareStatement(LOGIN_UPD_REALM_HEARTBEAT, "LOGIN_UPD_REALM_HEARTBEAT", "UPDATE `realmlist` SET `population` = ?, `last_heartbeat` = ?, `flags` = (`flags` & ~1) | ? WHERE `name` = ?", ConnectionFlags::Both);
+    PrepareStatement(LOGIN_INS_LOGIN_KEY, "LOGIN_INS_LOGIN_KEY", "INSERT INTO `login_key` (`key`, `account_id`, `character_guid`, `realm_id`, `machine_id`, `created`, `expires`, `used`) VALUES (?, ?, ?, ?, ?, ?, ?, 0)", ConnectionFlags::Both);
 }

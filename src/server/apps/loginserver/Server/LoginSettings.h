@@ -32,6 +32,8 @@ struct LoginSettings
     static constexpr uint32 DefaultAfkTimeoutSeconds = 360;
     static constexpr uint32 MaxAfkTimeoutSeconds = 24 * 3600;
     static constexpr int8 DefaultAfkWarning = 1;
+    static constexpr uint32 DefaultKeyTtlSeconds = 60;
+    static constexpr uint32 MinKeyTtlSeconds = 5;
     static constexpr uint32 DefaultShutdownGraceSeconds = 5;
     static constexpr uint32 MaxShutdownGraceSeconds = 60;
 
@@ -43,6 +45,7 @@ struct LoginSettings
     std::vector<std::string> AllowedRevisions;
     uint32 MaxAuthAttempts = DefaultMaxAuthAttempts;
     std::chrono::seconds Lockout{ DefaultLockoutSeconds };
+    std::chrono::seconds KeyTtl{ DefaultKeyTtlSeconds };
     DuplicateLoginPolicy DuplicateLogins = DuplicateLoginPolicy::KickExisting;
     std::chrono::seconds SessionKeyLifetime{ DefaultSessionKeyLifetimeSeconds };
     std::chrono::seconds AfkTimeout{ DefaultAfkTimeoutSeconds };

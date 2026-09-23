@@ -1,6 +1,6 @@
 /*
  * Project Ambrose by Imjustchico
- * Ambrose-authored LOGIN and GAME message definitions for login server tests: the authentication requests and replies, the AFK and shutdown messages with their field layouts, the character list request and its replies, and a game message the login server never accepts.
+ * Ambrose-authored LOGIN and GAME message definitions for login server tests: the authentication requests and replies, the AFK and shutdown messages with their field layouts, the character list request and its replies, the character pick and where it sends the client, and a game message the login server never accepts.
  */
 
 #ifndef AMBROSE_LOGINMESSAGEFIXTURES_H
@@ -17,9 +17,11 @@ namespace LoginMessageFixtures
 <FixtureLoginMessages>
 <_ProtocolInfo><RECORD><ServiceID TYPE="UBYT">7</ServiceID><ProtocolType TYPE="STR">LOGIN</ProtocolType></RECORD></_ProtocolInfo>
 <MSG_CHARACTERINFO><RECORD><_MsgOrder TYPE="UBYT" NOXFER="TRUE">3</_MsgOrder><CharacterInfo TYPE="STR"></CharacterInfo></RECORD></MSG_CHARACTERINFO>
+<MSG_CHARACTERSELECTED><RECORD><_MsgOrder TYPE="UBYT" NOXFER="TRUE">2</_MsgOrder><IP TYPE="STR"></IP><TCPPort TYPE="INT"></TCPPort><UDPPort TYPE="INT"></UDPPort><Key TYPE="STR"></Key><UserID TYPE="GID"></UserID><CharID TYPE="GID"></CharID><ZoneID TYPE="GID"></ZoneID><ZoneName TYPE="STR"></ZoneName><Location TYPE="STR"></Location><Slot TYPE="INT"></Slot><PrepPhase TYPE="INT"></PrepPhase><Error TYPE="INT"></Error><LoginServer TYPE="STR"></LoginServer><PlatformType TYPE="UINT"></PlatformType></RECORD></MSG_CHARACTERSELECTED>
 <MSG_CHARACTERLIST><RECORD><_MsgOrder TYPE="UBYT" NOXFER="TRUE">4</_MsgOrder><Error TYPE="UINT"></Error></RECORD></MSG_CHARACTERLIST>
 <MSG_REQUESTCHARACTERLIST><RECORD><_MsgOrder TYPE="UBYT" NOXFER="TRUE">8</_MsgOrder></RECORD></MSG_REQUESTCHARACTERLIST>
 <MSG_REQUESTSERVERLIST><RECORD><_MsgOrder TYPE="UBYT" NOXFER="TRUE">9</_MsgOrder></RECORD></MSG_REQUESTSERVERLIST>
+<MSG_SELECTCHARACTER><RECORD><_MsgOrder TYPE="UBYT" NOXFER="TRUE">10</_MsgOrder><CharID TYPE="GID"></CharID><ServerName TYPE="STR"></ServerName></RECORD></MSG_SELECTCHARACTER>
 <MSG_SERVERLIST><RECORD><_MsgOrder TYPE="UBYT" NOXFER="TRUE">11</_MsgOrder></RECORD></MSG_SERVERLIST>
 <MSG_STARTCHARACTERLIST><RECORD><_MsgOrder TYPE="UBYT" NOXFER="TRUE">12</_MsgOrder><LoginServer TYPE="STR"></LoginServer><PurchasedCharacterSlots TYPE="INT"></PurchasedCharacterSlots></RECORD></MSG_STARTCHARACTERLIST>
 <MSG_USER_AUTHEN><RECORD><_MsgOrder TYPE="UBYT" NOXFER="TRUE">13</_MsgOrder><Rec1 TYPE="STR"></Rec1><Version TYPE="STR"></Version><Revision TYPE="STR"></Revision><DataRevision TYPE="STR"></DataRevision><CRC TYPE="STR"></CRC><MachineID TYPE="GID"></MachineID><PatchClientID TYPE="STR"></PatchClientID><PlatformChatID TYPE="STR"></PlatformChatID></RECORD></MSG_USER_AUTHEN>

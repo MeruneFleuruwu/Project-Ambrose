@@ -43,6 +43,7 @@ public:
     void HandleLoginNotAfk(LoginMessages::LoginNotAfk& message);
     void HandleRequestCharacterList(LoginMessages::RequestCharacterList& message);
     void HandleRequestServerList(LoginMessages::RequestServerList& message);
+    void HandleSelectCharacter(LoginMessages::SelectCharacter& message);
 
 protected:
     void OnAccepted() override;
@@ -58,6 +59,8 @@ private:
     void AbortAuthentication(AuthAttempt* attempt, std::exception const& failure);
     void RefuseUnsupportedAuthentication(std::string_view tag);
     void StartCharacterList();
+    void SelectCharacter(uint64 charId, std::string const& realmName, PreparedQueryResult result);
+    void FailCharacterSelect(uint64 charId, std::string_view detail);
     void ListCharacters(uint32 purchasedSlots, uint32 expected);
     void FinishCharacterList(uint32 purchasedSlots, PreparedQueryResult result);
     void FailCharacterList(std::string_view detail);
@@ -81,6 +84,7 @@ private:
     uint32 _failedResponses = 0;
     uint64 _claimedAccountId = 0;
     std::atomic<uint64> _accountId{ 0 };
+    uint64 _machineId = 0;
     std::string _accountName;
 };
 

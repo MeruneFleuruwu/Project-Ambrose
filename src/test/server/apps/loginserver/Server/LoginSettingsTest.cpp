@@ -33,6 +33,7 @@ TEST(LoginSettingsTest, DefaultsApplyWithoutOptions)
     EXPECT_EQ(settings.Lockout, std::chrono::seconds(900));
     EXPECT_EQ(settings.DuplicateLogins, DuplicateLoginPolicy::KickExisting);
     EXPECT_EQ(settings.SessionKeyLifetime, std::chrono::hours(30));
+    EXPECT_EQ(settings.KeyTtl, std::chrono::seconds(60));
     EXPECT_EQ(settings.AfkTimeout, std::chrono::seconds(360));
     EXPECT_EQ(settings.AfkWarning, 1);
     EXPECT_EQ(settings.ShutdownGrace, std::chrono::seconds(5));
@@ -42,7 +43,7 @@ TEST(LoginSettingsTest, ReadsListsAndClampsEveryOption)
 {
     std::vector<std::string> problems;
     LoginSettings const settings = LoadFrom("Login.EnforceRevision = 1\nLogin.AllowedRevision = \" r806919.Wizard_1_610 ,, r900000.Wizard_1_620 \"\n"
-        "Login.MaxAuthAttempts = 5000\nLogin.LockoutSeconds = 0\nLogin.SessionKeyLifetime = 10\nLogin.DuplicateLoginPolicy = 0\n", problems);
+        "Login.MaxAuthAttempts = 5000\nLogin.LockoutSeconds = 0\nLogin.SessionKeyLifetime = 10\nLogin.KeyTTL = 1\nLogin.DuplicateLoginPolicy = 0\n", problems);
     EXPECT_TRUE(settings.EnforceRevision);
     EXPECT_EQ(settings.AllowedRevisions, (std::vector<std::string>{ "r806919.Wizard_1_610", "r900000.Wizard_1_620" }));
     EXPECT_TRUE(settings.AllowsRevision("r900000.Wizard_1_620"));
@@ -50,9 +51,10 @@ TEST(LoginSettingsTest, ReadsListsAndClampsEveryOption)
     EXPECT_EQ(settings.MaxAuthAttempts, LoginSettings::MaxAuthAttemptsLimit);
     EXPECT_EQ(settings.Lockout, std::chrono::seconds(1));
     EXPECT_EQ(settings.SessionKeyLifetime, std::chrono::seconds(LoginSettings::MinSessionKeyLifetimeSeconds));
+    EXPECT_EQ(settings.KeyTtl, std::chrono::seconds(LoginSettings::MinKeyTtlSeconds));
     EXPECT_EQ(settings.DuplicateLogins, DuplicateLoginPolicy::Reject);
     EXPECT_EQ(problems, (std::vector<std::string>{ "Login.MaxAuthAttempts = 5000 is outside 0-1000; using 1000", "Login.LockoutSeconds = 0 is outside 1-2592000; using 1",
-        "Login.SessionKeyLifetime = 10 is outside 60-2592000; using 60" }));
+        "Login.SessionKeyLifetime = 10 is outside 60-2592000; using 60", "Login.KeyTTL = 1 is outside 5-2592000; using 5" }));
 
     LoginSettings const unlimited = LoadFrom("Login.MaxAuthAttempts = 0\nLogin.DuplicateLoginPolicy = 7\n", problems);
     EXPECT_EQ(unlimited.MaxAuthAttempts, 0u);

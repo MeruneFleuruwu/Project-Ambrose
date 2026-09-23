@@ -214,7 +214,7 @@ Picking a wizard sends the client to the right gameserver with a one-time key, s
 **Acceptance**
 
 - [x] Unit: LocationString formats (-32,-552,-28, yaw 6.350083) as '-32,-552,-28,6.350083', the exact string in the capture, and parses it back (LocationStringTest.FormatsAndParsesTheCapturedCoordinates)
-- [ ] Unit: selecting another account's CharID, a deleted character or with no realm online gives Error!=0 and no login_key row
+- [x] Unit: selecting another account's CharID, a deleted character or with no realm online gives Error!=0 and no login_key row (SelectCharacterTest.AnotherAccountsWizardIsRefusedAndWritesNoKey, .ADeletedWizardIsRefusedAndWritesNoKey, .NoRealmOnlineIsRefusedAndWritesNoKey, with .ARealmThatStoppedBeatingIsRefusedRatherThanUsedAnyway and .ANamedRealmThatIsNotThereIsRefusedRatherThanSwappedForAnother for the two ways a realm can be missing, and .AnOwnWizardOnAnOnlineRealmIsSentThereWithAKeyThatWasWrittenDown for the pick that works)
 - [ ] Integration: a stub TCP listener on the realm port receives a connection and a GAME MSG_ATTACH whose LoginKey == Key, UserID and CharID match, and ZoneName and Location echo the CHARACTERSELECTED values (the behavior at capture lines 11-12)
 - [ ] Real client: after clicking Play, the loading screen appears and the client connects to the gameserver port (visible in the gameserver log) instead of showing a disconnect dialog
 
@@ -233,7 +233,7 @@ Picking a wizard sends the client to the right gameserver with a one-time key, s
 
 **Acceptance**
 
-- [ ] Another account's CharID, deleted character or no realm gives Error!=0 and no login_key
+- [x] Another account's CharID, deleted character or no realm gives Error!=0 and no login_key
 - [ ] Stub listener receives MSG_ATTACH whose LoginKey == Key with matching UserID/CharID
 
 ### Detailed spec from LOG-11: Character select and handoff: MSG_SELECTCHARACTER -> MSG_CHARACTERSELECTED
@@ -263,7 +263,7 @@ Picking a wizard sends the client to the right gameserver with a one-time key, s
 **Acceptance**
 
 - [x] Unit: LocationString formats (-32,-552,-28, yaw 6.350083) as '-32,-552,-28,6.350083', the exact string in the capture, and parses it back (LocationStringTest.FormatsAndParsesTheCapturedCoordinates)
-- [ ] Unit: selecting another account's CharID, a deleted character or with no realm online gives Error!=0 and no login_key row
+- [x] Unit: selecting another account's CharID, a deleted character or with no realm online gives Error!=0 and no login_key row (SelectCharacterTest.AnotherAccountsWizardIsRefusedAndWritesNoKey, .ADeletedWizardIsRefusedAndWritesNoKey, .NoRealmOnlineIsRefusedAndWritesNoKey, with .ARealmThatStoppedBeatingIsRefusedRatherThanUsedAnyway and .ANamedRealmThatIsNotThereIsRefusedRatherThanSwappedForAnother for the two ways a realm can be missing, and .AnOwnWizardOnAnOnlineRealmIsSentThereWithAKeyThatWasWrittenDown for the pick that works)
 - [ ] Integration: a stub TCP listener on the realm port receives a connection and a GAME MSG_ATTACH whose LoginKey == Key, UserID and CharID match, and ZoneName and Location echo the CHARACTERSELECTED values (the behavior at capture lines 11-12)
 - [ ] Real client: after clicking Play, the loading screen appears and the client connects to the gameserver port (visible in the gameserver log) instead of showing a disconnect dialog
 

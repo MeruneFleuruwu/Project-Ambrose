@@ -179,6 +179,50 @@ namespace LoginMessages
         static constexpr auto Fields() { return std::tuple<>{}; }
     };
 
+    struct SelectCharacter
+    {
+        static constexpr uint8 ServiceId = LoginService;
+        static constexpr std::string_view Tag = "MSG_SELECTCHARACTER";
+
+        uint64 CharId = 0;
+        std::string ServerName;
+
+        static constexpr auto Fields()
+        {
+            return std::tuple{ DmlField("CharID", &SelectCharacter::CharId), DmlField("ServerName", &SelectCharacter::ServerName) };
+        }
+    };
+
+    struct CharacterSelected
+    {
+        static constexpr uint8 ServiceId = LoginService;
+        static constexpr std::string_view Tag = "MSG_CHARACTERSELECTED";
+
+        std::string Ip;
+        int32 TcpPort = 0;
+        int32 UdpPort = 0;
+        std::string Key;
+        uint64 UserId = 0;
+        uint64 CharId = 0;
+        uint64 ZoneId = 0;
+        std::string ZoneName;
+        std::string Location;
+        int32 Slot = 0;
+        int32 PrepPhase = 0;
+        int32 Error = 0;
+        std::string LoginServer;
+        uint32 PlatformType = 0;
+
+        static constexpr auto Fields()
+        {
+            return std::tuple{ DmlField("IP", &CharacterSelected::Ip), DmlField("TCPPort", &CharacterSelected::TcpPort), DmlField("UDPPort", &CharacterSelected::UdpPort),
+                DmlField("Key", &CharacterSelected::Key), DmlField("UserID", &CharacterSelected::UserId), DmlField("CharID", &CharacterSelected::CharId),
+                DmlField("ZoneID", &CharacterSelected::ZoneId), DmlField("ZoneName", &CharacterSelected::ZoneName), DmlField("Location", &CharacterSelected::Location),
+                DmlField("Slot", &CharacterSelected::Slot), DmlField("PrepPhase", &CharacterSelected::PrepPhase), DmlField("Error", &CharacterSelected::Error),
+                DmlField("LoginServer", &CharacterSelected::LoginServer), DmlField("PlatformType", &CharacterSelected::PlatformType) };
+        }
+    };
+
     struct StartCharacterList
     {
         static constexpr uint8 ServiceId = LoginService;

@@ -45,6 +45,7 @@ Login.MaxAuthAttempts = 5
 Login.LockoutSeconds = 900
 Login.DuplicateLoginPolicy = 1
 Login.SessionKeyLifetime = 108000
+Login.KeyTTL = 60
 Login.AfkTimeout = 360
 Login.AfkWarning = 1
 Login.ShutdownGrace = 5

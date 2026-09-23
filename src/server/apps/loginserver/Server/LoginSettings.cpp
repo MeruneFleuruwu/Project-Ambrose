@@ -52,6 +52,7 @@ LoginSettings LoginSettings::Load(ConfigMgr const& config, std::vector<std::stri
     settings.MaxAuthAttempts = bounded("Login.MaxAuthAttempts", DefaultMaxAuthAttempts, 0, MaxAuthAttemptsLimit);
     settings.Lockout = std::chrono::seconds(bounded("Login.LockoutSeconds", DefaultLockoutSeconds, 1, MaxDurationSeconds));
     settings.SessionKeyLifetime = std::chrono::seconds(bounded("Login.SessionKeyLifetime", DefaultSessionKeyLifetimeSeconds, MinSessionKeyLifetimeSeconds, MaxDurationSeconds));
+    settings.KeyTtl = std::chrono::seconds(bounded("Login.KeyTTL", DefaultKeyTtlSeconds, MinKeyTtlSeconds, MaxDurationSeconds));
 
     settings.AfkTimeout = std::chrono::seconds(bounded("Login.AfkTimeout", DefaultAfkTimeoutSeconds, 0, MaxAfkTimeoutSeconds));
     settings.ShutdownGrace = std::chrono::seconds(bounded("Login.ShutdownGrace", DefaultShutdownGraceSeconds, 0, MaxShutdownGraceSeconds));
