@@ -1,8 +1,9 @@
 /*
  * Project Ambrose by Imjustchico
- * The live picture of the app that served the panel: its entry in the app list and its capabilities, read when watching starts and, when the supervisor served the panel, the whole app list read again every second because it carries every app's state, its status read every second into the latest sample and the time it arrived, fifteen-minute typed-array rings of tick times and sessions for the charts, and the connection in the words doc/DESIGN.md sets, retrying with a growing delay and a countdown when answers stop, and stopping when the session ends.
+ * The live picture of the app that served the panel: its entry in the app list and its capabilities, read when watching starts and, when the supervisor served the panel, the whole app list read again every second because it carries every app's state, its status read every second into the latest sample and the time it arrived, fifteen-minute typed-array rings of tick times and sessions for the charts, and the connection in the words doc/DESIGN.md sets, retrying with a growing delay and a countdown when answers stop, and stopping when the session ends. Watching starts untracked, so a caller starting it from inside an effect does not take whatever the first read touches as a dependency and then cancel its own request when that state changes.
  */
 
+import { untrack } from "svelte";
 import { ApiError, request } from "./api.svelte";
 import {
     AppList,
@@ -153,7 +154,7 @@ export function watch() {
     watching = true;
     live.connection = "live";
     clock = setInterval(() => (live.now = Date.now()), 1000);
-    void poll();
+    untrack(() => void poll());
 }
 
 export function stop() {
