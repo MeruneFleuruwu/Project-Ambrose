@@ -1,4 +1,4 @@
-<!-- Project Ambrose by Imjustchico: The log viewer: a tab per app, a search that marks what it finds, level and category filters with their counts, and the records as the four-column rows doc/DESIGN.md sets with the level chip the only tinted part, following new lines live, pausing on request with a count of what arrived, jumping back to the newest, wrapping on request and opening any record to show and copy its fields. -->
+<!-- Project Ambrose by Imjustchico: The log viewer, live: a tab per app the supervisor runs, reading each app's own log after the last sequence number it saw and appending what came back, so a page that was away sees what it missed rather than starting again. Level and category filters with their counts, a search that marks what it finds, following with a count of what arrived while paused, jumping back to the newest, wrapping on request, and opening a record to read its fields. Lines the app wrote faster than this page could read them are said to be gone rather than quietly skipped, and a read that fails says so instead of the page looking merely quiet. -->
 <script lang="ts">
     import * as Card from "$lib/components/ui/card/index.js";
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
@@ -19,7 +19,8 @@
     import PageHeader from "../components/PageHeader.svelte";
     import StatusBadge from "../components/StatusBadge.svelte";
     import { focus } from "../focus.svelte";
-    import { apps, logRecord, logRecords, type LogRecord } from "../sample";
+    import { supervised, logsAfter } from "$lib/supervision.svelte.js";
+    import type { LogRecord } from "$lib/schemas.js";
 
     const order = ["trace", "debug", "info", "warn", "error", "fatal"] as const;
     const chips: Record<string, string> = {
@@ -39,7 +40,11 @@
         fatal: "bg-destructive",
     };
 
-    let records = $state.raw<LogRecord[]>(logRecords);
+    const apps = $derived(supervised());
+    let records = $state.raw<LogRecord[]>([]);
+    let after = 0;
+    let reading = false;
+    let trouble = $state("");
     let levels = $state<string[]>(["debug", "info", "warn", "error", "fatal"]);
     let hidden = $state<string[]>([]);
     let search = $state("");
@@ -126,13 +131,60 @@
     });
 
     $effect(() => {
+        const name = focus.app;
+        records = [];
+        after = 0;
+        unseen = 0;
+        trouble = "";
+        return () => {
+            void name;
+        };
+    });
+
+    $effect(() => {
         if (!live) return;
-        const timer = setInterval(() => {
-            const next = logRecord((records.at(-1)?.sequence ?? 999) - 999);
-            records = [...records.slice(-499), next];
-            if (passes(next) && !atBottom) unseen += 1;
-        }, 1500);
-        return () => clearInterval(timer);
+        const name = focus.app;
+        let stopped = false;
+        const controller = new AbortController();
+
+        async function read() {
+            if (reading || stopped || name === "") return;
+            reading = true;
+            try {
+                const answer = await logsAfter(name, after, controller.signal);
+                if (stopped) return;
+                trouble = "";
+                if (answer.dropped)
+                    records = [
+                        ...records,
+                        {
+                            sequence: answer.dropped.from,
+                            time: "",
+                            epoch_ms: 0,
+                            level: "warn",
+                            category: "logs",
+                            message: `${answer.dropped.count} line(s) were written faster than this page could read them and are gone`,
+                        } as LogRecord,
+                    ];
+                if (answer.records.length > 0) {
+                    after = answer.records[answer.records.length - 1].sequence;
+                    records = [...records, ...answer.records].slice(-2000);
+                    if (!atBottom) unseen += answer.records.filter(passes).length;
+                }
+            } catch (failure) {
+                if (!stopped) trouble = failure instanceof Error ? failure.message : String(failure);
+            } finally {
+                reading = false;
+            }
+        }
+
+        void read();
+        const timer = setInterval(() => void read(), 1000);
+        return () => {
+            stopped = true;
+            controller.abort();
+            clearInterval(timer);
+        };
     });
 </script>
 
@@ -150,6 +202,11 @@
 
 {#snippet viewer()}
     <Card.Root class="gap-0 overflow-hidden py-0 shadow-xs">
+        {#if trouble !== ""}
+            <div class="border-b bg-destructive/10 px-4 py-2 text-sm text-destructive" role="status">
+                The log could not be read: {trouble}
+            </div>
+        {/if}
         <div class="relative">
             <div
                 bind:this={viewport}

@@ -7,6 +7,7 @@ import { request } from "./api.svelte";
 import { live } from "./status.svelte";
 import {
     CommandAnswer,
+    LogAnswer,
     DatabaseAnswer,
     DatabaseApplyAnswer,
     DatabaseUpdatesAnswer,
@@ -45,6 +46,10 @@ export function power(app: string, action: PowerAction, seconds = 0) {
 
 export function output(app: string, run: OutputRun, signal?: AbortSignal) {
     return request("GET", `api/apps/${app}/output/${run}`, OutputAnswer, undefined, signal);
+}
+
+export function logsAfter(app: string, after: number, signal?: AbortSignal) {
+    return request("GET", pathFor(app, `logs/after/${after}`), LogAnswer, undefined, signal);
 }
 
 export function runCommand(app: string, command: string, confirm = false) {
