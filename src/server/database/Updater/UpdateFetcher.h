@@ -86,6 +86,16 @@ struct UpdateSummary
     std::string Failure;
 };
 
+struct UpdaterSettings
+{
+    bool AutoSetup = true;
+    std::filesystem::path SourceDirectory;
+    bool Redundancy = false;
+    bool AllowRehash = false;
+    int32 CleanDeadRefMaxCount = 3;
+    bool AllowPending = false;
+};
+
 class UpdateFetcher
 {
 public:
@@ -95,13 +105,14 @@ public:
     static constexpr std::size_t MaxNameLength = 200;
     static constexpr std::size_t ExcerptLength = 120;
 
-    UpdateFetcher(MySQLConnection& bookkeeping, std::filesystem::path sourceDirectory, ApplyFunction apply);
+    UpdateFetcher(MySQLConnection& bookkeeping, UpdaterSettings settings, ApplyFunction apply);
 
     static std::string_view ToString(UpdateState state) noexcept;
     static std::optional<UpdateState> ParseState(std::string_view text) noexcept;
     static int GetOrder(UpdateState state) noexcept;
     static std::string HashContents(std::string_view contents);
     static bool IsReleasedFileName(std::string_view fileName) noexcept;
+    static bool IsPendingFileName(std::string_view fileName) noexcept;
     static bool HasSqlExtension(std::filesystem::path const& path);
     static bool ReadFile(std::filesystem::path const& path, std::string& contents, std::string& error);
     static bool ListSqlFiles(std::filesystem::path const& directory, std::vector<std::filesystem::path>& files, std::string& error);
@@ -119,7 +130,7 @@ private:
     bool ReadRecorded(std::vector<AppliedUpdate>& recorded, std::string& error) const;
 
     MySQLConnection& _bookkeeping;
-    std::filesystem::path _sourceDirectory;
+    UpdaterSettings _settings;
     ApplyFunction _apply;
 };
 

@@ -15,12 +15,30 @@
 #include <fmt/format.h>
 
 #include <algorithm>
+#include <filesystem>
 #include <vector>
 
 namespace
 {
     constexpr uint64 DefaultMaxPacket = 16 * 1024 * 1024;
     constexpr uint64 PacketMargin = 64 * 1024;
+
+    void RegisterModuleIncludes(MySQLConnection& bookkeeping, std::filesystem::path const& source, std::string_view database)
+    {
+        std::filesystem::path const modules = source / "modules";
+        std::error_code error;
+        for (std::filesystem::directory_iterator iterator(modules, error); !error && iterator != std::filesystem::directory_iterator(); iterator.increment(error))
+        {
+            if (!iterator->is_directory(error))
+                continue;
+            std::filesystem::path const sql = iterator->path() / "data" / "sql" / fmt::format("db-{}", database);
+            if (!std::filesystem::is_directory(sql, error))
+                continue;
+            std::string const path = fmt::format("$/modules/{}/data/sql/db-{}", ConfigMgr::PathToUtf8(iterator->path().filename()), database);
+            if (!bookkeeping.Execute(fmt::format("INSERT IGNORE INTO `updates_include` (`path`, `state`) VALUES ('{}', 'MODULE')", bookkeeping.Escape(path))))
+                LOG_ERROR("sql.updates", "Cannot register module SQL folder {}: [{}] {}", path, bookkeeping.GetLastErrorCode(), bookkeeping.GetLastErrorText());
+        }
+    }
 
     struct Batch
     {
@@ -158,7 +176,9 @@ bool DBUpdater::Inspect(MySQLConnectionInfo const& info, UpdaterSettings const& 
     MySQLConnection bookkeeping(info, connectionSettings);
     if (!OpenBookkeeping(bookkeeping, info, error))
         return false;
-    UpdateFetcher const fetcher(bookkeeping, SourceDirectoryFor(settings), {});
+    UpdaterSettings effective = settings;
+    effective.SourceDirectory = SourceDirectoryFor(settings);
+    UpdateFetcher const fetcher(bookkeeping, std::move(effective), {});
     return fetcher.Inspect(report, error);
 }
 
@@ -172,7 +192,9 @@ UpdateSummary DBUpdater::ApplyDataOnly(MySQLConnectionInfo const& info, std::str
         summary.Succeeded = false;
         return summary;
     }
-    UpdateFetcher fetcher(bookkeeping, SourceDirectoryFor(settings), [&info, &connectionSettings](UpdateFile const& file, std::string_view contents, std::string& failure)
+    UpdaterSettings effective = settings;
+    effective.SourceDirectory = SourceDirectoryFor(settings);
+    UpdateFetcher fetcher(bookkeeping, std::move(effective), [&info, &connectionSettings](UpdateFile const& file, std::string_view contents, std::string& failure)
     {
         return ApplyScript(info, connectionSettings, ConfigMgr::PathToUtf8(file.Path), contents, &failure, UpdateFetcher::Classify(contents).Transactional);
     });
@@ -283,7 +305,10 @@ bool DBUpdater::Run(MySQLConnectionInfo const& info, std::string_view folderName
         }
         return false;
     }
-    UpdateFetcher fetcher(bookkeeping, source, [&info, &connectionSettings](UpdateFile const& file, std::string_view contents, std::string& failure)
+    RegisterModuleIncludes(bookkeeping, source, folderName);
+    UpdaterSettings effective = settings;
+    effective.SourceDirectory = source;
+    UpdateFetcher fetcher(bookkeeping, std::move(effective), [&info, &connectionSettings](UpdateFile const& file, std::string_view contents, std::string& failure)
     {
         return ApplyScript(info, connectionSettings, ConfigMgr::PathToUtf8(file.Path), contents, &failure);
     });

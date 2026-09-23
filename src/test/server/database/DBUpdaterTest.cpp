@@ -146,6 +146,9 @@ TEST(UpdateFetcherTest, NamesStatesAndHashes)
     EXPECT_EQ(UpdateFetcher::HashContents("a\r\nb\r\n"), UpdateFetcher::HashContents("a\nb\n"));
     EXPECT_NE(UpdateFetcher::HashContents("a\rb"), UpdateFetcher::HashContents("a\nb"));
     EXPECT_EQ(UpdateFetcher::HashContents(""), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+    EXPECT_TRUE(UpdateFetcher::IsPendingFileName("rev_1767225600_npc.sql"));
+    EXPECT_FALSE(UpdateFetcher::IsPendingFileName("2026_01_01_00.sql"));
+    EXPECT_FALSE(UpdateFetcher::IsPendingFileName("rev_now_npc.sql"));
 }
 
 TEST(SqlScriptTest, TellsDataOnlyStatementsFromOnesThatCanChangeTheSchema)
@@ -370,6 +373,7 @@ TEST(DBUpdaterTest, ALiveDataOnlyApplyStopsBeforeASchemaChangeAndRollsAFailingFi
         EXPECT_EQ(applied.StoppedAt, "2026_03_03_00.sql");
         EXPECT_TRUE(log.Contains("2026_03_03_00.sql can change the schema"));
     }
+
     EXPECT_EQ(Count(*info, "SELECT COUNT(*) FROM `rows` WHERE `note` = 'first'"), 1u);
     EXPECT_EQ(Count(*info, "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'rows' AND column_name = 'extra'"), 0u);
     EXPECT_EQ(Count(*info, "SELECT COUNT(*) FROM `updates` WHERE `name` IN ('2026_03_03_00.sql', '2026_03_04_00.sql')"), 0u);
@@ -384,4 +388,47 @@ TEST(DBUpdaterTest, ALiveDataOnlyApplyStopsBeforeASchemaChangeAndRollsAFailingFi
     EXPECT_NE(failed.Failure.find("nothing it changed was kept"), std::string::npos) << failed.Failure;
     EXPECT_EQ(Count(*info, "SELECT COUNT(*) FROM `rows` WHERE `id` = 5"), 0u);
     EXPECT_EQ(Count(*info, "SELECT COUNT(*) FROM `updates` WHERE `name` = '2026_03_05_00.sql'"), 0u);
+}
+
+TEST(DBUpdaterTest, EnforcesRehashRedundancyDeadReferenceAndPendingPolicies)
+{
+    std::optional<MySQLConnectionInfo> const info = TestDatabase("ambrose_updater_part_two");
+    if (!info)
+        GTEST_SKIP() << "AMBROSE_TEST_DB is not set";
+    DropDatabase(*info);
+    ScopeExit const drop([&info] { DropDatabase(*info); });
+    UpdaterSource source;
+    WriteFile(source.Base() / "policy.sql", "CREATE TABLE `policy` (`value` INT NOT NULL);\n");
+    WriteFile(source.Updates() / "2026_03_01_00.sql", "INSERT INTO `policy` VALUES (1);\n");
+    UpdaterSettings settings;
+    settings.SourceDirectory = source.Root();
+    ASSERT_TRUE(DBUpdater::Run(*info, "test", settings));
+
+    WriteFile(source.Updates() / "2026_03_01_00.sql", "INSERT INTO `policy` VALUES (2);\n");
+    EXPECT_FALSE(DBUpdater::Run(*info, "test", settings));
+    settings.Redundancy = true;
+    EXPECT_TRUE(DBUpdater::Run(*info, "test", settings));
+    EXPECT_EQ(Count(*info, "SELECT COUNT(*) FROM `policy`"), 2u);
+
+    for (int index = 0; index < 4; ++index)
+        WriteFile(source.Updates() / fmt::format("2026_03_02_{:02}.sql", index), "INSERT INTO `policy` VALUES (3);\n");
+    ASSERT_TRUE(DBUpdater::Run(*info, "test", settings));
+    for (int index = 0; index < 4; ++index)
+        std::filesystem::remove(source.Updates() / fmt::format("2026_03_02_{:02}.sql", index));
+    settings.CleanDeadRefMaxCount = 3;
+    EXPECT_FALSE(DBUpdater::Run(*info, "test", settings));
+    EXPECT_EQ(Count(*info, "SELECT COUNT(*) FROM `updates` WHERE `name` LIKE '2026_03_02_%'"), 4u);
+
+    std::filesystem::path const pending = source.Root() / "data" / "sql" / "updates" / "pending_db_test";
+    WriteFile(pending / "rev_1767225600_policy.sql", "INSERT INTO `policy` VALUES (4);\n");
+    MySQLConnection bookkeeping(*info);
+    ASSERT_EQ(bookkeeping.Open(), 0u);
+    ASSERT_TRUE(bookkeeping.Execute("INSERT INTO `updates_include` (`path`, `state`) VALUES ('$/data/sql/updates/pending_db_test', 'PENDING')"));
+    settings.CleanDeadRefMaxCount = -1;
+    settings.AllowPending = false;
+    ASSERT_TRUE(DBUpdater::Run(*info, "test", settings));
+    EXPECT_EQ(Count(*info, "SELECT COUNT(*) FROM `updates` WHERE `name` = 'rev_1767225600_policy.sql'"), 0u);
+    settings.AllowPending = true;
+    ASSERT_TRUE(DBUpdater::Run(*info, "test", settings));
+    EXPECT_EQ(Count(*info, "SELECT COUNT(*) FROM `updates` WHERE `name` = 'rev_1767225600_policy.sql' AND `state` = 'PENDING'"), 1u);
 }

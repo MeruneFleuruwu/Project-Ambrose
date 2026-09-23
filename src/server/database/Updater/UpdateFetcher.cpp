@@ -22,8 +22,8 @@
 #include <map>
 #include <set>
 
-UpdateFetcher::UpdateFetcher(MySQLConnection& bookkeeping, std::filesystem::path sourceDirectory, ApplyFunction apply)
-    : _bookkeeping(bookkeeping), _sourceDirectory(std::move(sourceDirectory)), _apply(std::move(apply))
+UpdateFetcher::UpdateFetcher(MySQLConnection& bookkeeping, UpdaterSettings settings, ApplyFunction apply)
+    : _bookkeeping(bookkeeping), _settings(std::move(settings)), _apply(std::move(apply))
 {
 }
 
@@ -92,6 +92,22 @@ bool UpdateFetcher::IsReleasedFileName(std::string_view fileName) noexcept
         if (separator ? fileName[i] != '_' : (fileName[i] < '0' || fileName[i] > '9'))
             return false;
     }
+    return true;
+}
+
+bool UpdateFetcher::IsPendingFileName(std::string_view fileName) noexcept
+{
+    if (fileName.size() < 10 || fileName.substr(0, 4) != "rev_" || !Ambrose::EqualsIgnoreCase(fileName.substr(fileName.size() - 4), ".sql"))
+        return false;
+    std::size_t const separator = fileName.find('_', 4);
+    if (separator == std::string_view::npos || separator == 4 || separator + 1 >= fileName.size() - 4)
+        return false;
+    for (std::size_t index = 4; index < separator; ++index)
+        if (fileName[index] < '0' || fileName[index] > '9')
+            return false;
+    for (std::size_t index = separator + 1; index < fileName.size() - 4; ++index)
+        if (!((fileName[index] >= 'a' && fileName[index] <= 'z') || (fileName[index] >= 'A' && fileName[index] <= 'Z') || (fileName[index] >= '0' && fileName[index] <= '9') || fileName[index] == '-' || fileName[index] == '_'))
+            return false;
     return true;
 }
 
@@ -205,7 +221,7 @@ bool UpdateFetcher::CollectFiles(std::vector<UpdateFile>& files, std::string& er
             while (!relative.empty() && (relative.front() == '/' || relative.front() == '\\'))
                 relative.remove_prefix(1);
         }
-        std::filesystem::path const directory = fromSource ? _sourceDirectory / ConfigMgr::PathFromUtf8(relative) : ConfigMgr::PathFromUtf8(text);
+        std::filesystem::path const directory = fromSource ? _settings.SourceDirectory / ConfigMgr::PathFromUtf8(relative) : ConfigMgr::PathFromUtf8(text);
         std::error_code directoryError;
         if (!std::filesystem::is_directory(directory, directoryError))
         {
@@ -227,6 +243,16 @@ bool UpdateFetcher::CollectFiles(std::vector<UpdateFile>& files, std::string& er
             {
                 error = fmt::format("{} in {} is not named YYYY_MM_DD_NN.sql", name, ConfigMgr::PathToUtf8(directory));
                 return false;
+            }
+            if (*state == UpdateState::Pending)
+            {
+                if (!_settings.AllowPending)
+                    continue;
+                if (!IsPendingFileName(name))
+                {
+                    error = fmt::format("{} in {} is not named rev_<unix-timestamp>_<slug>.sql", name, ConfigMgr::PathToUtf8(directory));
+                    return false;
+                }
             }
             if (name.size() > MaxNameLength)
             {
@@ -371,6 +397,7 @@ UpdateSummary UpdateFetcher::Update(std::string_view databaseLabel, AdmitFunctio
 
 UpdateSummary UpdateFetcher::Pass(std::string_view databaseLabel, std::set<std::string, std::less<>>& warned, AdmitFunction const& admit)
 {
+    (void)warned;
     UpdateSummary summary;
     auto const fail = [&summary, databaseLabel](std::string failure, std::string file = {})
     {
@@ -399,23 +426,58 @@ UpdateSummary UpdateFetcher::Pass(std::string_view databaseLabel, std::set<std::
     for (auto const& [name, recordedHash] : applied)
         if (!present.contains(name) && !recordedHash.empty())
             vanishedByHash.emplace(recordedHash, name);
+    std::set<std::string, std::less<>> deadNames;
+    for (auto const& [name, recordedHash] : applied)
+        if (!present.contains(name))
+            deadNames.insert(name);
+    std::map<std::string, std::string, std::less<>> fileHashes;
+    for (UpdateFile const& file : files)
+    {
+        std::string contents;
+        if (!ReadFile(file.Path, contents, error))
+            return fail(std::move(error), file.Name);
+        fileHashes.emplace(file.Name, HashContents(contents));
+    }
+    for (auto const& [name, hash] : fileHashes)
+        if (auto const renamed = vanishedByHash.find(hash); renamed != vanishedByHash.end())
+            deadNames.erase(renamed->second);
+    for (std::string const& name : deadNames)
+        LOG_WARN("sql.updates", "{} was applied to the {} database but is no longer present on disk", name, databaseLabel);
+    if (_settings.CleanDeadRefMaxCount > 0 && deadNames.size() > static_cast<std::size_t>(_settings.CleanDeadRefMaxCount))
+        return fail(fmt::format("{} applied update references are missing from disk (limit {})", deadNames.size(), _settings.CleanDeadRefMaxCount));
+    if (_settings.CleanDeadRefMaxCount != 0)
+        for (std::string const& name : deadNames)
+            if (!_bookkeeping.Execute(fmt::format("DELETE FROM `updates` WHERE `name` = '{}'", _bookkeeping.Escape(name))))
+                return fail(fmt::format("cannot remove missing update {}: [{}] {}", name, _bookkeeping.GetLastErrorCode(), _bookkeeping.GetLastErrorText()));
 
     for (UpdateFile const& file : files)
     {
         std::string contents;
         if (!ReadFile(file.Path, contents, error))
             return fail(std::move(error), file.Name);
-        std::string const hash = HashContents(contents);
+        std::string const hash = fileHashes.at(file.Name);
+        bool reapply = false;
         if (auto const found = applied.find(file.Name); found != applied.end())
         {
             ++summary.AlreadyApplied;
             if (!found->second.empty() && found->second != hash)
             {
                 ++summary.Changed;
-                if (warned.insert(file.Name).second)
-                    LOG_WARN("sql.updates", "{} changed after it was applied to the {} database; the recorded hash is {}, the file's is {}", file.Name, databaseLabel, found->second, hash);
+                if (!_settings.Redundancy)
+                    return fail(fmt::format("{} changed after it was applied to the {} database; Updates.Redundancy is disabled", file.Name, databaseLabel), file.Name);
+                reapply = true;
             }
-            continue;
+            else if (found->second.empty())
+            {
+                if (!_settings.AllowRehash)
+                    return fail(fmt::format("{} has no recorded hash; enable Updates.AllowRehash to fill it", file.Name), file.Name);
+                if (!_bookkeeping.Execute(fmt::format("UPDATE `updates` SET `hash` = '{}' WHERE `name` = '{}'", hash, _bookkeeping.Escape(file.Name))))
+                    return fail(fmt::format("cannot fill the hash for {}: [{}] {}", file.Name, _bookkeeping.GetLastErrorCode(), _bookkeeping.GetLastErrorText()), file.Name);
+                LOG_INFO("sql.updates", "Filled the missing hash for {} in the {} database", file.Name, databaseLabel);
+                continue;
+            }
+            if (!reapply)
+                continue;
         }
         if (auto const renamed = vanishedByHash.find(hash); renamed != vanishedByHash.end())
         {
@@ -445,8 +507,11 @@ UpdateSummary UpdateFetcher::Pass(std::string_view databaseLabel, std::set<std::
             return summary;
         }
         auto const elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
-        std::string const record = fmt::format("INSERT INTO `updates` (`name`, `hash`, `state`, `speed`) VALUES ('{}', '{}', '{}', {})",
-            _bookkeeping.Escape(file.Name), hash, ToString(file.State), elapsed);
+        std::string const record = reapply
+            ? fmt::format("UPDATE `updates` SET `hash` = '{}', `state` = '{}', `timestamp` = CURRENT_TIMESTAMP, `speed` = {} WHERE `name` = '{}'",
+                hash, ToString(file.State), elapsed, _bookkeeping.Escape(file.Name))
+            : fmt::format("INSERT INTO `updates` (`name`, `hash`, `state`, `speed`) VALUES ('{}', '{}', '{}', {})",
+                _bookkeeping.Escape(file.Name), hash, ToString(file.State), elapsed);
         if (!_bookkeeping.Execute(record))
             return fail(fmt::format("{} was applied but could not be recorded: [{}] {}", file.Name, _bookkeeping.GetLastErrorCode(), _bookkeeping.GetLastErrorText()), file.Name);
         applied.emplace(file.Name, hash);
