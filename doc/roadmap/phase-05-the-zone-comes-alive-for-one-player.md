@@ -310,7 +310,7 @@ Server start does not re-parse the 13.8 MB JSON dump each time, and a revision m
 
 - [ ] Client-gated test: the binary registry equals the JSON-loaded registry (every class, property and enum table compared)
 - [ ] Load time from binary is under 200 ms
-- [ ] A deliberately stale cache (edited hash) is rejected with a clear message
+- [x] A deliberately stale cache (edited hash) is rejected with a clear message (TypeRegistryBinaryTest.RoundTripsTheRegistryAndRejectsAnEditedPayload and .FallsBackToJsonForMissingOrStaleCaches; a truncated, a bit-flipped and a random cache built from the pinned install's dump are each refused by name and the JSON dump keeps serving)
 
 ## 5.08 Installer (FND-22)
 
