@@ -16,7 +16,7 @@ import announce
 class FakePost:
     def __init__(self, answer=None, failure=None):
         self.calls = []
-        self.answer = answer or json.dumps({"id": "1552"})
+        self.answer = answer or json.dumps({"id": "1552", "attachments": [{"id": "9", "filename": "progress.png"}]})
         self.failure = failure
 
     def __call__(self, url, payload, attachment=None, method="POST"):
@@ -36,8 +36,8 @@ class AnnouncerTests(unittest.TestCase):
 
     def test_editing_replaces_the_card_rather_than_adding_another(self):
         announce.post = FakePost()
-        identifier, status, what = announce.send("https://discord.invalid/hook", self.payload, "progress.png", "1552")
-        self.assertEqual((identifier, status, what), ("1552", 200, "edited"))
+        identifier, status, what, held = announce.send("https://discord.invalid/hook", self.payload, "progress.png", "1552")
+        self.assertEqual((identifier, status, what, held), ("1552", 200, "edited", 1))
         call = announce.post.calls[0]
         self.assertEqual(call["method"], "PATCH")
         self.assertIn("/messages/1552", call["url"])
@@ -50,7 +50,7 @@ class AnnouncerTests(unittest.TestCase):
 
     def test_the_first_post_is_a_post_and_its_id_comes_back(self):
         announce.post = FakePost()
-        identifier, _status, what = announce.send("https://discord.invalid/hook", self.payload, "progress.png", None)
+        identifier, _status, what, _held = announce.send("https://discord.invalid/hook", self.payload, "progress.png", None)
         self.assertEqual((identifier, what), ("1552", "posted"))
         self.assertEqual(announce.post.calls[0]["method"], "POST")
         self.assertNotIn("attachments", announce.post.calls[0]["payload"])
@@ -58,7 +58,7 @@ class AnnouncerTests(unittest.TestCase):
     def test_a_message_discord_no_longer_has_is_posted_again(self):
         gone = urllib.error.HTTPError("u", 404, "Not Found", None, None)
         announce.post = FakePost(failure=gone)
-        identifier, _status, what = announce.send("https://discord.invalid/hook", self.payload, None, "1552")
+        identifier, _status, what, _held = announce.send("https://discord.invalid/hook", self.payload, None, "1552")
         self.assertEqual((identifier, what), ("1552", "posted"))
         self.assertEqual([call["method"] for call in announce.post.calls], ["PATCH", "POST"])
 

@@ -15,8 +15,11 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 DATA = "doc/progress/progress.json"
 CARD_URL = "https://raw.githubusercontent.com/Justchicoo/Project-Ambrose/main/doc/progress/progress.svg"
 REPOSITORY_URL = "https://github.com/Justchicoo/Project-Ambrose"
+BOARD_URL = "https://justchicoo.github.io/Project-Ambrose/"
+ROADMAP_URL = REPOSITORY_URL + "/blob/main/doc/ROADMAP.md"
 GOLD = 0xE4B457
 ATTACHMENT = "progress.png"
+NEWLINE = chr(10)
 
 
 def load(root):
@@ -58,25 +61,24 @@ def embed(now, before):
     checks = now["checks"]
     track = now["contributor_track"]
     gained = milestones["done"] - before["milestones"]["done"] if before else 0
-    headline = f'{milestones["percent"]}% of the plan built'
-    if gained > 0:
-        headline += f', {gained} milestone{"s" if gained > 1 else ""} more than last time'
-    fields = [
-        {"name": "Milestones", "value": f'{milestones["done"]} of {milestones["total"]}', "inline": True},
-        {"name": "Acceptance checks", "value": f'{checks["done"]} of {checks["total"]}', "inline": True},
-        {"name": "Contributor items", "value": f'{track["merged"]} merged, {track["open"]} open', "inline": True},
-    ]
     lines = moved(now, before)
+
+    description = [f'**{milestones["percent"]}% of the plan built** · {milestones["done"]} of {milestones["total"]} milestones · '
+                   f'{checks["done"]} of {checks["total"]} acceptance checks']
+    if gained > 0:
+        description.append(f'{gained} milestone{"s" if gained > 1 else ""} finished since the last update.')
     if lines:
-        fields.append({"name": "What moved", "value": "\n".join(lines[:6]), "inline": False})
+        description.append(NEWLINE.join("· " + line for line in lines[:4]))
+    description.append(f'[What is free to take]({BOARD_URL}) · [The plan]({ROADMAP_URL}) · '
+                       f'{track["merged"]} contributor items merged, {track["open"]} open')
+
     return {
         "username": "Project Ambrose",
         "embeds": [{
-            "title": "Progress update",
-            "url": REPOSITORY_URL,
-            "description": headline,
+            "title": "Project Ambrose",
+            "url": BOARD_URL,
+            "description": (NEWLINE + NEWLINE).join(description),
             "color": GOLD,
-            "fields": fields,
             "image": {"url": "attachment://" + ATTACHMENT},
             "footer": {"text": stamp()},
         }],
@@ -134,6 +136,13 @@ def remember(path, message_id):
         handle.write("\n")
 
 
+def carried(body):
+    try:
+        return len(json.loads(body).get("attachments", []))
+    except (json.JSONDecodeError, AttributeError, TypeError):
+        return 0
+
+
 def send(url, payload, attachment, message_id):
     if message_id:
         edited = dict(payload)
@@ -141,7 +150,7 @@ def send(url, payload, attachment, message_id):
             edited["attachments"] = [{"id": 0, "filename": ATTACHMENT}]
         try:
             body, status = post(f"{url}/messages/{message_id}?wait=true", edited, attachment, method="PATCH")
-            return message_id, status, "edited"
+            return message_id, status, "edited", carried(body)
         except urllib.error.HTTPError as failure:
             if failure.code not in (404, 401, 403):
                 raise
@@ -151,7 +160,7 @@ def send(url, payload, attachment, message_id):
         fresh = json.loads(body).get("id")
     except (json.JSONDecodeError, AttributeError):
         pass
-    return fresh, status, "posted"
+    return fresh, status, "posted", carried(body)
 
 
 def main(argv=None):
@@ -179,7 +188,7 @@ def main(argv=None):
         if args.attach and attachment is None:
             print(f"{args.attach}: not found, posting without the card", file=sys.stderr)
             payload["embeds"][0].pop("image", None)
-        message_id, status, what = send(url, payload, attachment, remembered(args.state))
+        message_id, status, what, carried = send(url, payload, attachment, remembered(args.state))
     except urllib.error.HTTPError as failure:
         print(f"the webhook refused the post: {reason(failure)}", file=sys.stderr)
         return 1
@@ -188,7 +197,10 @@ def main(argv=None):
         return 1
     if message_id:
         remember(args.state, message_id)
-    print(f"{what} message {message_id}, Discord answered {status}")
+    print(f"{what} message {message_id}, Discord answered {status}, the message now carries {carried} attachment(s)")
+    if carried > 1:
+        print("the message carries more than one card, which means an edit did not replace the one before it", file=sys.stderr)
+        return 1
     return 0
 
 
