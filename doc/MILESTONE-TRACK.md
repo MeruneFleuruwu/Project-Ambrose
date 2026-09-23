@@ -95,7 +95,6 @@ Then one of four things happens, each with one message saying which and why: it 
 | 4.08 | Zone extractor part 1: WizZoneData | M | Your own client installation | The largest one open, and the one that unblocks most: zone templates, locations and objects read out of your own install into the world database. Its phase file calls it oversized, so landing the extractor and its reporting first, with the row checks after, is expected |
 | 5.07 | Binary type-registry cache | S | Your own client installation | A converter and a loader that make startup fast, with a stale cache rejected. Three checks, all mechanical |
 | 6.09 | Schema probe for classes missing from the dump | M | Your own client installation | Names the classes the client's own dump does not describe, by sweeping archives and reading hashes. The check lists the exact hashes and counts to reproduce |
-| 8.14 | Versionable BINd encoder, byte-exact | M | Your own client installation | Round-trips the client's object format back to identical bytes over a 2000-file sample. The encoder is written and decoding is tested; what is missing is that proof at scale and whatever it breaks |
 | 16.01 | FileBinary table codec | S | A build; the dev-gated check needs a file you obtained yourself | The patch server's table format, byte for byte, with the first bytes of a written list spelled out in the check |
 
 ## Reserved
@@ -121,6 +120,7 @@ Everything not in the table above, including every milestone whose dependencies 
 
 | ID | Who | Pull request | What is left |
 |---|---|---|---|
+| 8.14 | MeruneFleuruwu | [#129](https://github.com/Justchicoo/Project-Ambrose/pull/129) | Both acceptance checks are earned and the byte comparison has teeth, but the order preservation this adds to PropertyObject is never what makes the bytes match: disabling it leaves every test passing, because on each file tested the client's order is already the ordinal one. It needs a file that requires it, or it should be removed with the per-object memory it costs |
 | 3.18 | MeruneFleuruwu | [#127](https://github.com/Justchicoo/Project-Ambrose/pull/127) | The four acceptance checks are earned and ticked, but the deliverable asking for unit tests of the decision logic against an in-memory applied set, with no database, is not delivered: the three cases it names are covered by an integration test that skips wherever no database is configured. ARCHIVED files and module includes are also still to come |
 
 ## Landed
