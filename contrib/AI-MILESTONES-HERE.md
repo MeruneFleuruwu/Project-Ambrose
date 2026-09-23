@@ -64,6 +64,15 @@ The name of the test that runs it, or the tool run and what it printed, or the s
 
 **The shape of the work is not the work.** A header with no implementation, a test that asserts nothing, a table with no rows: each of those has been sent here before and none of them closed anything. If only part of the milestone is possible, build that part properly and say which part.
 
+## The first hour, in order
+
+1. Read the board's `state.json` and pick a milestone whose status is `open`. Tell me its id, its size and what it needs from me.
+2. `git fetch upstream`, branch from `upstream/main` with the name the table below gives, and **open the draft pull request straight away**, with the plan in its description rather than an empty body. That reserves the milestone within minutes and, more importantly, puts the approach where a reviewer can see it before a week of work rests on it. One milestone here was rebuilt from scratch after review because nobody saw the design until it was finished.
+3. Read the milestone's whole section in its phase file, then the phase's review notes, then whatever `doc/TOOLS.md` and `src/tools` already have for the format it touches.
+4. Write the plan out for me: each acceptance check, what will earn it, and which I cannot earn on this machine. That list is the pull request description at the end, so writing it now costs nothing.
+5. Build, so a broken toolchain surfaces before the work, not after it: `cmake --preset windows-msvc-x64` then `cmake --build --preset windows-debug` and `ctest --preset windows-debug`.
+6. Then write the failing test, then the code.
+
 ## How I want you to work
 
 1. **Find out whether Ambrose already has it, before writing that it lacks it.** This is the single most common fault in contributions here: two proposals in a row set out to add what the project had already built. Read "Where we are", then the phase file, then grep `src/` for the type or the file name, then grep `src/test/` for a test that already proves it. The cheapest disproof of "nothing does X" is the test that does X, and it takes five minutes.
@@ -83,6 +92,17 @@ So, before I write: name the format, say what in this repository already reads i
 11. **Resolve the phase's review notes that name my milestone**, in the milestone or in the pull request, saying which and how.
 12. Write the files, then have me run every check below and fix whatever they print.
 13. Write the pull request description: the milestone id, what was built, how it was verified, which checks are ticked, which are not and why.
+
+## Where code goes, so a reviewer never has to move it
+
+- `src/common/` is everything with no game in it: configuration, logging, threading, cryptography, encoding, small utilities.
+- `src/server/shared/` is what more than one app needs: the archive reader, the message registry, the ObjectProperty codec, the network layer, the admin API, client data.
+- `src/server/game/` is the world: the tick, sessions, scripting, movement, zones, entities, chat.
+- `src/server/database/` is the pool, the dated updater and extraction, and `data/sql/updates/` holds the dated files themselves.
+- `src/tools/` is a program somebody runs by hand, and `apps/` is the Python and front-end tooling beside it.
+- `src/test/` mirrors whichever of those the code lives in, and the test for `src/server/game/Movement/X.cpp` belongs at `src/test/server/game/Movement/XTest.cpp`.
+
+A milestone's deliverables name the folder. Where they and this disagree, follow the deliverables and say so in the description.
 
 ## Setting the whole thing up on my machine
 
@@ -125,6 +145,24 @@ AMBROSE_PANEL_API=https://127.0.0.1:12080 npm run dev --workspace apps/dashboard
 
 A branch named `milestone/<id>-<short-name>` builds the Linux GCC leg in CI by itself, so an open pull request tells us both whether it compiles there, and the maintainer adds a label for the Windows leg when it is worth one. The first run from a new contributor waits for a maintainer to approve it.
 
+## Running one test rather than all of them
+
+The suite builds into one executable, so a single test is a filter rather than a separate target:
+
+```
+cmake --build --preset windows-debug --target unit_tests
+./build/windows-msvc-x64/bin/Debug/unit_tests.exe --gtest_filter=MovementPackingTest.*
+ctest --preset windows-debug -R MovementPacking
+```
+
+Tests that need my installation are a second executable, `client_tests`, and skip unless `AMBROSE_CLIENT_DIR` names the install; ones that need my type dump read `AMBROSE_TYPE_DUMP_PATH`; database ones run only when `AMBROSE_TEST_DB` holds a connection string. A test that skips prints why, and a skipped test is not a passed one, so read the count.
+
+Three build traps on Windows, each of which has cost somebody an hour here:
+
+- Two builds in the same tree fail with `C1041`, cannot open program database. Let one finish, or build in separate trees.
+- A link failing with `LNK1104` for no visible reason is usually a build worker from an earlier run still holding the file, not a broken change.
+- The first configure builds every dependency from source and takes about an hour. Later ones are fast, so do it before I need it rather than while I wait.
+
 ## What has actually gone wrong here, so we do not repeat it
 
 Every one of these came from real pull requests on this track. None of them was carelessness, and each cost a round trip.
@@ -148,6 +186,18 @@ If I can only build on one platform, say so and let the leg tell us, but expect 
 **Say when the work deviates from the deliverables.** Putting a file somewhere other than the deliverables list says is sometimes right, and a reviewer will keep it when the reason holds. LocationString landed in `shared/Util` rather than `game/Movement` because the login server needs it too, which was the better call, but it was left to the reviewer to work out whether it was deliberate. One sentence in the description settles it.
 
 **A closed pull request is not a rejected one.** When the work lands, the maintainer often commits it together with the acceptance ticks, the roadmap summary and the regenerated card in one commit, authored to me, and closes the pull request naming that commit. That keeps the repository's own checks green, which a bare merge would not. Look for the commit before assuming anything went wrong.
+
+## What the reviewer will do to your work, so nothing is a surprise
+
+It is reviewed by running, never by reading, and by somebody who assumes the tests might be empty:
+
+- Your branch is built and its whole suite run, then every ticked check is run by name and read for what it actually asserts.
+- The central claim is broken on purpose to see whether a test notices. One codec had a flag byte flipped by one bit; all three of its tests failed, which is why it merged.
+- If the milestone is about something being faster, smaller or quieter, it is measured against what it replaces, on real input. One cache was correct, well tested, and loaded twice as slowly as the file it replaced.
+- If the milestone adds a behaviour, that behaviour is switched off to see whether anything notices. One encoder's whole ordering feature turned out never to change a byte on any input it was tested against.
+- Malformed input is fed to anything that parses: truncated, bit-flipped, and random bytes. Each should be refused by name rather than crashing.
+
+None of that is adversarial for its own sake. A test that cannot fail is worse than no test, because it makes the next change look safe.
 
 ## Before the pull request
 
