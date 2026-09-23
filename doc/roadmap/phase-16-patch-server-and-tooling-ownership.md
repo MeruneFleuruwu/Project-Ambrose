@@ -36,8 +36,8 @@ The roadmap critic flagged these. Resolve each one before or while implementing 
 
 **Acceptance**
 
-- [ ] Synthetic list round-trips
-- [ ] 3 _TableList rows begin 03 00 00 00 02 01 28 00 04 00 'Name' 09 28 ...
+- [x] Synthetic list round-trips (`BinaryTableFileTest.SyntheticTableRoundTrips`)
+- [x] 3 _TableList rows begin `03 00 00 00 02 01 28 00 04 00 'Name' 09 28 ...` (`BinaryTableFileTest.TableListPrefixMatchesRetailDictionary`)
 - [ ] Dev-gated: reference .bin re-emits identically (1144891 bytes)
 
 ### Detailed spec from PAT-3: FileBinary table codec for LatestFileList.bin
@@ -59,8 +59,8 @@ The server can read and write the client's binary table-list format byte for byt
 
 **Acceptance**
 
-- [ ] Unit: write then read a synthetic list (_TableList, About{Version=1}, Base with 2 records) round-trips all fields
-- [ ] Unit: first bytes of a written list with 3 _TableList rows begin 03 00 00 00 02 01 28 00 04 00 'Name' 09 28 0C 00 '_TargetTable' 09 28 0A 00 '_TableList' when names match the retail dictionary
+- [x] Unit: write then read a synthetic list (_TableList, About{Version=1}, Base with 2 records) round-trips all fields (`BinaryTableFileTest.SyntheticTableRoundTrips`)
+- [x] Unit: first bytes of a written list with 3 _TableList rows begin `03 00 00 00 02 01 28 00 04 00 'Name' 09 28 0C 00 '_TargetTable' 09 28 0A 00 '_TableList'` when names match the retail dictionary (`BinaryTableFileTest.TableListPrefixMatchesRetailDictionary`)
 - [ ] Env-gated dev test (AMBROSE_REFERENCE_LIST points at a list the developer obtained themselves, never committed): parse the reference .bin, re-emit it, and get identical bytes (1144891 bytes for r806919)
 
 **Risks**
