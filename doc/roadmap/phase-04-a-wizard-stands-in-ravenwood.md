@@ -369,10 +369,10 @@ The gameserver accepts a client only with a valid, unexpired, single-use key iss
 
 **Acceptance**
 
-- [ ] 3356 zone WADs with gamedata.bin, 0 decode failures targeted
-- [ ] WC_Hub display key 'WizardZone_TheCommons'; locations include 'Start', 'Target location (WC_Hub Street1 Exit)'
+- [x] 3356 zone WADs with gamedata.bin, 0 decode failures targeted (a full run over the pinned install: 3589 zone WADs scanned, 3356 with gamedata.bin, 3356 decoded, 0 failed, in 33 seconds)
+- [x] WC_Hub display key 'WizardZone_TheCommons'; locations include 'Start', 'Target location (WC_Hub Street1 Exit)' (the written zone_template row carries that key, and the 31 zone_location rows include all three named ones with positions)
 - [ ] WC_Ravenwood yields 97 CoreObjectInfo incl. templates 38232, 38230, 81102, 1451035, 39088
-- [ ] Idempotent rerun; git status clean
+- [x] Idempotent rerun; git status clean (two runs produce byte-identical SQL, and git status shows nothing extracted into the tree)
 
 ### Detailed spec from WLD-2: Zone extractor part 1: WizZoneData to world DB
 
@@ -397,11 +397,11 @@ Every zone's metadata, named locations and static object placements exist as wor
 
 **Acceptance**
 
-- [ ] Running the extractor over r806919 reports 3356 zone WADs with gamedata.bin and lists each decode failure by name, target 0
-- [ ] zone_template row for WizardCity/WC_Hub has display name key 'WizardZone_TheCommons' plus farClip, healingPerMinute, soft/hard limit and noMounts filled
-- [ ] zone_location for WC_Hub contains 'Start', 'Target location (WC_Hub Street1 Exit)' and 'Target location(WC_Hub Ravenwood)' with position and direction
+- [x] Running the extractor over r806919 reports 3356 zone WADs with gamedata.bin and lists each decode failure by name, target 0 (3356 of 3589 carry gamedata.bin, all 3356 decode, none fails)
+- [x] zone_template row for WizardCity/WC_Hub has display name key 'WizardZone_TheCommons' plus farClip, healingPerMinute, soft/hard limit and noMounts filled (display_name_key WizardZone_TheCommons, far_clip 24500, healing_per_minute 20, soft_limit 50, hard_limit 100, no_mounts 0)
+- [x] zone_location for WC_Hub contains 'Start', 'Target location (WC_Hub Street1 Exit)' and 'Target location(WC_Hub Ravenwood)' with position and direction (all three present among 31 rows, none with a null location or direction)
 - [ ] zone_object for WC_Hub has one row per m_objectList entry with templateID, location, orientation, scale, zoneTag, startState, loadingType and a nullable serialized spawnRequirements column
-- [ ] Re-running is idempotent (same row counts), and git status shows no extracted files
+- [x] Re-running is idempotent (same row counts), and git status shows no extracted files (two runs hash identically and the tree stays clean)
 
 **Risks**
 
@@ -434,7 +434,7 @@ world.zone_object and world.spawn_* hold every NPC and interactable placement an
 
 - [ ] Integration test: WizardCity/WC_Ravenwood yields 97 CoreObjectInfo templateIDs, including NPC templates 38232, 38230, 81102, 1451035 (WC-Bartleby) and 39088. Its spawnData yields 5 SpawnObjects, including SpawnPoint_Wood_01 with SNT_RANDOM_UNIQUE.
 - [ ] Integration test: WizardCity/WC_Hub spawnData contains HalloweenSpawner1 with a ReqGlobalRegistryValue requirement.
-- [ ] Full run over ~3356 zone WADs finishes, with a per-zone error count of 0 or a listed set of unknown classes.
+- [x] Full run over ~3356 zone WADs finishes, with a per-zone error count of 0 or a listed set of unknown classes. (3356 zones, 0 errors, 33 seconds)
 
 **Risks**
 
