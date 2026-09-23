@@ -11,6 +11,7 @@
 
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <filesystem>
 #include <functional>
@@ -70,6 +71,10 @@ private:
 using TypeCatalogPtr = std::shared_ptr<TypeCatalog const>;
 
 class TypedViewRegistry;
+namespace TypeDumpLoader
+{
+    struct RawDump;
+}
 
 class TypeRegistry
 {
@@ -97,6 +102,9 @@ public:
 
 private:
     bool Build(std::string_view text, std::string sourceName);
+    bool BuildRaw(TypeDumpLoader::RawDump dump, std::string sourceName, std::string sha256);
+    bool Publish(TypeCatalogPtr catalog, std::vector<std::string> errors, std::string sourceName,
+        std::chrono::steady_clock::time_point start);
 
     TypedViewRegistry* _views;
     std::atomic<TypeCatalogPtr> _catalog;

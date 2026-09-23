@@ -6,14 +6,16 @@
 #ifndef AMBROSE_TYPEREGISTRYBINARY_H
 #define AMBROSE_TYPEREGISTRYBINARY_H
 
+#include "TypeDumpLoader.h"
+
 #include <filesystem>
 #include <string>
 #include <string_view>
 
 namespace TypeRegistryBinary
 {
-    bool Write(std::filesystem::path const& output, std::string_view json, std::string_view revision, std::string& error);
-    bool Read(std::filesystem::path const& input, std::string_view expectedRevision, std::string& json, std::string& revision, std::string& error);
+    bool Write(std::filesystem::path const& output, TypeDumpLoader::RawDump const& dump, std::string_view revision, std::string& error);
+    bool Read(std::filesystem::path const& input, std::string_view expectedRevision, TypeDumpLoader::RawDump& dump, std::string& revision, std::string& payloadHash, std::string& error);
 }
 
 #endif

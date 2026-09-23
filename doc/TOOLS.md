@@ -47,7 +47,7 @@ Builds the type dump of the user's own install by emulating its client program, 
 
 ### typeregbuild (built in 5.07)
 
-Wraps a format-v2 type dump from the user's own install in a versioned binary cache. `typeregbuild --input <revision>.json --output <revision>.bin` validates the JSON, records the input filename's revision, stamps the payload with SHA-256, and writes only to the requested output path. `TypeRegistry::LoadBinary` validates the envelope, revision and hash before building the same catalog as JSON; callers may provide the JSON path as a fallback, which is logged when a cache is stale or corrupt. The cache is a local data file and must never be committed.
+Wraps a format-v2 type dump from the user's own install in a versioned binary cache. `typeregbuild --input <revision>.json --output <revision>.bin` validates the JSON, records the input filename's revision, stores fixed-width raw records plus one shared string table, stamps the exact payload bytes with SHA-256, and writes only to the requested output path. `TypeRegistry::LoadBinary` validates the envelope, revision and hash before building the same catalog directly from those records; the login and game servers prefer a sibling `.bin` cache when present, and callers may provide the JSON path as a fallback, which is logged when a cache is stale or corrupt. The cache is a local data file and must never be committed.
 
 ### localetool (built in 3.13)
 

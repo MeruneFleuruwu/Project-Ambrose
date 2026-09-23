@@ -92,26 +92,28 @@ bool TypeRegistry::LoadFromFile(std::filesystem::path const& path)
 
 bool TypeRegistry::LoadBinary(std::filesystem::path const& path, std::string_view expectedRevision)
 {
-    std::string text;
+    TypeDumpLoader::RawDump dump;
     std::string revision;
+    std::string payloadHash;
     std::string error;
-    if (!TypeRegistryBinary::Read(path, expectedRevision, text, revision, error))
+    if (!TypeRegistryBinary::Read(path, expectedRevision, dump, revision, payloadHash, error))
     {
         std::lock_guard const lock(_writeMutex);
         _errors = { fmt::format("cannot load binary type registry {}: {}", ConfigMgr::PathToUtf8(path), error) };
         LOG_ERROR(LogFilter, "{}; keeping the active type dump", _errors.front());
         return false;
     }
-    return Build(text, ConfigMgr::PathToUtf8(path));
+    return BuildRaw(std::move(dump), ConfigMgr::PathToUtf8(path), std::move(payloadHash));
 }
 
 bool TypeRegistry::LoadBinary(std::filesystem::path const& path, std::filesystem::path const& fallbackJson, std::string_view expectedRevision)
 {
-    std::string text;
+    TypeDumpLoader::RawDump dump;
     std::string revision;
+    std::string payloadHash;
     std::string error;
-    if (TypeRegistryBinary::Read(path, expectedRevision, text, revision, error))
-        return Build(text, ConfigMgr::PathToUtf8(path));
+    if (TypeRegistryBinary::Read(path, expectedRevision, dump, revision, payloadHash, error))
+        return BuildRaw(std::move(dump), ConfigMgr::PathToUtf8(path), std::move(payloadHash));
 
     LOG_WARN(LogFilter, "cannot load binary type registry {}: {}; falling back to {}", ConfigMgr::PathToUtf8(path), error, ConfigMgr::PathToUtf8(fallbackJson));
     return LoadFromFile(fallbackJson);
@@ -133,6 +135,22 @@ bool TypeRegistry::Build(std::string_view text, std::string sourceName)
     std::vector<ViewDefinition const*> const views = _views ? _views->Seal() : std::vector<ViewDefinition const*>();
     if (TypeDumpLoader::Parse(text, dump, errors))
         catalog = TypeCatalogBuilder::Build(std::move(dump), sourceName, sha256, _nextGeneration, views, errors);
+    return Publish(std::move(catalog), std::move(errors), std::move(sourceName), start);
+}
+
+bool TypeRegistry::BuildRaw(TypeDumpLoader::RawDump dump, std::string sourceName, std::string sha256)
+{
+    std::lock_guard const lock(_writeMutex);
+    auto const start = std::chrono::steady_clock::now();
+    std::vector<std::string> errors;
+    std::vector<ViewDefinition const*> const views = _views ? _views->Seal() : std::vector<ViewDefinition const*>();
+    TypeCatalogPtr catalog = TypeCatalogBuilder::Build(std::move(dump), sourceName, sha256, _nextGeneration, views, errors);
+    return Publish(std::move(catalog), std::move(errors), std::move(sourceName), start);
+}
+
+bool TypeRegistry::Publish(TypeCatalogPtr catalog, std::vector<std::string> errors, std::string sourceName,
+    std::chrono::steady_clock::time_point start)
+{
     if (!catalog)
     {
         if (errors.empty())

@@ -152,10 +152,20 @@ namespace
 
             if (!setup.TypeDump)
                 LOG_WARN("server.loginserver", "No type dump is in use, so ObjectProperty data cannot be read or written: {}", setup.TypeDumpError);
-            else if (!sTypeRegistry.LoadFromFile(*setup.TypeDump))
+            else
             {
-                LOG_ERROR("server.loginserver", "Cannot load the type dump {}", ConfigMgr::PathToUtf8(*setup.TypeDump));
-                return false;
+                std::filesystem::path binary = *setup.TypeDump;
+                binary.replace_extension(".bin");
+                bool loaded = false;
+                if (std::filesystem::exists(binary))
+                    loaded = sTypeRegistry.LoadBinary(binary, *setup.TypeDump, setup.Install ? setup.Install->Revision : std::string_view{});
+                else
+                    loaded = sTypeRegistry.LoadFromFile(*setup.TypeDump);
+                if (!loaded)
+                {
+                    LOG_ERROR("server.loginserver", "Cannot load the type dump {}", ConfigMgr::PathToUtf8(*setup.TypeDump));
+                    return false;
+                }
             }
 
             if (!_databases.Load())

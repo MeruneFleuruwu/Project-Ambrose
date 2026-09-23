@@ -46,7 +46,7 @@ int main(int argc, char** argv)
         return 1;
     }
     std::string error;
-    if (!TypeRegistryBinary::Write(output, json, input.stem().string(), error))
+    if (!TypeRegistryBinary::Write(output, dump, input.stem().string(), error))
     {
         std::cerr << fmt::format("typeregbuild: {}\n", error);
         return 1;
