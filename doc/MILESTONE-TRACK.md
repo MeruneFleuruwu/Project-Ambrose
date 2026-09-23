@@ -92,7 +92,8 @@ Then one of four things happens, each with one message saying which and why: it 
 
 | ID | Milestone | Size | What you need | Why it is a good one to take |
 |---|---|---|---|---|
-| 4.04 | World wire math and LocationString | S | A build; one check reads your client's XML | Self-contained maths and parsing with eleven checks that say the exact numbers. Everything the world phase does with positions rests on it |
+| 1.12 | Crypto basics: the CRC32 the client uses | S | Your own client installation | Three checks left and the code is already there: prove which CRC32 variant the client's archives use by checking a stored entry against its bytes, add the synthetic archive unit test, and sweep every archive in your own install |
+| 16.02 | LatestFileList model and XML | S | A build; the gated check needs a reference XML you obtained yourself | The natural step after 16.01, which is landed: the same table list as a model that round-trips through both XML and the binary form, with the exact counts named, 3590 tables, 140 records in Base and 97 in PatchClient |
 
 ## Reserved
 
@@ -118,6 +119,7 @@ Everything not in the table above, including every milestone whose dependencies 
 | ID | Who | Pull request | What is left |
 |---|---|---|---|
 | 4.08 | MeruneFleuruwu | [#126](https://github.com/Justchicoo/Project-Ambrose/pull/126) | Every zone decodes and the rows carry real positions and display keys. Left: the writer skips an object it cannot read without a word, so WC_Hub writes 177 rows for 183 objects and WC_Ravenwood 93 for 97, and spawn data is not extracted, so HalloweenSpawner1 and its requirement are absent |
+| 4.04 | MeruneFleuruwu | [#125](https://github.com/Justchicoo/Project-Ambrose/pull/125) | Its own work is landed and eight checks are ticked. The two left are not its own: the handoff integration belongs to 4.05, which has since landed and may already earn it, and the last needs a real client session |
 | 5.07 | MeruneFleuruwu | [#124](https://github.com/Justchicoo/Project-Ambrose/pull/124) | The cache is built, wired into the login server and measured at a third of the JSON path's time on the pinned install, and a truncated, bit-flipped or random cache is refused by name. Left: a client-gated comparison of every class, property and enum table, and a measurement showing a load under 200 ms |
 | 6.09 | MeruneFleuruwu | [#128](https://github.com/Justchicoo/Project-Ambrose/pull/128) | The sweep is delivered and its two measurable checks are earned, but the oracle the milestone exists for is not: a run collects no unknown properties at all and names nothing for any of the 104 unknown classes, so 520243970 is still unnamed and the draft schema the next milestone feeds on comes out empty |
 | 8.14 | MeruneFleuruwu | [#129](https://github.com/Justchicoo/Project-Ambrose/pull/129) | Both acceptance checks are earned and the byte comparison has teeth, but the order preservation this adds to PropertyObject is never what makes the bytes match: disabling it leaves every test passing, because on each file tested the client's order is already the ordinal one. It needs a file that requires it, or it should be removed with the per-object memory it costs |

@@ -31,6 +31,10 @@ def find(built, identifier):
     return next(row for row in built["milestones"] if row["id"] == identifier)
 
 
+def takeable():
+    return next(row["id"] for row in state()["milestones"] if row["status"] == "open")
+
+
 class BoardTests(unittest.TestCase):
     def test_every_milestone_carries_one_status(self):
         built = state()
@@ -65,16 +69,18 @@ class BoardTests(unittest.TestCase):
                 self.assertEqual(row["status"], "held", row["id"])
 
     def test_a_pull_request_claims_its_milestone(self):
-        built = state({"pulls": [pull("4.04")], "issues": []})
-        row = find(built, "4.04")
+        identifier = takeable()
+        built = state({"pulls": [pull(identifier)], "issues": []})
+        row = find(built, identifier)
         self.assertEqual(row["status"], "building")
         self.assertIn("someone", row["note"])
         self.assertEqual(row["claim"]["kind"], "a draft pull request")
 
     def test_a_claim_nobody_has_pushed_to_falls_back_to_open(self):
-        built = state({"pulls": [pull("4.04", updated="2026-09-01T10:00:00Z")], "issues": []})
-        self.assertEqual(find(built, "4.04")["status"], "open")
-        self.assertTrue(find(built, "4.04")["claim"]["stale"])
+        identifier = takeable()
+        built = state({"pulls": [pull(identifier, updated="2026-09-01T10:00:00Z")], "issues": []})
+        self.assertEqual(find(built, identifier)["status"], "open")
+        self.assertTrue(find(built, identifier)["claim"]["stale"])
 
     def test_a_claim_issue_counts_as_a_claim(self):
         takeable = next(row["id"] for row in state()["milestones"] if row["status"] == "open")
@@ -91,14 +97,14 @@ class BoardTests(unittest.TestCase):
         snapshot = {"pulls": [
             {"number": 140, "title": "C-61: a corpus", "headRefName": "contrib/c61", "author": {"login": "someone"}, "url": "u", "updatedAt": "2026-09-22T12:00:00Z"},
             {"number": 141, "title": "bump", "headRefName": "dependabot/npm/x", "author": {"login": "dependabot[bot]"}, "url": "u", "updatedAt": "2026-09-22T12:00:00Z"},
-            pull("4.04")], "issues": []}
+            pull(takeable())], "issues": []}
         rows = build.other_work(snapshot, NOW)
         self.assertEqual([row["number"] for row in rows], [140, 141])
         self.assertEqual(rows[0]["kind"], "the contributor track")
         self.assertEqual(rows[1]["kind"], "a bot")
         built = build.build_state(ROOT, snapshot, NOW)
         self.assertEqual(len(built["other_open_work"]), 2)
-        self.assertEqual(find(built, "4.04")["status"], "building")
+        self.assertEqual(find(built, takeable())["status"], "building")
 
     def test_a_held_milestone_names_who_holds_it_and_what_they_are_on(self):
         built = state()
