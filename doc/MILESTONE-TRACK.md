@@ -94,7 +94,6 @@ Then one of four things happens, each with one message saying which and why: it 
 |---|---|---|---|---|
 | 4.04 | World wire math and LocationString | S | A build; one check reads your client's XML | Self-contained maths and parsing with eleven checks that say the exact numbers. Everything the world phase does with positions rests on it |
 | 4.08 | Zone extractor part 1: WizZoneData | M | Your own client installation | The largest one open, and the one that unblocks most: zone templates, locations and objects read out of your own install into the world database. Its phase file calls it oversized, so landing the extractor and its reporting first, with the row checks after, is expected |
-| 16.01 | FileBinary table codec | S | A build; the dev-gated check needs a file you obtained yourself | The patch server's table format, byte for byte, with the first bytes of a written list spelled out in the check |
 
 ## Reserved
 
@@ -128,4 +127,5 @@ Everything not in the table above, including every milestone whose dependencies 
 
 | ID | Who | Pull request | What landed |
 |---|---|---|---|
+| 16.01 | MeruneFleuruwu | [#131](https://github.com/Justchicoo/Project-Ambrose/pull/131) | The client's binary table list read and written byte for byte, proven against a reference list of exactly the size the check names, with all six checks earned |
 | 1.06, 1.07, 1.08 | MeruneFleuruwu | [#130](https://github.com/Justchicoo/Project-Ambrose/pull/130) | The last check of all three was stale: the locale round-trip it asks for is covered by a client-gated test that passes on the pinned install |
