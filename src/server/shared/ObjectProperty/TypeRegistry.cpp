@@ -9,6 +9,7 @@
 #include "Log.h"
 #include "SHA256.h"
 #include "TypeDumpLoader.h"
+#include "TypeRegistryBinary.h"
 #include "TypedView.h"
 
 #include <chrono>
@@ -78,6 +79,7 @@ bool TypeRegistry::LoadFromFile(std::filesystem::path const& path)
         if (!stream || !stream.read(text.data(), static_cast<std::streamsize>(text.size())))
             error = std::make_error_code(std::errc::io_error);
     }
+
     if (error)
     {
         std::lock_guard const lock(_writeMutex);
@@ -86,6 +88,33 @@ bool TypeRegistry::LoadFromFile(std::filesystem::path const& path)
         return false;
     }
     return Build(text, sourceName);
+}
+
+bool TypeRegistry::LoadBinary(std::filesystem::path const& path, std::string_view expectedRevision)
+{
+    std::string text;
+    std::string revision;
+    std::string error;
+    if (!TypeRegistryBinary::Read(path, expectedRevision, text, revision, error))
+    {
+        std::lock_guard const lock(_writeMutex);
+        _errors = { fmt::format("cannot load binary type registry {}: {}", ConfigMgr::PathToUtf8(path), error) };
+        LOG_ERROR(LogFilter, "{}; keeping the active type dump", _errors.front());
+        return false;
+    }
+    return Build(text, ConfigMgr::PathToUtf8(path));
+}
+
+bool TypeRegistry::LoadBinary(std::filesystem::path const& path, std::filesystem::path const& fallbackJson, std::string_view expectedRevision)
+{
+    std::string text;
+    std::string revision;
+    std::string error;
+    if (TypeRegistryBinary::Read(path, expectedRevision, text, revision, error))
+        return Build(text, ConfigMgr::PathToUtf8(path));
+
+    LOG_WARN(LogFilter, "cannot load binary type registry {}: {}; falling back to {}", ConfigMgr::PathToUtf8(path), error, ConfigMgr::PathToUtf8(fallbackJson));
+    return LoadFromFile(fallbackJson);
 }
 
 bool TypeRegistry::LoadFromText(std::string_view text, std::string sourceName)

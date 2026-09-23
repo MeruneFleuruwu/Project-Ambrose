@@ -85,6 +85,8 @@ public:
 
     void SetViews(TypedViewRegistry* views);
     bool LoadFromFile(std::filesystem::path const& path);
+    bool LoadBinary(std::filesystem::path const& path, std::string_view expectedRevision = {});
+    bool LoadBinary(std::filesystem::path const& path, std::filesystem::path const& fallbackJson, std::string_view expectedRevision);
     bool LoadFromText(std::string_view text, std::string sourceName);
     void Clear();
 

@@ -5,12 +5,15 @@
 
 #include "StringHash.h"
 #include "TypeRegistry.h"
+#include "TypeRegistryBinary.h"
 
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <string>
+#include <filesystem>
+#include <fstream>
 #include <variant>
 
 namespace
@@ -150,6 +153,38 @@ TEST_F(TypeRegistryTest, AliasesCollapseAndBasesResolve)
     EXPECT_GT(catalog->GetApproximateBytes(), 0u);
     EXPECT_EQ(catalog->FindClass("class Missing"), nullptr);
     EXPECT_EQ(catalog->FindClass(uint32{ 12345 }), nullptr);
+}
+
+TEST(TypeRegistryBinaryTest, RoundTripsTheRegistryAndRejectsAnEditedPayload)
+{
+    std::filesystem::path const path = std::filesystem::temp_directory_path() / "ambrose-typeregistry-test.bin";
+    std::string const text = SyntheticDump().dump();
+    std::string error;
+    ASSERT_TRUE(TypeRegistryBinary::Write(path, text, "r-test", error)) << error;
+
+    TypeRegistry registry;
+    ASSERT_TRUE(registry.LoadBinary(path, "r-test")) << (registry.GetErrors().empty() ? std::string() : registry.GetErrors().front());
+    TypeCatalogPtr const catalog = registry.GetCatalog();
+    ASSERT_TRUE(catalog);
+    EXPECT_EQ(catalog->GetClassCount(ClassKind::PropertyClass), 5u);
+    EXPECT_EQ(catalog->GetPropertyCount(), 10u);
+
+    std::fstream stream(path, std::ios::binary | std::ios::in | std::ios::out);
+    ASSERT_TRUE(stream);
+    stream.seekp(-1, std::ios::end);
+    char byte = '\0';
+    stream.read(&byte, 1);
+    stream.seekp(-1, std::ios::end);
+    byte = static_cast<char>(byte ^ 0x01);
+    stream.write(&byte, 1);
+    stream.close();
+
+    TypeRegistry stale;
+    EXPECT_FALSE(stale.LoadBinary(path, "r-test"));
+    ASSERT_FALSE(stale.GetErrors().empty());
+    EXPECT_NE(stale.GetErrors().front().find("SHA-256"), std::string::npos);
+    std::error_code ignored;
+    std::filesystem::remove(path, ignored);
 }
 
 TEST_F(TypeRegistryTest, PropertiesAreOrderedByIdAndClassified)

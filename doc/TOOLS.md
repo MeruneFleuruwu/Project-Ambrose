@@ -45,6 +45,10 @@ Extracts world database rows from the user's own install. `extractor names` read
 
 Builds the type dump of the user's own install by emulating its client program, without launching the game or writing into the install. The C and C++ initializers, the lazy type getters and the client's own race adder rebuild the client's type registry, which is then checked and written as format v2. `typeextract --help` lists its options. It reads the install named by `--client` or `AMBROSE_CLIENT_DIR`, or else the newest revision found on the machine. It writes `--out` or types/<revision>.json in the Ambrose data folder, and `--compare <dump>` prints every difference from another dump, which is read before extracting, so it may name the output file. When the revision or the data folder cannot name the default file, it asks for `--out`. `--exit-when-input-ends` makes it exit with code 1 as soon as its standard input ends, which the servers and tools use so a build never outlives the process that started it. It exits 0 on success, 1 when extraction, validation or writing fails, and 2 on bad usage.
 
+### typeregbuild (built in 5.07)
+
+Wraps a format-v2 type dump from the user's own install in a versioned binary cache. `typeregbuild --input <revision>.json --output <revision>.bin` validates the JSON, records the input filename's revision, stamps the payload with SHA-256, and writes only to the requested output path. `TypeRegistry::LoadBinary` validates the envelope, revision and hash before building the same catalog as JSON; callers may provide the JSON path as a fallback, which is logged when a cache is stale or corrupt. The cache is a local data file and must never be committed.
+
 ### localetool (built in 3.13)
 
 Finds the keys whose text matches, checks that a key exists and prints its text, dumps a table, and lists the installed locales with the files each skips, all from the `.lang` files of the user's own Root.wad. `localetool --help` lists its options. It reads the install named by `--client` or `AMBROSE_CLIENT_DIR`, or else the one `AMBROSE_SETUP_MODE` finds as the extractor does, and writes nothing.
